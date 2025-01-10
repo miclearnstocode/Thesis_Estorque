@@ -1,0 +1,136 @@
+import pandas as pd
+import numpy as np
+from sklearn.preprocessing import StandardScaler
+from sklearn.cluster import AgglomerativeClustering
+
+def process_data(file_path_old, file_path_new):
+    def map_year_semester(year_semester):
+        try:
+            year_semester = str(year_semester)
+            if '.' in year_semester:
+                year, semester = year_semester.split('.')
+                return f"Y{year}S{semester}"
+            else:
+                return np.nan
+        except ValueError:
+            return np.nan
+
+    def determine_year_standing(credits_earned):
+        if credits_earned < 60:
+            return 1
+        elif credits_earned < 120:
+            return 2
+        elif credits_earned < 180:
+            return 3
+        else:
+            return 4
+
+    # Load both datasets
+    df_old = pd.read_csv(file_path_old)
+    df_new = pd.read_csv(file_path_new)
+
+    # Add curriculum identifier
+    df_old['Curriculum'] = 'Old'
+    df_new['Curriculum'] = 'New'
+
+    # Combine both datasets
+    df = pd.concat([df_old, df_new], ignore_index=True)
+
+    # Ensure 'Course No.' and 'Prerequisite' remain as strings
+    df['Course No.'] = df['Course No.'].astype(str)
+    df['Prerequisite'] = df['Prerequisite'].astype(str)
+
+    # No uniqueness check for 'Course No.' since duplicates are allowed
+
+    # Replace 'N/A' values with NaN
+    df['Units'] = df['Units'].replace('N/A', np.nan)
+    df['Lab'] = df['Lab'].replace('N/A', np.nan)
+    df['Lec'] = df['Lec'].replace('N/A', np.nan)
+
+    # Convert numerical columns to numeric, coercing errors to NaN
+    df['Units'] = pd.to_numeric(df['Units'], errors='coerce')
+    df['Lab'] = pd.to_numeric(df['Lab'], errors='coerce')
+    df['Lec'] = pd.to_numeric(df['Lec'], errors='coerce')
+
+    # Remove rows with NaN values in numerical columns
+    df = df.dropna(subset=['Units', 'Lab', 'Lec'])
+
+    # Convert 'Year Level' to string to handle possible float NaNs
+    df['Year Level'] = df['Year Level'].astype(str)
+
+    # Map 'Year Level' to a unified format combining year and semester (e.g., "Y1S1", "Y2S2")
+    df['Year Level Code'] = df['Year Level'].apply(map_year_semester)
+
+    # Convert 'Year Level Code' to numerical labels for clustering
+    year_semester_mapping = {
+        "Y1S1": 1, "Y1S2": 2,
+        "Y2S1": 3, "Y2S2": 4,
+        "Y3S1": 5, "Y3S2": 6,
+        "Y4S1": 7, "Y4S2": 8
+    }
+    df['Year Level Num'] = df['Year Level Code'].map(year_semester_mapping)
+
+    # Handle missing mappings
+    df = df.dropna(subset=['Year Level Num'])
+
+    # Determine year standing based on credits earned
+    #df['Year Standing'] = df['credits_earned'].apply(determine_year_standing)
+
+    # Define condition for maximum units per semester
+    def can_add_units(row):
+        if pd.isna(row['Year Standing']) or pd.isna(row['units_per_semester']):
+            return False
+        if row['Year Standing'] == 4:  # Allow overload for incoming 4th year
+            return True
+        return row['units_per_semester'] <= 18  # Example max units per semester
+
+    # Apply overload condition
+    #df['Can Add Units'] = df.apply(can_add_units, axis=1)
+
+    # Split data by year levels
+    clustered_data = pd.DataFrame()
+    year_levels = df['Year Level'].unique()
+    for year_level in year_levels:
+        year_level_df = df[df['Year Level'] == year_level]
+
+        # Extract features for clustering, excluding 'Course No.' and 'Prerequisite'
+        features = year_level_df[['Units', 'Lab', 'Lec']].values
+
+        # Standardize the features
+        scaler = StandardScaler()
+        scaled_features = scaler.fit_transform(features)
+
+        # Apply hierarchical clustering using Euclidean metric and Ward linkage
+        clustering = AgglomerativeClustering(n_clusters=1, affinity='euclidean', linkage='ward')
+        cluster_labels = clustering.fit_predict(scaled_features)
+
+        # Add cluster labels to the DataFrame
+        year_level_df['Cluster'] = cluster_labels
+
+        # Append to the final clustered data
+        clustered_data = pd.concat([clustered_data, year_level_df])
+        
+        #Calculate credits earned
+        clustered_data = calculate_credits_earned(clustered_data)
+
+    # Now we can determine year standing and apply overload condition
+    clustered_data['Year Standing'] = clustered_data['credits_earned'].apply(determine_year_standing)
+    clustered_data['Can Add Units'] = clustered_data.apply(can_add_units, axis=1)
+
+    return clustered_data
+
+# Example usage
+file_path_old = 'C:/Users/Acer/OneDrive/Documents/Thesis_Estorque/Data_Curri/Curriculum_NewSample.csv'
+file_path_new = 'C:/Users/Acer/OneDrive/Documents/Thesis_Estorque/Data_Curri/OldCurri_Sample.csv'
+clustered_data = process_data(file_path_old, file_path_new)
+
+def calculate_credits_earned(clustered_data):
+    # Group by Curriculum and Course No., then sum the Units
+    credits_earned = clustered_data.groupby(['Curriculum', 'Course No.'])['Units'].sum().reset_index()
+    credits_earned = credits_earned.groupby('Curriculum')['Units'].cumsum().reset_index()
+    credits_earned.columns = ['Curriculum', 'credits_earned']
+    
+    # Merge back to the original data
+    clustered_data = clustered_data.merge(credits_earned, on='Curriculum', how='left')
+    
+    return clustered_data
