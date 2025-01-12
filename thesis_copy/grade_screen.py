@@ -124,10 +124,28 @@ class GradeScreen(ctk.CTkFrame):
         semester_option = ctk.CTkOptionMenu(selection_frame, variable=semester_var, values=["1st Semester", "2nd Semester"], fg_color="white", button_color="white", button_hover_color="#707070", text_color="black", dropdown_fg_color="white", dropdown_text_color="black", dropdown_hover_color="#707070")
         semester_option.pack(side=tk.LEFT, padx=5)
 
-        import_icon =Image.open("C:/Users/Admin/Documents/Thesis_Estorque/icons/import.png")
-        self.import_icon=ctk.CTkImage(light_image=import_icon, dark_image=import_icon, size=(30, 30))
-        import_button = ctk.CTkButton(selection_frame, text="Import", image=self.import_icon,command=lambda: self.open_file_dialog(year_var.get(), semester_var.get()), **button_style)
-        import_button.pack(side=tk.LEFT, padx=5)
+        import_icon = Image.open("C:/Users/Admin/Documents/Thesis_Estorque/icons/import.png")
+        self.import_icon = ctk.CTkImage(light_image=import_icon, dark_image=import_icon, size=(30, 30))
+
+        # Add label for the import dropdown
+        ctk.CTkLabel(selection_frame, text="Import:", font=("Helvetica", 15)).pack(side=tk.LEFT, padx=5)
+
+        # Create the import dropdown
+        self.import_var = ctk.StringVar(value="Select")
+        import_dropdown = ctk.CTkOptionMenu(
+            selection_frame,
+            variable=self.import_var,
+            values=["Regular", "Irregular"],
+            fg_color="white",
+            button_color="white",
+            button_hover_color="#707070",
+            text_color="black",
+            dropdown_fg_color="white",
+            dropdown_text_color="black",
+            dropdown_hover_color="#707070",
+            command=lambda choice: self.open_file_dialog(year_var.get(), semester_var.get(), choice)
+        )
+        import_dropdown.pack(side=tk.LEFT, padx=5)
 
         save_icon = Image.open("C:/Users/Admin/Documents/Thesis_Estorque/icons/save.png")
         self.save_icon =ctk.CTkImage(light_image=save_icon, dark_image=save_icon, size=(30, 30))
@@ -439,11 +457,14 @@ class GradeScreen(ctk.CTkFrame):
 
         ctk.CTkButton(button_frame,text="Save Grades",command=save_grades,**button_style).pack(side=tk.LEFT, padx=5)
 
-    def open_file_dialog(self, year, semester):
+    def open_file_dialog(self, year, semester, choice):
         # Open a file dialog to select a CSV file
         file_path = filedialog.askopenfilename(filetypes=[("CSV files", "*.csv")])
         if file_path:
-            self.import_grading_sheet(file_path, year, semester)
+            if choice == "Regular":
+                self.import_grading_sheet(file_path, year, semester)
+            elif choice == "Irregular":
+                self.import_irregular_grading_sheet(file_path, year, semester)
 
     def import_grading_sheet(self, file_path, year, semester):
         if not self.school_year_var.get():
@@ -481,6 +502,36 @@ class GradeScreen(ctk.CTkFrame):
         except Exception as e:
             ctk.CTkMessageBox(title="Error", message=f"Error loading file: {e}").pack()
             return False
+        
+    def import_irregular_grading_sheet(self, file_path, year, semester):
+        if not self.school_year_var.get():
+            messagebox.showerror("Error", "Please select a School Year")
+            return False 
+
+        try:
+            grading_data = pd.read_csv(file_path)
+
+            if not grading_data.empty:
+                self.grading_data = grading_data
+                self.year = year
+                self.semester = semester
+                self.school_year = self.school_year_var.get()  # Store school year
+                self.display_grading_data(grading_data)
+                self.save_button.configure(state="normal")
+
+                return True
+
+            return False
+
+        except MemoryError:
+            # Handle out of memory situation
+            self.clear_cache()
+            ctk.CTkMessageBox(title="Memory Error", message="Not enough memory. Cache has been cleared. Please try again.").pack()
+            return False
+        except Exception as e:
+            ctk.CTkMessageBox(title="Error", message=f"Error loading file: {e}").pack()
+            return False
+        
 
     def get_cache_size(self):
         """Calculate current cache size in bytes"""
@@ -759,6 +810,15 @@ class GradeScreen(ctk.CTkFrame):
                 messagebox.showerror("Error", "No grading data loaded")
                 return
 
+            # Check for required ID columns
+            required_id_columns = ['ID_NO', 'LAST_NAME', 'FIRST_NAME', 'MIDDLE_NAME']
+            clean_data = self.grading_data.copy()
+            missing_columns = [col for col in required_id_columns if col not in clean_data.columns]
+            if missing_columns:
+                messagebox.showerror("Error", f"Missing required ID columns: {', '.join(missing_columns)}")
+                return
+            
+            
             # Clean the DataFrame before saving
             clean_data = self.grading_data.copy()
             
@@ -767,21 +827,36 @@ class GradeScreen(ctk.CTkFrame):
             
             # Clean data values
             for col in clean_data.columns:
-                if col not in ['ID_NO', 'LAST_NAME', 'FIRST_NAME', 'MIDDLE_NAME']:
-                    clean_data[col] = clean_data[col].apply(
-                        lambda x: str(x).strip().upper() if pd.notna(x) else ''
-                    )
+                clean_data[col] = clean_data[col].apply(
+                    lambda x: str(x).strip().upper() if pd.notna(x) else ''
+                )
             
             # Print debug information
             print("Columns in DataFrame:", clean_data.columns.tolist())
             print("Sample data:", clean_data.head())
             
-            success = self.db_handler.save_grading_data(
-                grading_data=clean_data, 
-                year=self.year, 
-                semester=self.semester,
-                school_year=self.school_year_var.get().strip()
-            )
+            # Determine if the data is for regular or irregular students
+            import_choice = self.import_var.get()
+            if import_choice == "Select":
+                messagebox.showerror("Error", "Please select an import type (Regular or Irregular)")
+                return
+
+            if import_choice == "Regular":
+                success = self.db_handler.save_grading_data(
+                    grading_data=clean_data, 
+                    year=self.year, 
+                    semester=self.semester,
+                    school_year=self.school_year_var.get().strip()
+                )
+            elif import_choice == "Irregular":
+                # Transform the DataFrame to match the required format
+                id_columns = ['appraised_id', 'id_no', 'last_name', 'first_name', 'middle_name', 'year', 'sex', 'age', 'email_address', 'descriptive_title', 'year_level', 'units', 'lec', 'lab', 'prerequisite']
+                grade_data = clean_data.melt(id_vars=id_columns, var_name='course_no', value_name='grades')
+                grade_data['school_year'] = self.school_year_var.get().strip()  # Add school_year column
+
+                success = self.db_handler.save_irregular_grading_data(
+                    grading_data=grade_data
+                )
             
             if success:
                 messagebox.showinfo("Success", "Grades have been successfully saved to the database.")
@@ -790,7 +865,7 @@ class GradeScreen(ctk.CTkFrame):
         except Exception as e:
             print(f"Error in on_save_button_click: {e}")  # Debug print
             messagebox.showerror("Error", f"Failed to save grades: {e}")
-
+                            
     def display_grading_data(self, grading_data):
         if self.data_frame:
             self.data_frame.destroy()

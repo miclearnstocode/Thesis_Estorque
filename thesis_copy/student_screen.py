@@ -56,10 +56,10 @@ class StudentScreen(ctk.CTkFrame):
             "border_color": "black",
             "corner_radius": 20}
         
-        self.regular_frame = ctk.CTkFrame(self, fg_color="transparent", corner_radius=20)
+        self.regular_frame = ctk.CTkFrame(self, fg_color="transparent")
         self.regular_frame.pack(pady=20)
 
-        self.back_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self.back_frame = ctk.CTkFrame(self, fg_color="transparent", corner_radius=30, width=20, height=15)
         self.back_frame.place(x=50,y=110)
         try:
             irreg_icon = Image.open("C:/Users/Admin/Documents/Thesis_Estorque/icons/irregulars.png")
@@ -484,11 +484,11 @@ class StudentScreen(ctk.CTkFrame):
             print("No data in curriculum_regular_data")
 
         # Configure tag colors
-        self.curriculum_tree.tag_configure('empty_row', background='white', font=('Times New Roman', 12))
+        self.curriculum_tree.tag_configure('empty_row', background='white', font=('Helvetica', 12))
         self.curriculum_tree.tag_configure('oddrow', background='#E5E5E5')
         self.curriculum_tree.tag_configure('evenrow', background='#FFFFFF')
         self.curriculum_tree.tag_configure('no_grade', foreground='red')
-        self.curriculum_tree.tag_configure('total', background='#D3D3D3', font=('Times New Roman', 12))  # Grey background for total rows
+        self.curriculum_tree.tag_configure('total', background='#D3D3D3', font=('Helvetica', 12))  # Grey background for total rows
 
         # Store the retrieved student ID for later use in printing
         self.selected_id_no = id_no  
@@ -1935,7 +1935,8 @@ class StudentScreen(ctk.CTkFrame):
             if enrolled_year == "Select Year":
                 messagebox.showerror("Error", "Please select an enrollment year.")
                 return
-            
+            """Ang kung mag print ka naga change ya font ka akun nga treeview kay uhon ko ni makapuli ko jan 1, 2025
+            subong ay dec 31 , 2024 11:57pm 3 minutes bag o ang new year"""
             try:
                 with open(file_path, 'r') as csvfile:
                     reader = csv.DictReader(csvfile)

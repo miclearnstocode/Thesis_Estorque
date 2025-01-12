@@ -554,20 +554,14 @@ class AppraisalScreen(ctk.CTkFrame):
         
         self.entries = {}
         for i, (label_text, row, validation_func) in enumerate(labels_entries):
+
             ctk.CTkLabel(self.basic_info_frame, text=label_text).grid(row=row, column=0)
-            
-            # Create entry with validation
-            entry = ctk.CTkEntry(self.basic_info_frame,  width=200, validate="key", validatecommand=(self.register(validation_func), '%P'))
+            entry = ctk.CTkEntry(self.basic_info_frame, corner_radius=30, width=200, validate="key", validatecommand=(self.register(validation_func), '%P'))
             entry.grid(row=row, column=1, pady=4, padx=20)
             self.entries[label_text] = entry
             
-            # Bind Enter key to move to next entry
-            entry.bind('<Return>', lambda e, current=i, total=len(labels_entries): 
-                self.move_to_next_entry(e, current, total))
-            
-            # Bind Tab key to move to next entry
-            entry.bind('<Tab>', lambda e, current=i, total=len(labels_entries): 
-                self.move_to_next_entry(e, current, total))
+            entry.bind('<Return>', lambda e, current=i, total=len(labels_entries): self.move_to_next_entry(e, current, total))
+            entry.bind('<Tab>', lambda e, current=i, total=len(labels_entries): self.move_to_next_entry(e, current, total))
 
     def validate_id_no(self, new_value):
         # Allow only numbers and hyphens
