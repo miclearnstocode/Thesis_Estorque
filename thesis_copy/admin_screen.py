@@ -24,6 +24,10 @@ class LoadingScreen(ctk.CTkToplevel):
         self.overrideredirect(True)
         self.configure(fg_color="white")
         
+        """Namion ko pa gid ya desig diri since ini ang 
+        medyo kalain kay ang combination sini indi 
+        manami kag ya structure ka admin kalain"""
+        
         # Center the loading screen
         parent_x = parent.winfo_rootx()
         parent_y = parent.winfo_rooty()
@@ -474,7 +478,7 @@ class AdminScreen(ctk.CTkFrame):
             max_level_count = max(level_counts)
             level_colors = [get_level_color(count, max_level_count) for count in level_counts]
             ax2.bar(levels, level_counts, color=level_colors)
-            ax2.set_title('Students Enrlled per Year Level', fontsize=12, fontweight='bold')
+            ax2.set_title('Students Enrolled per Year Level', fontsize=12, fontweight='bold')
             ax2.set_xlabel('Year Level', fontsize=10)
             ax2.set_ylabel('Number of Students', fontsize=10)
             ax2.tick_params(axis='both', labelsize=8)

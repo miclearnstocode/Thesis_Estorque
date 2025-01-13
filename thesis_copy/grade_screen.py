@@ -5,7 +5,9 @@ import tkinter as tk
 from tkinter import ttk, filedialog
 from tkinter import messagebox
 from database import DatabaseHandler
+from fuzzywuzzy import process  # Add this import at the top of the file
 import pandas as pd
+
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -799,41 +801,32 @@ class GradeScreen(ctk.CTkFrame):
             self.progress_bar.pack_forget()
         self.master.update_idletasks()
 
-
     def on_save_button_click(self):
         try:
             if not self.school_year_var.get():
                 messagebox.showerror("Error", "Please select a School Year")
                 return
             
+            import_choice = self.import_var.get()  # Get the import choice
+            
             if not hasattr(self, 'grading_data'):
                 messagebox.showerror("Error", "No grading data loaded")
                 return
 
-            # Check for required ID columns
-            required_id_columns = ['ID_NO', 'LAST_NAME', 'FIRST_NAME', 'MIDDLE_NAME']
-            clean_data = self.grading_data.copy()
-            missing_columns = [col for col in required_id_columns if col not in clean_data.columns]
-            if missing_columns:
-                messagebox.showerror("Error", f"Missing required ID columns: {', '.join(missing_columns)}")
-                return
-            
-            
             # Clean the DataFrame before saving
             clean_data = self.grading_data.copy()
             
             # Clean column names
             clean_data.columns = clean_data.columns.str.strip()
             
-            # Clean data values
+            # Clean data values and trim spaces
             for col in clean_data.columns:
                 clean_data[col] = clean_data[col].apply(
                     lambda x: str(x).strip().upper() if pd.notna(x) else ''
                 )
-            
-            # Print debug information
-            print("Columns in DataFrame:", clean_data.columns.tolist())
-            print("Sample data:", clean_data.head())
+                # Trim spaces for grades specifically
+                if col in ['Grade']:
+                    clean_data[col] = clean_data[col].str.replace(r'\s+', '', regex=True)
             
             # Determine if the data is for regular or irregular students
             import_choice = self.import_var.get()
@@ -848,25 +841,47 @@ class GradeScreen(ctk.CTkFrame):
                     semester=self.semester,
                     school_year=self.school_year_var.get().strip()
                 )
-            elif import_choice == "Irregular":
-                # Transform the DataFrame to match the required format
-                id_columns = ['appraised_id', 'id_no', 'last_name', 'first_name', 'middle_name', 'year', 'sex', 'age', 'email_address', 'descriptive_title', 'year_level', 'units', 'lec', 'lab', 'prerequisite']
-                grade_data = clean_data.melt(id_vars=id_columns, var_name='course_no', value_name='grades')
-                grade_data['school_year'] = self.school_year_var.get().strip()  # Add school_year column
 
+            elif import_choice == "Irregular":
+                # Prepare grade data for irregular students
+                grade_data = clean_data.copy()
+                
+                # Add school year to the DataFrame
+                grade_data['school_year'] = self.school_year_var.get().strip()
+
+                # Identify course columns (exclude ID column and other columns)
+                id_column = 'id_no'
+                exclude_columns = ['id_no', 'last_name', 'first_name', 'middle_name']
+                course_columns = [col for col in grade_data.columns if col not in exclude_columns]
+
+                # Melt the DataFrame to create a long format
+                melted_data = grade_data.melt(
+                    id_vars=['id_no', 'school_year'],
+                    value_vars=course_columns, 
+                    var_name='course_no', 
+                    value_name='grades'
+                )
+
+                # Replace empty grades with 'INC'
+                melted_data['grades'] = melted_data['grades'].apply(lambda x: 'INC' if x == '' or pd.isna(x) else x)
+
+                # Save or update grades for irregular students
                 success = self.db_handler.save_irregular_grading_data(
-                    grading_data=grade_data
+                    melted_data, 
+                    year=self.year, 
+                    semester=self.semester
                 )
             
             if success:
                 messagebox.showinfo("Success", "Grades have been successfully saved to the database.")
             else:
-                messagebox.showerror("Error", "Avoid leaving extra spaces in the CSV file, Failed to save to the database")
+                messagebox.showerror("Error", "Failed to save to the database")
+
         except Exception as e:
             print(f"Error in on_save_button_click: {e}")  # Debug print
             messagebox.showerror("Error", f"Failed to save grades: {e}")
                             
-    def display_grading_data(self, grading_data):
+    def display_grading_data(self, grading_data, is_irregular=False):
         if self.data_frame:
             self.data_frame.destroy()
 
@@ -876,22 +891,22 @@ class GradeScreen(ctk.CTkFrame):
         # Clean up column names by removing any leading/trailing spaces
         clean_data.columns = clean_data.columns.str.strip()
         
+        # Remove specific columns if irregular
+        if is_irregular:
+            columns_to_remove = ['ID_NO', 'LAST_NAME', 'FIRST_NAME', 'MIDDLE_NAME']
+            clean_data = clean_data.drop(columns=columns_to_remove, errors='ignore')
+        
         # Clean up data values
         for col in clean_data.columns:
-            if col not in ['ID_NO', 'LAST_NAME', 'FIRST_NAME', 'MIDDLE_NAME']:
-                clean_data[col] = clean_data[col].apply(
-                    lambda x: str(x).strip().upper() if pd.notna(x) else ''
-                )
+            clean_data[col] = clean_data[col].apply(
+                lambda x: str(x).strip().upper() if pd.notna(x) else ''
+            )
         
         self.data_frame = tk.Frame(self, bg="#008080")
         self.data_frame.pack(expand=True, fill='both', padx=10, pady=10)
 
-        # Create columns list with proper order
-        columns = ['ID_NO', 'LAST_NAME', 'FIRST_NAME', 'MIDDLE_NAME']
-        
-        # Add course columns (all other columns are assumed to be courses)
-        course_columns = [col for col in clean_data.columns if col not in columns]
-        columns.extend(course_columns)
+        # Get columns directly from the cleaned DataFrame
+        columns = list(clean_data.columns)
 
         # Configure Treeview style for row height
         style = ttk.Style()
@@ -920,20 +935,17 @@ class GradeScreen(ctk.CTkFrame):
         # Configure columns
         for col in columns:
             tree.heading(col, text=col)
-            if col in ['ID_NO', 'LAST_NAME', 'FIRST_NAME', 'MIDDLE_NAME']:
-                tree.column(col, anchor='center', width=80)
-            else:
-                tree.column(col, anchor='center', width=100)
+            tree.column(col, anchor='center', width=100)
 
         tree.tag_configure('oddrow', background='lightgrey')
         tree.tag_configure('evenrow', background='white')
- 
-        for index, (_, row) in enumerate(grading_data.iterrows()):
+    
+        for index, (_, row) in enumerate(clean_data.iterrows()):
             tag = 'oddrow' if index % 2 == 0 else 'evenrow'
             tree.insert("", "end", values=list(row), tags=(tag,))
 
-        self.grading_data = grading_data  # Store the cleaned DataFrame
-
+        self.grading_data = clean_data  # Store the cleaned DataFrame
+        
     def destroy(self):
         """Override destroy method to handle cleanup"""
         try:

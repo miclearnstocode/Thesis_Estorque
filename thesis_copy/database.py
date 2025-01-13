@@ -11,10 +11,12 @@ class DatabaseHandler:
         self.conn, self.cursor = self.get_db_connection()
     def get_db_connection(self):
         conn = mysql.connector.connect(
-            host='localhost',
+            host='localhost', #192.168.254.125
             user='root',
             password='', 
-            database='department'
+            database='department',
+            port=3306,
+            allow_local_infile=True
         )
         cursor = conn.cursor()
         return conn, cursor
@@ -739,7 +741,7 @@ class DatabaseHandler:
             if cursor:
                 cursor.close()
 
-   # pag savve ng grading shetyt
+    # pag savve ng grading shetyt
     def save_grading_data(self, grading_data, year, semester, school_year):
         try:
             # Clean DataFrame column names
@@ -830,7 +832,215 @@ class DatabaseHandler:
             print(f"Error saving grades: {e}")
             self.conn.rollback()
             return False
+        
+    def save_irregular_grading_data(self, grading_data, year, semester):
+        try:
+            # Define the table name
+            table_name = "appraised_curriculum"
+            
+            # Comprehensive year level conversion function
+            def convert_year_level(year_text):
+                # Mapping dictionaries with multiple variations
+                year_map = {
+                    '1ST YEAR': 1, '1ST': 1, '1': 1,
+                    '2ND YEAR': 2, '2ND': 2, '2': 2,
+                    '3RD YEAR': 3, '3RD': 3, '3': 3,
+                    '4TH YEAR': 4, '4TH': 4, '4': 4
+                }
+                
+                semester_map = {
+                    '1ST SEMESTER': 1, '1ST': 1, '1': 1,
+                    '2ND SEMESTER': 2, '2ND': 2, '2': 2
+                }
+                
+                # Normalize input
+                normalized = str(year_text).upper().replace(' ', '')
+                
+                try:
+                    # Direct numeric conversion
+                    return float(normalized)
+                except (ValueError, TypeError):
+                    pass
+                
+                # Handle text-based input
+                try:
+                    # Check if input is in predefined maps
+                    if normalized in year_map:
+                        return float(year_map[normalized])
+                    
+                    # Parse Year and Semester text
+                    if 'YEAR' in normalized and 'SEMESTER' in normalized:
+                        # Extract year part
+                        year_part = normalized.split('YEAR')[0]
+                        # Extract semester part
+                        semester_part = normalized.split('SEMESTER')[0].split('.')[-1]
+                        
+                        # Convert year and semester
+                        year_numeric = year_map.get(year_part, year_part)
+                        semester_numeric = semester_map.get(semester_part, semester_part)
+                        
+                        # Ensure numeric conversion
+                        return float(f"{year_numeric}.{semester_numeric}")
+                    
+                    # Try dot-separated format
+                    parts = normalized.split('.')
+                    if len(parts) == 2:
+                        year_numeric = year_map.get(parts[0], parts[0])
+                        semester_numeric = semester_map.get(parts[1], parts[1])
+                        return float(f"{year_numeric}.{semester_numeric}")
+                    
+                    # Fallback
+                    raise ValueError(f"Cannot convert {year_text} to year level")
+                
+                except Exception as e:
+                    print(f"Error converting year level: {year_text}, Error: {e}")
+                    return None
 
+            # Combine year and semester to create year_level
+            current_year_level = convert_year_level(f"{year} Year.{semester} Semester")
+            
+            # Validate year_level
+            if current_year_level is None:
+                raise ValueError(f"Invalid year level conversion for {year} Year.{semester} Semester")
+            
+            # Comprehensive search query to find all matching courses for the specific student
+            comprehensive_search_query = f"""
+            SELECT 
+                id_no, 
+                course_no, 
+                year_level, 
+                grades,
+                school_year
+            FROM `{table_name}`
+            WHERE 
+                id_no = %s AND 
+                course_no = %s
+            ORDER BY ABS(year_level - %s)  # Sort by closest year level
+            """
+            
+            # Update query that ensures update only for the specific student and course
+            update_query = f"""
+            UPDATE `{table_name}`
+            SET grades = %s, school_year = %s
+            WHERE 
+                id_no = %s AND 
+                course_no = %s AND 
+                year_level = %s
+            """
+            
+            # Handle both DataFrame and list of dictionaries
+            if isinstance(grading_data, pd.DataFrame):
+                # If it's a DataFrame, iterate through rows
+                for _, row in grading_data.iterrows():
+                    try:
+                        # First, try to update at the current year level
+                        self.cursor.execute(update_query, (
+                            row['grades'], 
+                            row['school_year'], 
+                            row['id_no'], 
+                            row['course_no'], 
+                            current_year_level
+                        ))
+                        
+                        # If no update occurred, search for alternative year levels
+                        if self.cursor.rowcount == 0:
+                            # Find all matching courses for this student, sorted by closest year level
+                            self.cursor.execute(comprehensive_search_query, (
+                                row['id_no'], 
+                                row['course_no'], 
+                                current_year_level
+                            ))
+                            existing_courses = self.cursor.fetchall()
+                            
+                            if existing_courses:
+                                # Log matching courses
+                                print(f"Fallback search for student {row['id_no']}:")
+                                for course in existing_courses:
+                                    print(f"Course: {course[1]}, Year Level: {course[2]}, Current Grade: {course[3]}")
+                                
+                                # Try to update the closest year level record
+                                closest_year_level = existing_courses[0][2]
+                                self.cursor.execute(update_query, (
+                                    row['grades'], 
+                                    row['school_year'], 
+                                    row['id_no'], 
+                                    row['course_no'], 
+                                    closest_year_level
+                                ))
+                                
+                                # Log the update
+                                print(f"Updated grade for course {row['course_no']} at fallback year level {closest_year_level}")
+                            else:
+                                print(f"No record found for course {row['course_no']} for student {row['id_no']}")
+                    
+                    except Exception as row_error:
+                        print(f"Error processing row: {row_error}")
+                        continue
+
+            elif isinstance(grading_data, list):
+                # Similar logic for list of dictionaries
+                for entry in grading_data:
+                    try:
+                        # First, try to update at the current year level
+                        self.cursor.execute(update_query, (
+                            entry['grades'], 
+                            entry['school_year'], 
+                            entry['id_no'], 
+                            entry['course_no'], 
+                            current_year_level
+                        ))
+                        
+                        # If no update occurred, search for alternative year levels
+                        if self.cursor.rowcount == 0:
+                            # Find all matching courses for this student, sorted by closest year level
+                            self.cursor.execute(comprehensive_search_query, (
+                                entry['id_no'], 
+                                entry['course_no'], 
+                                current_year_level
+                            ))
+                            existing_courses = self.cursor.fetchall()
+                            
+                            if existing_courses:
+                                # Log matching courses
+                                print(f"Fallback search for student {entry['id_no']}:")
+                                for course in existing_courses:
+                                    print(f"Course: {course[1]}, Year Level: {course[2]}, Current Grade: {course[3]}")
+                                
+                                # Try to update the closest year level record
+                                closest_year_level = existing_courses[0][2]
+                                self.cursor.execute(update_query, (
+                                    entry['grades'], 
+                                    entry['school_year'], 
+                                    entry['id_no'], 
+                                    entry['course_no'], 
+                                    closest_year_level
+                                ))
+                                
+                                # Log the update
+                                print(f"Updated grade for course {entry['course_no']} at fallback year level {closest_year_level}")
+                            else:
+                                print(f"No record found for course {entry['course_no']} for student {entry['id_no']}")
+                    
+                    except Exception as entry_error:
+                        print(f"Error processing entry: {entry_error}")
+                        continue
+            
+            else:
+                # Unsupported input type
+                raise ValueError("Invalid input type for grading_data. Expected DataFrame or list of dictionaries.")
+            
+            self.conn. commit()
+            return True
+        
+        except mysql.connector.Error as err:
+            print(f"Database Error: {err}")
+            self.conn.rollback()
+            return False
+        except Exception as e:
+            print(f"Error saving grades: {e}")
+            self.conn.rollback()
+            return False
+                                        
     def get_student_id(self, search_term=None):
         try:
             # Ensure we have a valid connection
@@ -898,6 +1108,7 @@ class DatabaseHandler:
         except Exception as e:
             print(f"Error getting student data: {e}")
             return {'full_data': [], 'names': []}
+        
     def get_student_by_id(self, id_no):
         """
         Fetch a single student's details by ID number
