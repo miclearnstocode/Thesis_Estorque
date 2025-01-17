@@ -3,7 +3,6 @@ import threading
 import customtkinter as ctk
 from tkinter import messagebox
 from tkinter import ttk
-
 from flask import Flask, jsonify, render_template_string, request
 import requests
 from database import DatabaseHandler
@@ -11,17 +10,6 @@ from PIL import Image
 from tkinter import TclError
 import re
 
-app = Flask(__name__)
-
-# Define a route for the root URL
-@app.route('/')
-def index():
-    return render_template_string("<h1>Welcome to the Flask Server</h1>")
-
-@app.route('/api/data', methods=['GET'])
-def get_data():
-    # Example route to get data
-    return jsonify({'status': 'success'})
 
 ctk.set_default_color_theme("green")    
 class StudentApp(ctk.CTk):
@@ -29,45 +17,9 @@ class StudentApp(ctk.CTk):
         super().__init__()
         self.title("Computer Studies Grades Kiosk")
         self.server_running = False
-        self.start_flask_server()
         self.db_handler = DatabaseHandler()
         self.show_login()
         
-    def start_flask_server(self):
-        """Start Flask server in a separate thread"""
-        if not self.server_running:
-            self.flask_thread = threading.Thread(target=self.run_flask)
-            self.flask_thread.daemon = True
-            self.flask_thread.start()
-            self.server_running = True
-
-    def run_flask(self):
-        """Run Flask server"""
-        def run():
-            app.run(host='127.0.0.1', port=5000)
-        run()
-
-    def stop_flask_server(self):
-        """Stop Flask server"""
-        if self.server_running:
-            func = request.environ.get('werkzeug.server.shutdown')
-            if func is None:
-                raise RuntimeError('Not running with the Werkzeug Server')
-            func()
-            self.server_running = False
-
-    def fetch_data_from_server(self):
-        """Fetch data from Flask server"""
-        try:
-            response = requests.get('http://127.0.0.1:5000/api/data')
-            if response.status_code == 200:
-                data = response.json()
-                print(data)
-            else:
-                print(f"Failed to fetch data: {response.status_code}")
-        except Exception as e:
-            print(f"Error fetching data: {e}")
-
     def show_login(self):
         self.clear_frame()
         
@@ -386,9 +338,9 @@ class StudentApp(ctk.CTk):
         #print(f"Selected tab: {selected_tab}")  # Debug print
         semester = self.semesters[selected_tab]
         #print(f"Mapped semester: {semester}")  # Debug print
-        school_year = self.db_handler.get_school_year(self.student_id, selected_tab)
+        school_year = self.db_handler.school_year(self.student_id, selected_tab)
         #print(f"Fetched school year: {school_year}")  # Debug print
-        description = self.semester_descriptions[selected_tab]
+        description = self.semester_descriptions[selected_tab]  
         self.school_year_label.configure(text=f"{description} - School Year: {school_year}")
 
     def logout(self):
@@ -411,16 +363,6 @@ class StudentApp(ctk.CTk):
             widget.destroy()
 
 if __name__ == "__main__":
-    try:
-        # Start Flask in separate thread
-        flask_thread = threading.Thread(target=lambda: app.run(host='0.0.0.0', port=5000, debug=False))
-        flask_thread.daemon = True
-        flask_thread.start()
+    app = StudentApp()
+    app.mainloop()
         
-        # Start tkinter mainloop
-        app = StudentApp()
-        app.mainloop()
-        
-    except Exception as e:
-        print(f"An error occurred: {e}")
-        sys.exit(1)

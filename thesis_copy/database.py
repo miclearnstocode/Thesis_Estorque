@@ -5,6 +5,8 @@ from tkinter import messagebox
 import mysql.connector
 from datetime import datetime
 import re
+import traceback
+import logging
 
 class DatabaseHandler:
     def __init__(self):
@@ -1807,7 +1809,7 @@ class DatabaseHandler:
 
         return grades
 
-    def get_school_year(self, student_id, semester):
+    def school_year(self, student_id, semester):
         table_names = {
             '1.1': 'first_year_first_semester',
             '1.2': 'first_year_second_semester',
@@ -1848,3 +1850,363 @@ class DatabaseHandler:
             return result[0] if result else "Unknown"
         finally:
             cursor.close()
+
+    def get_students_list(self):
+        """
+        Retrieve list of students for display purposes
+        """
+        try:
+            # Ensure connection is active
+            if not self.conn or not self.conn.is_connected():
+                self.conn, self.cursor = self.get_db_connection()
+
+            # Query to get basic student information
+            query = """
+            SELECT 
+                ID_NO, 
+                CONCAT(LAST_NAME, ', ', FIRST_NAME, ' ', COALESCE(MIDDLE_NAME, '')) AS FULL_NAME,
+                YR,
+                ENROLLED_YEAR
+            FROM student_information
+            ORDER BY LAST_NAME, FIRST_NAME
+            """
+            
+            self.cursor.execute(query)
+            students = self.cursor.fetchall()
+
+            return students
+
+        except mysql.connector.Error as e:
+            messagebox.showerror("Retrieval Error", f"Failed to retrieve students: {e}")
+            return []
+
+    def search_students(self, search_term):
+        """
+        Search students by ID, Name, or Year
+        """
+        try:
+            # Ensure connection is active
+            if not self.conn or not self.conn.is_connected():
+                self.conn, self.cursor = self.get_db_connection()
+
+            # Comprehensive search query
+            search_query = """
+            SELECT 
+                ID_NO, 
+                CONCAT(LAST_NAME, ', ', FIRST_NAME, ' ', COALESCE(MIDDLE_NAME, '')) AS FULL_NAME,
+                YR,
+                ENROLLED_YEAR
+            FROM student_information 
+            WHERE ID_NO LIKE %s OR 
+                  CONCAT(LAST_NAME, ' ', FIRST_NAME, ' ', COALESCE(MIDDLE_NAME, '')) LIKE %s OR
+                  YR = %s
+            ORDER BY LAST_NAME, FIRST_NAME
+            """
+            
+            # Prepare search parameters
+            search_param = f"%{search_term}%"
+            
+            # Try to convert search term to year if possible
+            try:
+                year_param = int(search_term)
+            except ValueError:
+                year_param = 0
+            
+            # Execute search
+            self.cursor.execute(search_query, (search_param, search_param, year_param))
+            students = self.cursor.fetchall()
+
+            return students
+
+        except mysql.connector.Error as e:
+            messagebox.showerror("Search Error", f"Failed to search students: {e}")
+            return []
+        
+    def get_students_list(self):
+        """
+        Retrieve list of students for display purposes, filtered by year value of 4, and include SCHOOL_YEAR.
+        """
+        try:
+            # Ensure connection is active
+            if not self.conn or not self.conn.is_connected():
+                self.conn, self.cursor = self.get_db_connection()
+
+            # Query to get basic student information, filtered by YR = 4
+            query = """
+            SELECT 
+                ID_NO, 
+                CONCAT(LAST_NAME, ', ', FIRST_NAME, ' ', COALESCE(MIDDLE_NAME, '')) AS FULL_NAME,
+                YR,
+                ENROLLED_YEAR
+            FROM student_information
+            WHERE YR = 4
+            ORDER BY LAST_NAME, FIRST_NAME
+            """
+            
+            self.cursor.execute(query)
+            students = self.cursor.fetchall()
+
+            # Convert to list of dictionaries if not already
+            if students and isinstance(students[0], dict):
+                students_list = students
+            elif students:
+                # Convert tuple results to dictionary
+                column_names = ['ID_NO', 'FULL_NAME', 'YR', 'ENROLLED_YEAR']
+                students_list = [dict(zip(column_names, student)) for student in students]
+            else:
+                return []
+
+            # Add SCHOOL_YEAR to each student's data
+            for student in students_list:
+                id_no = student['ID_NO']
+                school_year = self.get_school_year(id_no)  # Retrieve SCHOOL_YEAR
+                student['SCHOOL_YEAR'] = school_year
+
+            return students_list
+
+        except mysql.connector.Error as e:
+            messagebox.showerror("Retrieval Error", f"Failed to retrieve students: {e}")
+            return []
+        
+    def get_school_year(self, id_no):
+        """
+        Retrieve the SCHOOL_YEAR for a specific student from the fourth_year_second_semester table.
+        """
+        try:
+            # Ensure connection is active
+            if not self.conn or not self.conn.is_connected():
+                self.conn, self.cursor = self.get_db_connection()
+
+            # Query to get SCHOOL_YEAR for the given ID_NO
+            query = """
+            SELECT SCHOOL_YEAR 
+            FROM fourth_year_second_semester 
+            WHERE ID_NO = %s
+            """
+            self.cursor.execute(query, (id_no,))
+            result = self.cursor.fetchone()
+
+            # Return SCHOOL_YEAR if found, otherwise return "N/A"
+            return result[0] if result else "N/A"
+
+        except mysql.connector.Error as e:
+            messagebox.showerror("Retrieval Error", f"Failed to retrieve SCHOOL_YEAR for ID {id_no}: {e}")
+            return "N/A"
+                
+    def search_students(self, search_term):
+        """
+        Search students by ID, Name, or Year
+        """
+        try:
+            # Ensure connection is active
+            if not self.conn or not self.conn.is_connected():
+                self.conn, self.cursor = self.get_db_connection()
+
+            # Comprehensive search query
+            search_query = """
+            SELECT 
+                ID_NO, 
+                CONCAT(LAST_NAME, ', ', FIRST_NAME, ' ', COALESCE(MIDDLE_NAME, '')) AS FULL_NAME,
+                YR,
+                ENROLLED_YEAR
+            FROM student_information 
+            WHERE ID_NO LIKE %s OR 
+                  CONCAT(LAST_NAME, ' ', FIRST_NAME, ' ', COALESCE(MIDDLE_NAME, '')) LIKE %s OR
+                  YR = %s
+            ORDER BY LAST_NAME, FIRST_NAME
+            """
+            
+            # Prepare search parameters
+            search_param = f"%{search_term}%"
+            
+            # Try to convert search term to year if possible
+            try:
+                year_param = int(search_term)
+            except ValueError:
+                year_param = 0
+            
+            # Execute search
+            self.cursor.execute(search_query, (search_param, search_param, year_param))
+            students = self.cursor.fetchall()
+
+            # Convert to list of dictionaries if not already
+            if students and isinstance(students[0], dict):
+                return students
+            elif students:
+                # Convert tuple results to dictionary
+                column_names = ['ID_NO', 'FULL_NAME', 'YR', 'ENROLLED_YEAR']
+                return [dict(zip(column_names, student)) for student in students]
+            
+            return []
+
+        except mysql.connector.Error as e:
+            messagebox.showerror("Search Error", f"Failed to search students: {e}")
+            return []
+        
+    def get_course_data(self, student_id):
+        try:
+            # Close any existing cursor and create a new one
+            if hasattr(self, 'cursor'):
+                self.cursor.close()
+            
+            # Use dictionary cursor to handle column names with spaces
+            self.cursor = self.conn.cursor(dictionary=True)
+
+            # List of table names
+            table_names = [
+                'first_year_first_semester',
+                'first_year_second_semester',
+                'second_year_first_semester',
+                'second_year_second_semester',
+                'third_year_first_semester',
+                'third_year_second_semester',
+                'fourth_year_first_semester',
+                'fourth_year_second_semester'
+            ]
+
+            # Initialize course data dictionary
+            course_data = {}
+
+            # Loop over table names to retrieve grades for each table
+            for table_name in table_names:
+                # Dynamically get course columns
+                columns_query = f"""
+                    SELECT COLUMN_NAME 
+                    FROM INFORMATION_SCHEMA.COLUMNS 
+                    WHERE TABLE_NAME = %s 
+                    AND COLUMN_NAME NOT IN ('ID_NO', 'LAST_NAME', 'FIRST_NAME', 'MIDDLE_NAME', 'SCHOOL_YEAR', 'YR')
+                """
+                self.cursor.execute(columns_query, (table_name,))
+                course_columns = [col['COLUMN_NAME'] for col in self.cursor.fetchall()]
+
+                # Debugging: Print columns
+                print(f"Columns for {table_name}: {course_columns}")
+
+                # If no columns found, skip to next table
+                if not course_columns:
+                    continue
+
+                # Escape column names with spaces
+                escaped_columns = [f"`{col}`" for col in course_columns]
+                select_columns = ', '.join(escaped_columns)
+
+                # Construct dynamic query with escaped column names
+                grade_query = f"""
+                    SELECT ID_NO, {select_columns}
+                    FROM `{table_name}`
+                    WHERE ID_NO = %s
+                """
+
+                try:
+                    # Execute query
+                    self.cursor.execute(grade_query, (student_id,))
+                    results = self.cursor.fetchall()
+
+                    # Process results
+                    table_grades = []
+                    for row in results:
+                        for col in course_columns:
+                            grade = row.get(col)
+                            if grade and str(grade).strip() not in ['', 'N/A', '0']:
+                                # Ensure unique entries
+                                if [col, grade] not in table_grades:
+                                    table_grades.append([col, grade])
+
+                    # Add non-empty grades to course data
+                    if table_grades:
+                        course_data[table_name] = table_grades
+                        print(f"Grades found in {table_name}: {table_grades}")
+
+                except Exception as query_error:
+                    print(f"Error in {table_name}: {query_error}")
+                    continue
+
+            # Remove duplicate entries across tables
+            unique_course_data = {}
+            for table, grades in course_data.items():
+                for grade_entry in grades:
+                    if grade_entry[0] not in [existing[0] for existing in unique_course_data.get(table, [])]:
+                        if table not in unique_course_data:
+                            unique_course_data[table] = []
+                        unique_course_data[table].append(grade_entry)
+
+            # Comprehensive debugging
+            print("Final Course Data:")
+            for table, courses in unique_course_data.items():
+                print(f"{table}: {courses}")
+
+            return unique_course_data
+
+        except mysql.connector.Error as err:
+            print(f"Database error: {err}")
+            return None
+        finally:
+            # Ensure cursor is closed
+            if hasattr(self, 'cursor'):
+                self.cursor.close()
+                    
+    def get_course_columns(self, table_name):
+        """
+        Retrieve the column names for the specified course table.
+        """
+        try:
+            # Ensure connection is active
+            if not self.conn.is_connected():
+                self.conn, self.cursor = self.get_db_connection()
+
+            query = f"SHOW COLUMNS FROM {table_name}"
+            self.cursor.execute(query)
+            return [column['Field'] for column in self.cursor.fetchall()]
+        except mysql.connector.Error as err:
+            print(f"Error retrieving columns: {err}")
+            return []
+                            
+
+    def get_curriculum_regular(self):
+        try:
+            # Ensure connection is active
+            if not self.conn.is_connected():
+                self.conn, self.cursor = self.get_db_connection()
+
+            query = """
+                SELECT 
+                    COURSE_NO, 
+                    DESCRIPTIVE_TITLE, 
+                    YEAR_LEVEL, 
+                    UNITS, 
+                    LEC, 
+                    LAB, 
+                    PREREQUISITE, 
+                    GRADES
+                FROM 
+                    curriculum_regular
+            """
+            
+            # Execute the query
+            self.cursor.execute(query)
+            
+            # Fetch results
+            results = self.cursor.fetchall()
+            
+            # Check if results are empty
+            if not results:
+                logging.warning("No curriculum data found")
+                return [], []
+
+            # Extract column names
+            column_names = [desc[0] for desc in self.cursor.description]
+            
+            # Log successful retrieval
+            logging.info(f"Retrieved {len(results)} curriculum records")
+            
+            return column_names, results
+
+        except mysql.connector.Error as err:
+            # Detailed MySQL error logging
+            logging.error(f"MySQL Database error: {err}")
+            print(f"MySQL Database error: {err}")
+            
+            # Additional detailed error tracking
+            traceback.print_exc()
+            return [], []
+        

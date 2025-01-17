@@ -86,6 +86,8 @@ class StudentScreen(ctk.CTkFrame):
         ctk.CTkButton(self.back_frame, text="Back",image=self.back_icon,**button_style ,command=self.master.show_main_menu).pack(side=tk.LEFT)
     
     def validate_input(self, new_value):
+        if  len (new_value) > 11:
+            return False
         # Allow letters, numbers, and hyphen
         return bool(re.match(r'^[a-zA-Z0-9-]*$', new_value))
     
@@ -96,7 +98,6 @@ class StudentScreen(ctk.CTkFrame):
 
         # Search label
         ctk.CTkLabel(self.search_frame, text=f"{status} Students ID NO:", font=ctk.CTkFont(size=14)).pack(side="left", padx=5)
-
         # Search entry
         self.search_var = ctk.StringVar()
         self.search_entry = ctk.CTkEntry(self.search_frame,  textvariable=self.search_var,  width=200,  height=32,  placeholder_text="e.g, 2021-322048", validate="key", validatecommand=(self.register(self.validate_input), '%P'))
@@ -132,7 +133,7 @@ class StudentScreen(ctk.CTkFrame):
             print(f"Error loading add student icon: {e}")
         # Bind the Enter key to search functionality
         self.search_entry.bind("<Return>", lambda event: self.search_student())
-    
+
     def clear_all_displays(self):
         # Clear search frame
         for widget in self.search_frame.winfo_children():

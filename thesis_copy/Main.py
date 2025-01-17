@@ -13,27 +13,13 @@ import socket
 import urllib.request
 import psutil
 from tkinter import messagebox
-from flask import Flask, jsonify, render_template_string, request
 import requests
-
-app = Flask(__name__)
-
-# Define a route for the root URL
-@app.route('/')
-def index():
-    return render_template_string("<h1>Welcome to the Flask Server</h1>")
-
-@app.route('/api/data', methods=['GET'])
-def get_data():
-    # Example route to get data
-    return jsonify({'status': 'success'})
 
 class Application(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.title("BS Computer Science")
         self.server_running = False
-        self.start_flask_server()
 
         # Get screen dimensions
         screen_width = self.winfo_screenwidth()
@@ -64,41 +50,6 @@ class Application(ctk.CTk):
             login_success_callback=self.login_success,
             admin_login_callback=self.admin_login_success)
         self.grade_data = self.preload_grade_data()
-
-    def start_flask_server(self):
-        """Start Flask server in a separate thread"""
-        if not self.server_running:
-            self.flask_thread = threading.Thread(target=self.run_flask)
-            self.flask_thread.daemon = True
-            self.flask_thread.start()
-            self.server_running = True
-
-    def run_flask(self):
-        """Run Flask server"""
-        def run():
-            app.run(host='127.0.0.1', port=5000)
-        run()
-
-    def stop_flask_server(self):
-        """Stop Flask server"""
-        if self.server_running:
-            func = request.environ.get('werkzeug.server.shutdown')
-            if func is None:
-                raise RuntimeError('Not running with the Werkzeug Server')
-            func()
-            self.server_running = False
-
-    def fetch_data_from_server(self):
-        """Fetch data from Flask server"""
-        try:
-            response = requests.get('http://127.0.0.1:5000/api/data')
-            if response.status_code == 200:
-                data = response.json()
-                print(data)
-            else:
-                print(f"Failed to fetch data: {response.status_code}")
-        except Exception as e:
-            print(f"Error fetching data: {e}")
 
     def preload_grade_data(self):
         """Preload grade data for all semesters"""
@@ -175,7 +126,7 @@ class Application(ctk.CTk):
         self.progress.set(0)
         
         # Loading text
-        self.loading_label = ctk.CTkLabel(self.splash,text="Loading...",font=("Helvetica", 12),text_color="black")
+        self.loading_label = ctk.CTkLabel(self.splash,text="Loading...",font=("Helvetica", 12, 'bold'),text_color="black")
         self.loading_label.pack(pady=5)
         
         # Make splash screen appear on top
@@ -188,45 +139,254 @@ class Application(ctk.CTk):
     def update_progress_bar(self):
         def progress():
             try:
-                # Define system components to check
+                # Define system components to check with more detailed messages and weights
                 components = [
-                    ("Checking system requirements...", self.check_system_requirements),
-                    ("Loading modules...", self.check_modules),
-                    ("Initializing database...", self.check_database),
-                    ("Loading UI", self.check_ui_components),
-                    ("Finalizing setup", self.check_final_setup),
-                    ("Network Connection", self.check_network)
+                    ("Checking system compatibility", self.check_system_requirements, 15),
+                    ("Loading essential modules", self.check_modules, 20),
+                    ("Establishing database connection", self.check_database, 25),
+                    ("Initializing user interface", self.check_ui_components, 15),
+                    ("Performing final system checks", self.check_final_setup, 15),
+                    ("Verifying network connectivity", self.check_network, 10)
                 ]
                 
-                total_components = len(components)
-                current_progress = 0
+                # Calculate total weight to ensure 100%
+                total_weight = sum(weight for _, _, weight in components)
                 
-                # Check each component
-                for message, check_function in components:
-                    self.loading_label.after(0, self.loading_label.configure, {'text': message + "..."})
-                    if not check_function():
-                        raise Exception(f"Failed to {message.lower()}")
-                    current_progress += 1
-                    self.progress.after(0, self.progress.set, current_progress / total_components)
-                    time.sleep(0.5)  # Small delay for visibility
+                # Track cumulative progress
+                cumulative_progress = 0
                 
-                # Ensure we reach 100%
-                self.progress.after(0, self.progress.set, 1)
-                self.loading_label.after(0, self.loading_label.configure, {'text': "System ready!"})
-                time.sleep(1)
+                # Ensure initial message
+                self.splash.after(0, self.loading_label.configure, {
+                    'text': "Starting system initialization...",
+                    'text_color': "blue"
+                })
+                
+                # Iterate through components with detailed progress tracking
+                for message, check_function, weight in components:
+                    try:
+                        # Update loading message
+                        def update_loading(msg, color="black"):
+                            if hasattr(self, 'loading_label') and self.loading_label:
+                                self.loading_label.configure(
+                                    text=msg, 
+                                    text_color=color
+                                )
+                        
+                        # Dispatch message update
+                        self.splash.after(0, update_loading, f"{message}...", "blue")
+                        
+                        # Small delay to show message
+                        time.sleep(0.5)
+                        
+                        # Perform component check
+                        check_result = check_function()
+                        
+                        if not check_result:
+                            raise Exception(f"Failed to {message.lower()}")
+                        
+                        # Calculate and update progress
+                        cumulative_progress += weight
+                        progress_value = cumulative_progress / total_weight
+                        
+                        # Update progress bar
+                        def update_progress():
+                            if hasattr(self, 'progress') and self.progress:
+                                self.progress.set(min(progress_value, 1.0))
+                        
+                        self.splash.after(0, update_progress)
+                        
+                        # Success indication
+                        self.splash.after(0, update_loading, f"{message}... ✓", "green")
+                        
+                        # Small delay to show success
+                        time.sleep(0.3)
+                    
+                    except Exception as component_error:
+                        # Error handling
+                        error_msg = f"Error in {message}: {str(component_error)}"
+                        self.splash.after(0, update_loading, error_msg, "red")
+                        
+                        # Raise to potentially stop further processing
+                        raise
+                
+                # Final setup
+                def finalize_startup():
+                    if hasattr(self, 'progress') and self.progress:
+                        self.progress.set(1)
+                    
+                    if hasattr(self, 'loading_label') and self.loading_label:
+                        self.loading_label.configure(
+                            text="System ready!",
+                            text_color='green'
+                        )
+                
+                self.splash.after(0, finalize_startup)
                 
                 # Close splash screen and show main menu
-                self.splash.after(0, self.splash.destroy)
-                self.after(0, self.show_with_transition)
+                def close_splash():
+                    if hasattr(self, 'splash') and self.splash:
+                        self.splash.destroy()
+                    self.show_with_transition()
+                
+                self.splash.after(1000, close_splash)
                 
             except Exception as e:
-                self.loading_label.after(0, self.loading_label.configure, {'text': f"Error: {str(e)}"})
-                self.splash.after(0, self.splash.destroy)
-                self.after(0, lambda: CTkMessagebox(title="System Error", message=str(e), option_1="Exit"))
-                self.after(0, sys.exit, 1)
+                def handle_error(error_message=None):
+                    # Update loading label
+                    if hasattr(self, 'loading_label') and self.loading_label:
+                        self.loading_label.configure(
+                            text=error_message if error_message else "An error occurred",
+                            text_color='red'
+                        )
+                    
+                    # Show error dialog
+                    CTkMessagebox(
+                        title="System Initialization Error", 
+                        message=error_message if error_message else "An error occurred",
+                        icon="cancel",
+                        option_1="Exit"
+                    )
+                    
+                    # Attempt graceful shutdown
+                    self.quit()
+                
+                self.splash.after(0, handle_error, str(e))  # Pass the error message
+
         
+        # Start progress in a daemon thread
         threading.Thread(target=progress, daemon=True).start()
         
+        
+    def check_system_requirements(self):
+        """Check if system meets basic requirements"""
+        try:
+            # Check Python version
+            if sys.version_info < (3, 7):
+                raise Exception("Python 3.7 or higher is required")
+            
+            # Check available memory
+            if psutil.virtual_memory().available < 500 * 1024 * 1024:  # 500MB
+                raise Exception("Insufficient memory available")
+            
+            return True
+        except Exception as e:
+            print(f"System requirements check failed: {e}")
+            return False
+
+    def check_modules(self):
+        """Check if all required modules are available"""
+        required_modules = [
+            'customtkinter',
+            'PIL',
+            'mysql.connector',
+            'pandas',
+            'CTkMessagebox'
+        ]
+        
+        try:
+            for module in required_modules:
+                importlib.import_module(module)
+            return True
+        except ImportError as e:
+            print(f"Module check failed: {e}")
+            return False
+
+    def check_database(self):
+        """Check database connectivity and required tables"""
+        try:
+            db = DatabaseHandler()
+            if not db.conn.is_connected():
+                raise Exception("Database connection failed")
+            
+            # Check required tables
+            required_tables = [
+                'curriculum_regular',
+                'student_information',
+                'admin_management'
+            ]
+            
+            for table in required_tables:
+                db.cursor.execute(f"SHOW TABLES LIKE '{table}'")
+                if not db.cursor.fetchone():
+                    raise Exception(f"Required table '{table}' not found")
+            
+            db.close_db_connection()
+            return True
+        except Exception as e:
+            print(f"Database check failed: {e}")
+            return False
+
+    def check_ui_components(self):
+        """Check if UI components are properly loaded"""
+        try:
+            required_attributes = [
+                'dept_logo_image',
+                'splash',
+                'progress',
+                'loading_label'
+            ]
+            
+            for attr in required_attributes:
+                if not hasattr(self, attr):
+                    raise Exception(f"Missing UI component: {attr}")
+            
+            return True
+        except Exception as e:
+            print(f"UI component check failed: {e}")
+            return False
+
+    def check_final_setup(self):
+        """Perform final checks before system launch"""
+        try:
+            # Check if threading is available and active
+            if not threading.current_thread():
+                raise Exception("Threading system not initialized")
+            
+            # Check if main thread is alive and running
+            main_thread = threading.main_thread()
+            if not main_thread.is_alive():
+                raise Exception("Main thread is not active")
+            
+            # Check number of active threads
+            active_threads = threading.active_count()
+            print(f"Active threads: {active_threads}")
+            
+            # Check thread daemon status
+            current_thread = threading.current_thread()
+            print(f"Current thread daemon status: {current_thread.daemon}")
+            
+            # Check if thread can be created
+            try:
+                test_thread = threading.Thread(target=lambda: None)
+                test_thread.start()
+                test_thread.join(timeout=1.0)  # Wait for test thread with timeout
+            except Exception as thread_error:
+                raise Exception(f"Thread creation test failed: {thread_error}")
+            
+            return True
+        
+        except Exception as e:
+            print(f"Final setup check failed: {e}")
+            self.loading_label.configure(text=f"Threading check failed: {e}")
+            return False
+
+    def check_network(self):
+        """Check if network is available"""
+        try:
+            # Try to connect to a reliable host (Google's DNS server)
+            socket.create_connection(("8.8.8.8", 53), timeout=3)
+            return True
+        except OSError:
+            try:
+                # Fallback: Try to connect to a common website
+                urllib.request.urlopen('http://www.google.com', timeout=3)
+                return True
+            except:
+                error_message = "No network connection detected"
+                self.loading_label.configure(text=error_message)
+                raise Exception(error_message)
+        return False
+      
     def load_images(self):
         """Load and store all images used in the application"""
         try:
@@ -415,135 +575,6 @@ class Application(ctk.CTk):
         self.rowconfigure(0, weight=1)
         self.columnconfigure(1, weight=1)
 
-    def check_system_requirements(self):
-        """Check if system meets basic requirements"""
-        try:
-            # Check Python version
-            if sys.version_info < (3, 7):
-                raise Exception("Python 3.7 or higher is required")
-            
-            # Check available memory
-            if psutil.virtual_memory().available < 500 * 1024 * 1024:  # 500MB
-                raise Exception("Insufficient memory available")
-            
-            return True
-        except Exception as e:
-            print(f"System requirements check failed: {e}")
-            return False
-
-    def check_modules(self):
-        """Check if all required modules are available"""
-        required_modules = [
-            'customtkinter',
-            'PIL',
-            'mysql.connector',
-            'pandas',
-            'CTkMessagebox'
-        ]
-        
-        try:
-            for module in required_modules:
-                importlib.import_module(module)
-            return True
-        except ImportError as e:
-            print(f"Module check failed: {e}")
-            return False
-
-    def check_database(self):
-        """Check database connectivity and required tables"""
-        try:
-            db = DatabaseHandler()
-            if not db.conn.is_connected():
-                raise Exception("Database connection failed")
-            
-            # Check required tables
-            required_tables = [
-                'curriculum_regular',
-                'student_information',
-                'admin_management'
-            ]
-            
-            for table in required_tables:
-                db.cursor.execute(f"SHOW TABLES LIKE '{table}'")
-                if not db.cursor.fetchone():
-                    raise Exception(f"Required table '{table}' not found")
-            
-            db.close_db_connection()
-            return True
-        except Exception as e:
-            print(f"Database check failed: {e}")
-            return False
-
-    def check_ui_components(self):
-        """Check if UI components are properly loaded"""
-        try:
-            required_attributes = [
-                'dept_logo_image',
-                'splash',
-                'progress',
-                'loading_label'
-            ]
-            
-            for attr in required_attributes:
-                if not hasattr(self, attr):
-                    raise Exception(f"Missing UI component: {attr}")
-            
-            return True
-        except Exception as e:
-            print(f"UI component check failed: {e}")
-            return False
-
-    def check_final_setup(self):
-        """Perform final checks before system launch"""
-        try:
-            # Check if threading is available and active
-            if not threading.current_thread():
-                raise Exception("Threading system not initialized")
-            
-            # Check if main thread is alive and running
-            main_thread = threading.main_thread()
-            if not main_thread.is_alive():
-                raise Exception("Main thread is not active")
-            
-            # Check number of active threads
-            active_threads = threading.active_count()
-            print(f"Active threads: {active_threads}")
-            
-            # Check thread daemon status
-            current_thread = threading.current_thread()
-            print(f"Current thread daemon status: {current_thread.daemon}")
-            
-            # Check if thread can be created
-            try:
-                test_thread = threading.Thread(target=lambda: None)
-                test_thread.start()
-                test_thread.join(timeout=1.0)  # Wait for test thread with timeout
-            except Exception as thread_error:
-                raise Exception(f"Thread creation test failed: {thread_error}")
-            
-            return True
-        
-        except Exception as e:
-            print(f"Final setup check failed: {e}")
-            self.loading_label.configure(text=f"Threading check failed: {e}")
-            return False
-
-    def check_network(self):
-        """Check if network is available"""
-        try:
-            # Try to connect to a reliable host (Google's DNS server)
-            socket.create_connection(("8.8.8.8", 53), timeout=3)
-            return True
-        except OSError:
-            try:
-                # Fallback: Try to connect to a common website
-                urllib.request.urlopen('http://www.google.com', timeout=3)
-                return True
-            except:
-                error_message = "No network connection detected"
-                self.loading_label.configure(text=error_message)
-                raise Exception(error_message)
-        return False
 
     def create_window_controls(self):
         """Create window control buttons"""
@@ -645,17 +676,7 @@ class Application(ctk.CTk):
         uncover()  # Apply uncover effect
 
 if __name__ == "__main__":
-    try:
-        # Start Flask in separate thread
-        flask_thread = threading.Thread(target=lambda: app.run(host='0.0.0.0', port=5000, debug=False))
-        flask_thread.daemon = True
-        flask_thread.start()
+    app = Application()
+    app.preload_grade_data()
+    app.mainloop()
         
-        # Start tkinter mainloop
-        app = Application()
-        app.preload_grade_data()
-        app.mainloop()
-        
-    except Exception as e:
-        print(f"An error occurred: {e}")
-        sys.exit(1)
