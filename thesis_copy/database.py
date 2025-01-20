@@ -4,7 +4,7 @@ import pandas as pd
 from tkinter import messagebox
 import mysql.connector
 from datetime import datetime
-import re
+import time, os
 import traceback
 import logging
 
@@ -743,7 +743,29 @@ class DatabaseHandler:
             if cursor:
                 cursor.close()
 
-    # pag savve ng grading shetyt
+    def execute_query_with_retry(self, query, params=None, retries=3, delay=5):
+        for attempt in range(retries):
+            try:
+                if not self.conn.is_connected():
+                    self.conn.reconnect()
+                cursor = self.conn.cursor(dictionary=True)
+                cursor.execute(query, params or ())
+                if query.strip().lower().startswith("select"):
+                    results = cursor.fetchall()
+                    return results
+                else:
+                    self.conn.commit()
+                    return None
+            except mysql.connector.Error as e:
+                if attempt == retries - 1:
+                    self.conn.rollback()
+                    raise
+                time.sleep(delay)
+            finally:
+                if cursor:
+                    cursor.close()
+
+
     def save_grading_data(self, grading_data, year, semester, school_year):
         try:
             # Clean DataFrame column names
@@ -782,8 +804,7 @@ class DatabaseHandler:
             """
 
             print(f"Creating table with query: {create_table_query}")
-            self.cursor.execute(create_table_query)
-            self.conn.commit()
+            self.execute_query_with_retry(create_table_query)
 
             # Verify table exists
             self.cursor.execute(f"SHOW TABLES LIKE '{table_name}'")
@@ -801,7 +822,8 @@ class DatabaseHandler:
             {', '.join(f'`{col}` = VALUES(`{col}`)' for col in columns if col != 'ID_NO')}
             """
 
-            # Process each row
+            # Prepare values for batch insertion
+            values_list = []
             for _, row in grading_data.iterrows():
                 values = [
                     str(row['ID_NO']).strip(),
@@ -816,12 +838,15 @@ class DatabaseHandler:
                     grade = str(row[course]).strip().upper() if pd.notna(row[course]) else ''
                     values.append(grade)
 
-                try:
-                    self.cursor.execute(insert_query, tuple(values))
-                except mysql.connector.Error as err:
-                    print(f"Error inserting row: {err}")
-                    print(f"Values: {values}")
-                    raise
+                values_list.append(tuple(values))
+
+            # Execute batch insert
+            try:
+                self.cursor.executemany(insert_query, values_list)
+            except mysql.connector.Error as err:
+                print(f"Error inserting rows: {err}")
+                print(f"Values: {values_list}")
+                raise
 
             self.conn.commit()
             return True
@@ -834,7 +859,7 @@ class DatabaseHandler:
             print(f"Error saving grades: {e}")
             self.conn.rollback()
             return False
-        
+            
     def save_irregular_grading_data(self, grading_data, year, semester):
         try:
             # Define the table name
@@ -1143,7 +1168,117 @@ class DatabaseHandler:
         except Exception as e:
             print(f"Error fetching student: {e}")
             return None
-
+        
+    def check_student_existence(self, id_no):
+        """
+        Check if student exists in multiple tables
+        
+        Args:
+            id_no (str): Student ID number to check
+        
+        Returns:
+            bool: True if student exists in any table, False otherwise
+        """
+        try:
+            # Check in student_information table
+            query_student_info = """
+            SELECT COUNT(*) FROM student_information 
+            WHERE ID_NO = %s
+            """
+            self.cursor.execute(query_student_info, (id_no,))
+            student_info_count = self.cursor.fetchone()[0]
+            
+            if student_info_count > 0:
+                return True
+            
+            # Check in students table
+            query_students = """
+            SELECT COUNT(*) FROM students 
+            WHERE ID_NO = %s
+            """
+            self.cursor.execute(query_students, (id_no,))
+            students_count = self.cursor.fetchone()[0]
+            
+            if students_count > 0:
+                return True
+            
+            # Check in appraised_curriculum table
+            query_appraised = """
+            SELECT COUNT(*) FROM appraised_curriculum 
+            WHERE ID_NO = %s
+            """
+            self.cursor.execute(query_appraised, (id_no,))
+            appraised_count = self.cursor.fetchone()[0]
+            
+            return appraised_count > 0
+        
+        except Exception as e:
+            print(f"Error checking student existence: {e}")
+            return False
+        
+    def verify_record_exists(self, id_no, course_no):
+        """
+        Verify if a record exists in appraised_curriculum
+        
+        Args:
+            id_no (str): Student ID number
+            course_no (str): Course number
+        
+        Returns:
+            bool: True if record exists, False otherwise
+        """
+        try:
+            query = """
+            SELECT COUNT(*) 
+            FROM appraised_curriculum 
+            WHERE id_no = %s AND course_no = %s
+            """
+            self.cursor.execute(query, (id_no, course_no))
+            count = self.cursor.fetchone()[0]
+            
+            return count > 0
+        
+        except Exception as e:
+            print(f"Error verifying record existence: {e}")
+            return False
+            
+    def update_appraised_grades(self, grades_df):
+        """Update only grades column in appraised_curriculum table for existing records"""
+        try:
+            for _, row in grades_df.iterrows():
+                # Only update the grades column, using other columns to identify the correct row
+                update_query = """
+                    UPDATE appraised_curriculum 
+                    SET grades = %s
+                    WHERE id_no = %s 
+                    AND course_no = %s
+                    AND year_level = %s
+                    AND school_year = %s
+                    AND (grades IS NULL OR grades = '' OR grades = 'INC')
+                """
+                self.cursor.execute(
+                    update_query, 
+                    (
+                        row['grade'],      # New grade value to set
+                        row['id_no'],      # Identifier
+                        row['course_no'],   # Identifier
+                        row['year_level'],  # Identifier
+                        row['school_year']  # Identifier
+                    )
+                )
+                
+                if self.cursor.rowcount == 0:
+                    print(f"No update performed for student {row['id_no']}, course {row['course_no']} - record might not exist or already has a grade")
+                else:
+                    print(f"Successfully updated grade for student {row['id_no']}, course {row['course_no']}")
+                    
+            self.conn.commit()
+            return True
+        except Exception as e:
+            self.conn.rollback()
+            print(f"Error updating appraised grades: {e}")
+            raise
+                
     def save_manual_grades(self, grading_data, year_level, school_year):
         try:
             # Map year levels to table names
@@ -1171,7 +1306,7 @@ class DatabaseHandler:
             print("Available course columns:", course_columns)  # Debug print
 
             # Define valid grades
-            valid_grades = {1.0, 1.25, 1.5, 1.75, 2.0, 2.25, 2.5, 2.75, 3.0}
+            valid_grades = {1.0, 1.25, 1.5, 1.75, 2.0, 2.25, 2.5, 2.75, 3.0, 5.0}
 
             # Process each row in the grading data
             for _, row in grading_data.iterrows():
@@ -1260,6 +1395,46 @@ class DatabaseHandler:
             print(f"Unexpected Error: {e}")
             messagebox.showerror("Error", f"An unexpected error occurred: {e}")
             return False
+    def check_student_source(self, id_no):
+        """
+        Check if a student exists in student_information or appraised curriculum.
+
+        Args:
+            id_no (str): Student ID number to check.
+
+        Returns:
+            str: 'appraised' if found in appraised curriculum, 
+                'regular' if found in student_information,
+                'not_found' otherwise.
+        """
+        try:
+            # First check appraised curriculum
+            query_appraised = """
+                SELECT COUNT(*) FROM appraised_curriculum 
+                WHERE id_no = %s
+            """
+            self.cursor.execute(query_appraised, (id_no,))
+            appraised_count = self.cursor.fetchone()[0]
+
+            if appraised_count > 0:
+                return 'appraised'  # Found in appraised curriculum
+
+            # Check student_information table
+            query_student_info = """
+                SELECT COUNT(*) FROM student_information 
+                WHERE ID_NO = %s
+            """
+            self.cursor.execute(query_student_info, (id_no,))
+            student_info_count = self.cursor.fetchone()[0]
+
+            if student_info_count > 0:
+                return 'regular'  # Found in student_information
+
+            return 'not_found'  # Not found in any table
+
+        except Exception as e:
+            print(f"Error checking student source: {e}")
+            return 'not_found'  # Return not found on error
 
     def get_student_info(self):
         try:
@@ -1531,6 +1706,56 @@ class DatabaseHandler:
         except Exception as e:
             print(f"Error closing connection: {e}")
             
+    def create_templates_table(self):
+        """
+        Creates the 'templates' table if it does not already exist.
+        """
+        query = """
+        CREATE TABLE IF NOT EXISTS templates (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            file_name VARCHAR(255) NOT NULL,
+            file_data LONGTEXT NOT NULL,
+            uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        """
+        try:
+            self.cursor.execute(query)
+            self.conn.commit()
+            print("Table 'templates' created or already exists.")
+        except Exception as e:
+            print(f"Error creating table: {e}")
+            self.conn.rollback()
+
+    def save_templates_to_database(self, file_paths):
+        """
+        Saves multiple CSV files to the 'templates' table in the database.
+        """
+        try:
+            for file_path in file_paths:
+                # Extract file name
+                file_name = os.path.basename(file_path)
+
+                # Read the CSV file
+                with open(file_path, 'r') as file:
+                    csv_data = file.read()
+
+                # Insert the file into the database
+                query = "INSERT INTO templates (file_name, file_data) VALUES (%s, %s)"
+                self.cursor.execute(query, (file_name, csv_data))
+
+            # Commit the transaction
+            self.conn.commit()
+            print(f"{len(file_paths)} files saved to the database.")
+
+        except Exception as e:
+            print(f"Error saving files to the database: {e}")
+            self.conn.rollback()
+
+        finally:
+            # Close the cursor and connection
+            self.cursor.close()
+            self.conn.close()
+
     def preload_grade_data(self):
         """Preload grade data for all semesters"""
         try:

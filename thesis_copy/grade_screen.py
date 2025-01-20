@@ -1,3 +1,4 @@
+import logging
 import threading
 import customtkinter as ctk
 from CTkMessagebox import CTkMessagebox
@@ -171,19 +172,11 @@ class GradeScreen(ctk.CTkFrame):
             "corner_radius": 6
         }
 
+        self.db_handler.cursor.execute("SELECT file_name FROM templates")
+        templates = [row[0] for row in self.db_handler.cursor.fetchall()]
+
         # Add template download dropdown
         self.template_var = ctk.StringVar(value="Download Grading Sheet")
-        templates = [
-            "c:/Users/Admin/Documents/Grade_thesis_trial/Grade_1st_1stsem(Sheet1).csv",
-            "c:/Users/Admin/Documents/Grade_thesis_trial/Grade_1st_2ndsem(Sheet1).csv",
-            "c:/Users/Admin/Documents/Grade_thesis_trial/Grade_2nd_1stsem(Sheet1).csv",
-            "c:/Users/Admin/Documents/Grade_thesis_trial/Grade_2nd_2ndsem(Sheet1).csv",
-            "c:/Users/Admin/Documents/Grade_thesis_trial/3rd_year_1st_semester.csv",
-            "c:/Users/Admin/Documents/Grade_thesis_trial/3rd_year_2nd_semester.csv",
-            "c:/Users/Admin/Documents/Grade_thesis_trial/4th_year_1st_semester.csv",
-            "c:/Users/Admin/Documents/Grade_thesis_trial/4th_year_2nd_semester.csv"
-        ]
-        
         template_dropdown = ctk.CTkOptionMenu(
             self.back_frame,
             variable=self.template_var,
@@ -192,6 +185,16 @@ class GradeScreen(ctk.CTkFrame):
             **template_style
         )
         template_dropdown.pack(side=tk.RIGHT, padx=5)
+        # Add upload template button
+        upload_icon= Image.open("C:/Users/Admin/Documents/Thesis_Estorque/icons/upload.png")
+        self.upload_icon= ctk.CTkImage(light_image=upload_icon, dark_image=upload_icon, size=(30, 30))
+        upload_button = ctk.CTkButton(
+            self.back_frame, image=self.upload_icon,
+            text="Upload Templates",
+            command=self.upload_templates,
+            **button_style
+        )
+        upload_button.pack(side=tk.RIGHT, padx=5)
 
         edit_icon = Image.open("C:/Users/Admin/Documents/Thesis_Estorque/icons/edit.png")
         self.edit_icon = ctk.CTkImage(light_image=edit_icon, dark_image=edit_icon, size=(30, 30))
@@ -246,33 +249,88 @@ class GradeScreen(ctk.CTkFrame):
                 return
             
             try:
-                # Get all student info from database
-                query = "SELECT ID_NO, LAST_NAME, FIRST_NAME, MIDDLE_NAME FROM student_information"
-                self.db_handler.cursor.execute(query)
-                results = self.db_handler.cursor.fetchall()
+                # First check if student exists in appraised_curriculum
+                self.db_handler.cursor.execute("""
+                    SELECT DISTINCT id_no, last_name, first_name, middle_name 
+                    FROM appraised_curriculum 
+                    WHERE id_no = %s
+                    LIMIT 1
+                """, (id_no,))
+                appraised_student = self.db_handler.cursor.fetchone()
                 
-                # Convert to DataFrame for easier handling
-                all_students = pd.DataFrame(results, columns=['ID_NO', 'LAST_NAME', 'FIRST_NAME', 'MIDDLE_NAME'])
+                # If found in appraised_curriculum, use those details
+                if appraised_student:
+                    self.current_student_source = 'appraised'
+                    last_name_var.set(appraised_student[1])
+                    first_name_var.set(appraised_student[2])
+                    middle_name_var.set(appraised_student[3] if appraised_student[3] else '')
+                    
+                    # Get available courses for this student
+                    self.db_handler.cursor.execute("""
+                        SELECT course_no, grades 
+                        FROM appraised_curriculum 
+                        WHERE id_no = %s AND (grades IS NULL OR grades = '' OR grades = 'INC')
+                    """, (id_no,))
+                    
+                    available_courses = self.db_handler.cursor.fetchall()
+                    if not available_courses:
+                        messagebox.showinfo("Info", 
+                            "This student has no incomplete courses in appraised curriculum.")
+                    
+                    course_no_entry.focus()
+                    return
                 
-                # Try exact match first
-                exact_match = all_students[all_students['ID_NO'] == id_no]
+                # If not in appraised_curriculum, check student_information
+                self.db_handler.cursor.execute("""
+                    SELECT ID_NO, LAST_NAME, FIRST_NAME, MIDDLE_NAME 
+                    FROM student_information
+                    WHERE ID_NO = %s
+                """, (id_no,))
+                student = self.db_handler.cursor.fetchone()
                 
-                if not exact_match.empty:
-                    student = exact_match.iloc[0]
-                    print(f"Found exact match: {student}")  # Debug print
-                    last_name_var.set(student['LAST_NAME'])
-                    first_name_var.set(student['FIRST_NAME'])
-                    middle_name_var.set(student['MIDDLE_NAME'] if pd.notna(student['MIDDLE_NAME']) else '')
-                    # Move focus to course number
+                if student:
+                    self.current_student_source = 'regular'
+                    last_name_var.set(student[1])
+                    first_name_var.set(student[2])
+                    middle_name_var.set(student[3] if student[3] else '')
                     course_no_entry.focus()
                 else:
-                    print(f"No exact match found for ID: {id_no}")  # Debug print
-                    messagebox.showwarning("Warning", "No matching student found")
+                    # If not found in student_information, check students table
+                    self.db_handler.cursor.execute("""
+                        SELECT ID_NO, LAST_NAME, FIRST_NAME, MIDDLE_NAME 
+                        FROM students
+                        WHERE ID_NO = %s
+                    """, (id_no,))
+                    student = self.db_handler.cursor.fetchone()
+                    
+                    if student:
+                        # Even if found in students table, check if they exist in appraised_curriculum
+                        self.db_handler.cursor.execute("""
+                            SELECT id_no FROM appraised_curriculum WHERE id_no = %s LIMIT 1
+                        """, (id_no,))
+                        is_appraised = self.db_handler.cursor.fetchone() is not None
+                        
+                        if is_appraised:
+                            self.current_student_source = 'appraised'
+                            messagebox.showinfo("Info", 
+                                "This student exists in appraised curriculum. Only existing incomplete courses can be updated.")
+                        else:
+                            self.current_student_source = 'regular'
+                        
+                        last_name_var.set(student[1])
+                        first_name_var.set(student[2])
+                        middle_name_var.set(student[3] if student[3] else '')
+                        course_no_entry.focus()
+                    else:
+                        self.current_student_source = None
+                        messagebox.showwarning("Warning", "No matching student found")
+                        id_var.set('')  # Clear ID field
+                        return
                     
             except Exception as e:
                 print(f"Error fetching student details: {e}")
                 messagebox.showerror("Error", "Failed to fetch student details")
-
+                
         # Frame for input fields
         input_frame = ctk.CTkFrame(self.completion_window)
         input_frame.pack(pady=20)
@@ -311,19 +369,154 @@ class GradeScreen(ctk.CTkFrame):
         ctk.CTkLabel(input_frame, text="Middle Name").grid(row=3, column=0, padx=5, pady=5)
         middle_name_entry = ctk.CTkEntry(input_frame, width=200, textvariable=middle_name_var, state="readonly")
         middle_name_entry.grid(row=3, column=1, padx=5, pady=5)
+        
+
         def validate_course_no(new_value):
             # Allow only letters, numbers, and spaces
             return new_value == "" or all(char.isalnum() or char.isspace() for char in new_value)
 
+        def suggest_courses(event=None):
+            current_input = course_no_entry.get().strip().upper()
+            id_no = id_var.get().strip()
+            
+            if not current_input:
+                suggestion_listbox.place_forget()
+                return
+
+            try:
+                # First check if student is in appraised_curriculum
+                self.db_handler.cursor.execute("""
+                    SELECT DISTINCT id_no FROM appraised_curriculum 
+                    WHERE id_no = %s
+                """, (id_no,))
+                is_appraised = self.db_handler.cursor.fetchone() is not None
+
+                if is_appraised:
+                    # Get courses from appraised_curriculum for this student that have no grades
+                    self.db_handler.cursor.execute("""
+                        SELECT DISTINCT course_no 
+                        FROM appraised_curriculum 
+                        WHERE id_no = %s 
+                        AND (grades IS NULL OR grades = '' OR grades = 'INC')
+                    """, (id_no,))
+                    available_courses = [row[0] for row in self.db_handler.cursor.fetchall()]
+                else:
+                    # Get courses from curriculum_regular for regular students
+                    self.db_handler.cursor.execute("""
+                        SELECT DISTINCT Course_No 
+                        FROM curriculum_regular
+                    """)
+                    available_courses = [row[0] for row in self.db_handler.cursor.fetchall()]
+
+                # Use fuzzy matching to find similar courses
+                matches = process.extract(current_input, available_courses, limit=5)
+                suggestions = [match[0] for match in matches if match[1] > 60]
+
+                if suggestions:
+                    suggestion_listbox.delete(0, tk.END)
+                    for suggestion in suggestions:
+                        suggestion_listbox.insert(tk.END, suggestion)
+                    
+                    # Position the suggestion listbox
+                    entry_x = course_no_entry.winfo_rootx() - input_frame.winfo_rootx()
+                    entry_y = course_no_entry.winfo_rooty() - input_frame.winfo_rooty()
+                    
+                    suggestion_listbox.lift()
+                    suggestion_listbox.place(
+                        x=entry_x, 
+                        y=entry_y + course_no_entry.winfo_height(),
+                        width=course_no_entry.winfo_width(),
+                        relx=0,
+                        rely=0
+                    )
+                else:
+                    suggestion_listbox.place_forget()
+                    
+            except Exception as e:
+                print(f"Error fetching course suggestions: {e}")
+                suggestion_listbox.place_forget()
+                
+                # Create suggestion frame
+        suggestion_frame = ctk.CTkFrame(
+            input_frame,
+            fg_color="white",
+            border_width=1,
+            border_color="grey",
+            width=200  # Will be adjusted to match entry width
+        )
+        def handle_up_down_keys(event):
+            if not suggestion_frame.winfo_ismapped():  # If suggestions are not visible
+                return
+            
+            suggestions = suggestion_frame.winfo_children()
+            if not suggestions:
+                return
+
+            # Update current index based on key press
+            if event.keysym == 'Up':
+                self.current_suggestion_index = (self.current_suggestion_index - 1) if self.current_suggestion_index > 0 else len(suggestions) - 1
+            elif event.keysym == 'Down':
+                self.current_suggestion_index = (self.current_suggestion_index + 1) if self.current_suggestion_index < len(suggestions) - 1 else 0
+
+            # Update button appearances
+            for i, button in enumerate(suggestions):
+                if i == self.current_suggestion_index:
+                    button.configure(fg_color="#0078D7", text_color="white")
+                else:
+                    button.configure(fg_color="transparent", text_color="black")
+
+            # If Enter is pressed, select the highlighted suggestion
+            if event.keysym == 'Return' and self.current_suggestion_index >= 0:
+                selected_button = suggestions[self.current_suggestion_index]
+                select_suggestion(selected_button.cget("text"))
+                return "break" 
+            
+        def select_suggestion(selected_value):
+            course_no_var.set(selected_value)
+            suggestion_frame.place_forget()
+            grade_entry.focus() 
+
+        def use_suggestion(event):
+            selection = suggestion_listbox.get(suggestion_listbox.curselection())
+            course_no_var.set(selection)
+            suggestion_listbox.place_forget()
+            grade_entry.focus()  # Move focus to grade entry
+
+        def hide_suggestions(event=None):
+            # Delay hiding to allow for selection
+            self.after(100, suggestion_listbox.place_forget)
+
+        # Create suggestion listbox
+        suggestion_listbox = tk.Listbox(
+            input_frame,
+            height=5,
+            selectmode=tk.SINGLE,
+            font=("Helvetica", 10),
+            bg="white",
+            fg="black"
+        )
+        suggestion_listbox.bind('<<ListboxSelect>>', use_suggestion)
 
         # Course No field
         ctk.CTkLabel(input_frame, text="Course No.").grid(row=4, column=0, padx=5, pady=5)
         course_no_entry = ctk.CTkEntry( input_frame,  width=200,  textvariable=course_no_var, validate="key", validatecommand=(input_frame.register(validate_course_no), '%P'))
         course_no_entry.grid(row=4, column=1, padx=5, pady=5)
+
+        # Bind events to course number entry
+        course_no_entry.bind('<Up>', handle_up_down_keys)
+        course_no_entry.bind('<Down>', handle_up_down_keys)
+        course_no_entry.bind('<KeyRelease-Return>', handle_up_down_keys)
+        course_no_entry.bind('<KeyRelease>', suggest_courses)
+        course_no_entry.bind('<FocusOut>', hide_suggestions)
+        course_no_entry.bind('<Return>', lambda e: grade_entry.focus())
+        
         def validate_grade(new_value):
-            # Allow only digits and a single decimal point
-            return new_value == "" or (new_value.replace('.', '', 1).isdigit() and new_value.count('.') <= 1)
-        # Grade field
+            # List of valid grades
+            valid_grades = ['1.00', '1.25', '1.50', '1.75', '2.00', '2.25', '2.50', '2.75', '3.00', '5.00', '']
+            
+            # Allow empty string (for backspace/delete) and only valid grades
+            return new_value in valid_grades or any(valid.startswith(new_value) for valid in valid_grades)
+        
         ctk.CTkLabel(input_frame, text="Grade").grid(row=5, column=0, padx=5, pady=5)
         grade_entry = ctk.CTkEntry(input_frame, width=200, textvariable=grade_var,validate="key",validatecommand=(input_frame.register(validate_grade), '%P'))
         grade_entry.grid(row=5, column=1, padx=5, pady=5)
@@ -406,6 +599,26 @@ class GradeScreen(ctk.CTkFrame):
             course_no = course_no_entry.get().strip().upper()
             grade = grade_entry.get().strip()
 
+            if not hasattr(self, 'current_student_source') or not self.current_student_source:
+                messagebox.showerror("Error", "Please enter a valid student ID first")
+                return
+                
+            if self.current_student_source == 'appraised':
+                # Verify course exists and is incomplete in appraised_curriculum
+                course_no = course_no_entry.get().strip().upper()
+                id_no = id_var.get().strip()
+                
+                self.db_handler.cursor.execute("""
+                    SELECT grades FROM appraised_curriculum 
+                    WHERE id_no = %s AND course_no = %s
+                    AND (grades IS NULL OR grades = '' OR grades = 'INC')
+                """, (id_no, course_no))
+                
+                if not self.db_handler.cursor.fetchone():
+                    messagebox.showwarning("Warning", 
+                        "This course either doesn't exist or already has a grade in appraised curriculum")
+                    return
+
             if not all([id_no, last_name, first_name, course_no, grade]):
                 messagebox.showerror("Error", "Please fill in all required fields")
                 return
@@ -425,32 +638,128 @@ class GradeScreen(ctk.CTkFrame):
             
             self.grade_tree.delete(selected_item)
 
-        def save_grades():
+        def save_grades(event=None):
+            """
+            Save grades with comprehensive validation and multi-table checking
+            """
             grades_data = []
+            invalid_students = []
+            appraised_updates = []
+
+            # Collect grades data and validate student existence
             for item in self.grade_tree.get_children():
                 values = self.grade_tree.item(item)['values']
-                grades_data.append({
-                    'ID_NO': values[0],
-                    'Last Name': values[1],
-                    'First Name': values[2],
-                    'Middle Name': values[3],
-                    'Course No.': values[4],
-                    'Grade': values[5]
-                })
-            
-            if not grades_data:
-                messagebox.showerror("Error", "No grades to save!")
-                return
+                id_no = values[0]
+                course_no = values[4]
+                grade = values[5]
                 
-            grades_df = pd.DataFrame(grades_data, columns=["ID_NO", "Last Name", "First Name", "Middle Name", "Course No.", "Grade"])
+                # Check student existence and source
+                student_source = self.db_handler.check_student_source(id_no)
+                
+                if student_source == 'not_found':
+                    invalid_students.append(id_no)
+                    continue
+                
+                # Handle students from appraised curriculum or students table (irregular)
+                if student_source in ['appraised', 'students']:
+                    try:
+                        # Check if the course exists in appraised_curriculum for this student
+                        self.db_handler.cursor.execute("""
+                            SELECT id_no, course_no, grades FROM appraised_curriculum 
+                            WHERE id_no = %s AND course_no = %s AND (grades IS NULL OR grades = '' OR grades = 'INC')
+                        """, (id_no, course_no))
+                        
+                        incomplete_course = self.db_handler.cursor.fetchone()
+                        
+                        if incomplete_course:
+                            # Add to appraised updates if course exists and has no grade
+                            appraised_updates.append({
+                                'id_no': id_no,
+                                'course_no': course_no,
+                                'grade': grade
+                            })
+                        else:
+                            # Check if course exists with a grade
+                            self.db_handler.cursor.execute("""
+                                SELECT id_no FROM appraised_curriculum 
+                                WHERE id_no = %s AND course_no = %s
+                            """, (id_no, course_no))
+                            exists_with_grade = self.db_handler.cursor.fetchone() is not None
+                            if exists_with_grade:
+                                messagebox.showwarning("Warning", 
+                                    f"Course {course_no} for student {id_no} already has a grade in appraised curriculum.")
+                                continue
+                            else:
+                                messagebox.showwarning("Warning", 
+                                    f"Course {course_no} for student {id_no} does not exist in appraised curriculum.")
+                                continue
+                    except Exception as e:
+                        print(f"Error checking appraised curriculum: {e}")
+                        continue
+                else:
+                    # Regular student grades
+                    grades_data.append({
+                        'ID_NO': id_no,
+                        'Last Name': values[1],
+                        'First Name': values[2],
+                        'Middle Name': values[3],
+                        'Course No.': course_no,
+                        'Grade': grade
+                    })
+
+            # Handle invalid students
+            if invalid_students:
+                error_message = f"The following student IDs are not found in any database:\n{', '.join(invalid_students)}"
+                response = messagebox.askyesno(
+                    "Invalid Students", 
+                    f"{error_message}\n\nDo you want to proceed with saving only valid students?"
+                )
+                if not response:
+                    return
+
+            # Check if there are any valid grades to save
+            if not grades_data and not appraised_updates:
+                messagebox.showerror("Error", "No valid grades to save!")
+                return
+
+            # Get additional context
             year_level = year_level_var.get()
-            school_year = school_year_var.get()  # Get the selected school year
-            
-            # Pass all three parameters to save_manual_grades
-            if self.db_handler.save_manual_grades(grades_df, year_level, school_year):
+            school_year = school_year_var.get()
+
+            # Attempt to save grades
+            try:
+                # Save regular grades
+                if grades_data:
+                    grades_df = pd.DataFrame(
+                        grades_data, 
+                        columns=["ID_NO", "Last Name", "First Name", "Middle Name", "Course No.", "Grade"]
+                    )
+                    self.db_handler.save_manual_grades(grades_df, year_level, school_year)
+
+                # Update existing incomplete grades in appraised_curriculum
+                if appraised_updates:
+                    appraised_df = pd.DataFrame(
+                        appraised_updates,
+                        columns=["id_no", "course_no", "grade"]
+                    )
+                    self.db_handler.update_appraised_grades(appraised_df)
+
+                # Clear the grade tree after successful save
                 for item in self.grade_tree.get_children():
                     self.grade_tree.delete(item)
-                messagebox.showinfo("Success", "Grades saved successfully!")
+
+                # Show success message
+                success_message = "Grades saved successfully!\n\n"
+                if grades_data:
+                    success_message += f"Regular grades: {len(grades_data)}\n"
+                if appraised_updates:
+                    success_message += f"Updated grades in appraised curriculum: {len(appraised_updates)}"
+
+                messagebox.showinfo("Success", success_message)
+
+            except Exception as e:
+                messagebox.showerror("Save Error", f"Failed to save grades: {str(e)}")
+
 
         # Add buttons with the new style
         ctk.CTkButton(button_frame, text="Add Grade", command=add_grade, **button_style).pack(side=tk.LEFT, padx=5)
@@ -1290,34 +1599,51 @@ class GradeScreen(ctk.CTkFrame):
         grade_entry.focus_set()
 
     def download_template(self, choice):
-        """Handle template download"""
-        if choice == self.template_var.get():  # Ensure it's a real selection
-            try:
-                # Define the source template directory
-                template_dir = "C:/Users/Admin/Documents/Thesis_Estorque/templates/"
-                source_file = os.path.join(template_dir, choice)
-                
-                # Open file dialog for saving
-                save_path = filedialog.asksaveasfilename(
+        try:
+            # Get the selected template
+            template_name = self.template_var.get()
+
+            # Get the file path from the database
+            self.db_handler.cursor.execute("SELECT file_data FROM templates WHERE file_name = %s", (template_name,))
+            file_data = self.db_handler.cursor.fetchone()
+
+            if file_data:
+                # Ask the user to save the file with a custom name
+                file_path = filedialog.asksaveasfilename(
+                    title="Save Template",
                     defaultextension=".csv",
-                    initialfile=choice,
-                    filetypes=[("CSV files", "*.csv")],
-                    title="Save Grading Sheet Template"
+                    filetypes=[("CSV Files", "*.csv")]
                 )
-                
-                if save_path:
-                    import shutil
-                    shutil.copy2(source_file, save_path)
-                    messagebox.showinfo(
-                        "Success", 
-                        f"Template '{choice}' has been downloaded successfully!"
-                    )
-                    
-            except Exception as e:
-                messagebox.showerror(
-                    "Error",
-                    f"Failed to download template: {str(e)}"
-                )
-                
-            # Reset dropdown to default text
-            self.template_var.set("Download Grading Sheet")
+
+                if file_path:
+                    # Save the file to the local file system
+                    with open(file_path, 'w') as file:
+                        file.write(file_data[0])
+
+                    # Show a success message
+                    CTkMessagebox(title="Success", message="Template downloaded successfully!")
+                else:
+                    # Show a message if the user cancels the save operation
+                    CTkMessagebox(title="Info", message="Save operation cancelled.")
+            else:
+                # Show an error message if the file is not found
+                CTkMessagebox(title="Error", message="Failed to download template: Cannot find file path")
+
+        except Exception as e:
+            # Log the error and show an error message
+            print(f"Error downloading template: {e}")
+            CTkMessagebox(title="Error", message="Failed to download template: Unknown error")
+
+    def upload_templates(self):
+
+        # Open file dialog to select multiple CSV files
+        file_paths = filedialog.askopenfilenames(
+            title="Select CSV Files",
+            filetypes=[("CSV Files", "*.csv")]
+        )
+        
+        if file_paths:
+            # Call the function in database.py to save the files
+            self.db_handler.save_templates_to_database(file_paths)
+
+            CTkMessagebox(title="Success", message="Templates have been uploaded successfully!")

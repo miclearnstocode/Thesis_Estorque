@@ -22,7 +22,6 @@ import numpy as np
 from PIL import Image, ImageTk
 import customtkinter as ctk
 from CTkMessagebox import CTkMessagebox
-from datetime import datetime
 
 class StudentScreen(ctk.CTkFrame):
     def __init__(self, master):
@@ -100,7 +99,7 @@ class StudentScreen(ctk.CTkFrame):
         ctk.CTkLabel(self.search_frame, text=f"{status} Students ID NO:", font=ctk.CTkFont(size=14)).pack(side="left", padx=5)
         # Search entry
         self.search_var = ctk.StringVar()
-        self.search_entry = ctk.CTkEntry(self.search_frame,  textvariable=self.search_var,  width=200,  height=32,  placeholder_text="e.g, 2021-322048", validate="key", validatecommand=(self.register(self.validate_input), '%P'))
+        self.search_entry = ctk.CTkEntry(self.search_frame, corner_radius=20 ,textvariable=self.search_var,  width=200,  height=32,  placeholder_text="e.g, 2021-322048", validate="key", validatecommand=(self.register(self.validate_input), '%P'))
         self.search_entry.pack(side="left", padx=5)
         try:
             search_icon = Image.open("C:/Users/Admin/Documents/Thesis_Estorque/icons/searchs.png")
@@ -903,7 +902,7 @@ class StudentScreen(ctk.CTkFrame):
 
         # Search entry
         self.search_var = ctk.StringVar()
-        self.search_entry = ctk.CTkEntry( self.search_frame,  textvariable=self.search_var,  width=200,  height=32,  placeholder_text="Enter ID", validate="key", validatecommand=(self.register(validate_input), '%P'))
+        self.search_entry = ctk.CTkEntry( self.search_frame, corner_radius=20 ,textvariable=self.search_var,  width=200,  height=32,  placeholder_text="Enter ID", validate="key", validatecommand=(self.register(validate_input), '%P'))
         self.search_entry.pack(side="left", padx=5)
 
         search_icon = Image.open("C:/Users/Admin/Documents/Thesis_Estorque/icons/searchs.png")

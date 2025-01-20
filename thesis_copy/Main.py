@@ -13,13 +13,98 @@ import socket
 import urllib.request
 import psutil
 from tkinter import messagebox
-import requests
+import json
+
+class Server:
+    def __init__(self, host='192.168.254.125', port=65432):
+        #self.host = host
+        #self.port = port
+        self.db_handler = DatabaseHandler()
+
+    """def start_server(self):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
+            server_socket.bind((self.host, self.port))
+            server_socket.listen()
+
+            print(f"Server listening on {self.host}:{self.port}")
+
+            while True:
+                conn, addr = server_socket.accept()
+                with conn:
+                    print(f"Connected by {addr}")
+                    data = conn.recv(1024).decode()
+
+                    if not data:
+                        break
+
+                    request = json.loads(data)
+                    action = request.get("action")
+                    response = {}
+
+                    if action == "get_student":
+                        student_id = request["data"]["student_id"]
+                        student_info = self.db_handler.get_student(student_id)
+                        response = {
+                            "status": "success",
+                            "action": "get_student",
+                            "data": student_info
+                        }
+
+                    elif action == "get_grades":
+                        student_id = request["data"]["student_id"]
+                        grades = self.db_handler.get_grades(student_id)
+                        response = {
+                            "status": "success",
+                            "action": "get_grades",
+                            "data": {
+                                "student_id": student_id,
+                                "grades": grades
+                            }
+                        }
+
+                    elif action == "school_year":
+                        student_id = request["data"]["student_id"]
+                        semester = request["data"]["semester"]
+                        school_year = self.db_handler.school_year(student_id, semester)
+                        response = {
+                            "status": "success",
+                            "action": "school_year",
+                            "data": {
+                                "student_id": student_id,
+                                "semester": semester,
+                                "school_year": school_year
+                            }
+                        }
+
+                    elif action == "get_descriptive_title":
+                        course_no = request["data"]["course_no"]
+                        descriptive_title = self.db_handler.get_descriptive_title(course_no)
+                        response = {
+                            "status": "success",
+                            "action": "get_descriptive_title",
+                            "data": {
+                                "course_no": course_no,
+                                "descriptive_title": descriptive_title
+                            }
+                        }
+
+                    else:
+                        response = {
+                            "status": "error",
+                            "message": "Invalid action"
+                        }
+
+                    conn.sendall(json.dumps(response).encode())"""
+
 
 class Application(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.title("BS Computer Science")
-        self.server_running = False
+        # Start the socket server in a separate thread
+        """self.server_thread = threading.Thread(target=self.start_server)
+        self.server_thread.daemon = True
+        self.server_thread.start()"""
 
         # Get screen dimensions
         screen_width = self.winfo_screenwidth()
@@ -50,7 +135,10 @@ class Application(ctk.CTk):
             login_success_callback=self.login_success,
             admin_login_callback=self.admin_login_success)
         self.grade_data = self.preload_grade_data()
-
+    """def start_server(self):
+        # Start the server in a separate thread to avoid blocking the UI
+        server = Server()
+        server.start_server()"""
     def preload_grade_data(self):
         """Preload grade data for all semesters"""
         try:
@@ -546,34 +634,127 @@ class Application(ctk.CTk):
         self.current_screen = None
 
     def show_screen(self, screen_class, screen_name):
-        """Handle screen switching"""
+        """Handle screen switching with loading screen for grades"""
         if self.current_screen:
             self.current_screen.grid_forget()
             self.current_screen.destroy()
+
+        # Show loading screen only for Grade screen
+        if screen_name == "Grade":
+            # Create and show loading screen
+            loading_frame = ctk.CTkFrame(self, fg_color="white")
+            loading_frame.grid(row=0, column=1, sticky="nsew")
             
-        # Reload the appropriate module
-        module_map = {
-            "Student": student_screen,
-            "Grade": grade_screen,
-            "Curriculum": curriculum_screen,
-            "Appraisal": appraisal_screen,
-            "Archive": archive_screen,
-            "Admin": admin_screen
-        }
-        importlib.reload(database)
-        if screen_name in module_map:
-            module = module_map[screen_name]
-            importlib.reload(module)
-            screen_class = getattr(module, f"{screen_name}Screen")
+            # Center the loading content
+            loading_frame.grid_rowconfigure(0, weight=1)
+            loading_frame.grid_columnconfigure(0, weight=1)
+            
+            loading_container = ctk.CTkFrame(loading_frame, fg_color="transparent")
+            loading_container.grid(row=0, column=0)
+            
+            empty_img = ctk.CTkImage(
+                light_image=Image.new("RGB", (300, 40), color="white"),
+                dark_image=Image.new("RGB", (300, 40), color="white"),
+                size=(300, 40)
+            )
 
-        # Create and show new screen
-        screen = screen_class(self)
-        screen.grid(row=0, column=1, sticky="nsew")
-        self.current_screen = screen
+            loading_label = ctk.CTkLabel(
+                loading_container,
+                text="Loading Grades Module",
+                font=("Helvetica", 16, "bold"),
+                image=empty_img,
+                compound="center"  # Text will be centered over image
+            )
+            loading_label.pack(pady=10)
+            
+            # Progress bar
+            progress = ctk.CTkProgressBar(
+                loading_container,
+                width=300,
+                height=15,
+                corner_radius=10,
+                mode="indeterminate"
+            )
+            progress.pack(pady=10)
+            progress.start()
+            
+            # Status message
+            status_label = ctk.CTkLabel(
+                loading_container,
+                text="Initializing...",
+                font=("Helvetica", 12)
+            )
+            status_label.pack(pady=5)
 
-        # Configure grid weights
-        self.rowconfigure(0, weight=1)
-        self.columnconfigure(1, weight=1)
+            def update_status(message):
+                status_label.configure(text=message)
+                self.update()
+
+            def initialize_grade_screen():
+                try:
+                    update_status("Loading database tables...")
+                    # Reload the database module
+                    importlib.reload(database)
+                    
+                    update_status("Preparing grade interface...")
+                    # Reload the grade_screen module
+                    importlib.reload(grade_screen)
+                    
+                    update_status("Loading student records...")
+                    # Create the grade screen instance
+                    screen = screen_class(self)
+                    
+                    update_status("Finalizing...")
+                    # Configure grid weights
+                    self.rowconfigure(0, weight=1)
+                    self.columnconfigure(1, weight=1)
+                    
+                    # Remove loading screen
+                    loading_frame.destroy()
+                    
+                    # Show the grade screen
+                    screen.grid(row=0, column=1, sticky="nsew")
+                    self.current_screen = screen
+                    
+                except Exception as e:
+                    error_msg = f"Error loading grade screen: {str(e)}"
+                    print(error_msg)
+                    CTkMessagebox(
+                        title="Loading Error",
+                        message=error_msg,
+                        icon="cancel"
+                    )
+                    # Remove loading screen and show main menu
+                    loading_frame.destroy()
+                    self.show_main_menu()
+
+            # Start initialization in a separate thread
+            threading.Thread(target=initialize_grade_screen, daemon=True).start()
+            
+        else:
+            # For other screens, load normally
+            # Reload the appropriate module
+            module_map = {
+                "Student": student_screen,
+                "Curriculum": curriculum_screen,
+                "Appraisal": appraisal_screen,
+                "Archive": archive_screen,
+            }
+            
+            if screen_name in module_map:
+                importlib.reload(database)
+                module = module_map[screen_name]
+                importlib.reload(module)
+                screen_class = getattr(module, f"{screen_name}Screen")
+
+            # Create and show new screen
+            screen = screen_class(self)
+            screen.grid(row=0, column=1, sticky="nsew")
+            self.current_screen = screen
+
+            # Configure grid weights
+            self.rowconfigure(0, weight=1)
+            self.columnconfigure(1, weight=1)
 
 
     def create_window_controls(self):

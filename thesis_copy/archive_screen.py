@@ -134,15 +134,26 @@ class ArchiveScreen(ctk.CTkFrame):
                 student_data = {
                     'ID_NO': student[0],
                     'FULL_NAME': student[1],
-                    'YR': student[2],
-                    'ENROLLED_YEAR': student[3],
-                    'YEAR_GRADUATED': student[4] if len(student) > 4 else "N/A"  # Add Year Graduated
+                    'YR': student[2],  # Current year (e.g., 1, 2, 3, 4)
+                    'ENROLLED_YEAR': student[3],  # Year the student enrolled
+                    'YEAR_GRADUATED': "N/A"  # Default value
                 }
             else:
                 # If dictionary, use key-based access
                 student_data = student
 
-            # Map 'SCHOOL_YEAR' to 'YEAR_GRADUATED'
+            # Calculate Year Graduated
+            current_year = student_data.get('YR', 1)  # Default to 1 if not provided
+            enrolled_year = student_data.get('ENROLLED_YEAR', 2020)  # Default to 2020 if not provided
+
+            # If the student is in their fourth year, second semester, they are graduating this year
+            if current_year == 4:  # Fourth year
+                student_data['YEAR_GRADUATED'] = enrolled_year + 4  # Graduation year
+            else:
+                # If not in fourth year, set to "N/A" or calculate expected graduation year
+                student_data['YEAR_GRADUATED'] = enrolled_year + 4  # Expected graduation year
+
+            # Map 'SCHOOL_YEAR' to 'YEAR_GRADUATED' (if needed)
             if 'SCHOOL_YEAR' in student_data:
                 student_data['YEAR_GRADUATED'] = student_data['SCHOOL_YEAR']
 
@@ -157,11 +168,10 @@ class ArchiveScreen(ctk.CTkFrame):
                     command=lambda s=student_data: self.on_student_click(s)  # Bind click event
                 )
                 btn.grid(row=row, column=col, padx=5, pady=2, sticky="w" if col < 2 else "ew")
-        
-        styles = getSampleStyleSheet()   
-        # Register Times New Roman font
-        pdfmetrics.registerFont(TTFont('TimesNewRoman', 'C:\\Windows\\Fonts\\times.ttf'))
-        pdfmetrics.registerFont(TTFont('TimesNewRomanBold', 'C:\\Windows\\Fonts\\timesbd.ttf'))
+    styles = getSampleStyleSheet()   
+    # Register Times New Roman font
+    pdfmetrics.registerFont(TTFont('TimesNewRoman', 'C:\\Windows\\Fonts\\times.ttf'))
+    pdfmetrics.registerFont(TTFont('TimesNewRomanBold', 'C:\\Windows\\Fonts\\timesbd.ttf'))
 
     def on_student_click(self, student_data):
         def add_header_footer(canvas, doc):

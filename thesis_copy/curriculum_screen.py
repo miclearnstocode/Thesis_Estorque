@@ -292,6 +292,7 @@ class CurriculumScreen(ctk.CTkFrame):
                 messagebox.showerror("Error", f"An error occurred: {e}")
         else:
             messagebox.showerror("Error", "No data to save")
+            
 class CTkToolTip:
     def __init__(self, widget, text):
         self.widget = widget
