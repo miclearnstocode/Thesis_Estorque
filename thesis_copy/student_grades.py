@@ -1,10 +1,9 @@
-import sys
+import socket
+import json
 import threading
 import customtkinter as ctk
 from tkinter import messagebox
 from tkinter import ttk
-from flask import Flask, jsonify, render_template_string, request
-import requests
 from database import DatabaseHandler
 from PIL import Image
 from tkinter import TclError
@@ -16,9 +15,27 @@ class StudentApp(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.title("Computer Studies Grades Kiosk")
-        self.server_running = False
+        #self.server_running = False
         self.db_handler = DatabaseHandler()
         self.show_login()
+        
+    """def send_request(action, data):
+        request = {
+            "action": action,
+            "data": data
+        }
+
+        # Connect to the server
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket:
+            client_socket.connect(('192.168.254.125', 65432))
+            client_socket.sendall(json.dumps(request).encode())
+
+            # Receive the response
+            response = client_socket.recv(1024).decode()
+            print("Server Response:", json.loads(response))
+
+    # Example usage:
+    send_request("get_grades", {"student_id": "12345"})"""
         
     def show_login(self):
         self.clear_frame()

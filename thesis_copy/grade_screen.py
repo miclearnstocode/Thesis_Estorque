@@ -538,7 +538,7 @@ class GradeScreen(ctk.CTkFrame):
         id_entry.configure(border_color="blue")
 
         # Keep the Treeview as is
-        columns = ("ID_NO", "Last Name", "First Name", "Middle Name", "Course No.", "Grade")
+        columns = ("ID No", "Last Name", "First Name", "Middle Name", "Course No.", "Grade")
         self.grade_tree = ttk.Treeview(self.completion_window, columns=columns, show="headings")
         
         for col in columns:

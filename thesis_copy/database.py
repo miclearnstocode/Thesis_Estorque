@@ -212,7 +212,7 @@ class DatabaseHandler:
 
 
     # pag display sa irregular studnt baga
-    def fetch_irregular_students(self, id_no): #sa irregular student ni sa 
+    def fetch_irregular_students(self, id_no):
             logging.debug(f"Fetching irregular student data for ID_NO: {id_no}")
             appraised_query = """
                 SELECT 
@@ -232,11 +232,17 @@ class DatabaseHandler:
                     ac.lec, 
                     ac.lab, 
                     ac.prerequisite,
-                    ac.grades
+                    ac.grades,
+                    CAST(SUBSTRING_INDEX(ac.year_level, '.', 1) AS UNSIGNED) as year_num,
+                    CAST(SUBSTRING_INDEX(ac.year_level, '.', -1) AS UNSIGNED) as sem_num
                 FROM
                     appraised_curriculum ac
                 WHERE
                     ac.id_no = %s
+                ORDER BY 
+                    year_num ASC,
+                    sem_num ASC,
+                    ac.course_no ASC
             """
 
             appraised_params = (id_no,)
@@ -248,12 +254,44 @@ class DatabaseHandler:
                     logging.warning(f"No appraised curriculum data found for ID_NO: {id_no}")
                     return []
 
+                # Process results to determine latest semester with grades
+                latest_completed_sem = {'year': 0, 'sem': 0}
+                current_sem = {'year': 0, 'sem': 0}
+                
+                for record in appraised_results:
+                    year_level = str(record['year_level'])
+                    try:
+                        year, sem = map(int, year_level.split('.'))
+                        grade = str(record['grades']).strip()
+                        
+                        # Track the latest semester with grades
+                        if grade and grade != '0.00':
+                            if (year > latest_completed_sem['year'] or 
+                                (year == latest_completed_sem['year'] and sem > latest_completed_sem['sem'])):
+                                latest_completed_sem = {'year': year, 'sem': sem}
+                        
+                        # Track the current semester (with no grades)
+                        if grade == '0.00':
+                            if (year > current_sem['year'] or 
+                                (year == current_sem['year'] and sem > current_sem['sem'])):
+                                current_sem = {'year': year, 'sem': sem}
+                    except ValueError:
+                        continue
+
                 logging.info(f"Found {len(appraised_results)} records for ID_NO: {id_no}")
+                logging.info(f"Latest completed semester: {latest_completed_sem['year']}.{latest_completed_sem['sem']}")
+                logging.info(f"Current semester: {current_sem['year']}.{current_sem['sem']}")
+
+                # Add semester progression info to results
+                for record in appraised_results:
+                    record['latest_completed_sem'] = f"{latest_completed_sem['year']}.{latest_completed_sem['sem']}"
+                    record['current_sem'] = f"{current_sem['year']}.{current_sem['sem']}"
+
                 return appraised_results
 
             except mysql.connector.Error as err:
                 logging.error(f"An error occurred while fetching irregular student data: {err.msg}")
-                return []        
+                return []      
         
     def update_student_yr(self, id_no): # para kat update ng year level ng student
         """

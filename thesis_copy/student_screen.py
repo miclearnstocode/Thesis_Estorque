@@ -1,5 +1,5 @@
 import csv
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 import logging
 import os
 import subprocess
@@ -22,6 +22,7 @@ import numpy as np
 from PIL import Image, ImageTk
 import customtkinter as ctk
 from CTkMessagebox import CTkMessagebox
+from datetime import datetime
 
 class StudentScreen(ctk.CTkFrame):
     def __init__(self, master):
@@ -72,10 +73,10 @@ class StudentScreen(ctk.CTkFrame):
             print(f"Error loading Irregular/Regular icon: {e}")
         # Frames for search bar and student list
         self.search_frame = tk.Frame(self, bg="ghost white")
-        self.search_frame.pack(pady=10)
+        self.search_frame.place(x=10, y=190)
 
         self.student_list_frame = tk.Frame(self)
-        self.student_list_frame.pack(pady=10)
+        self.student_list_frame.place(x=30, y=250)
 
         self.print_frame = tk.Frame(self)
         self.print_frame.pack(pady=10)
@@ -273,26 +274,37 @@ class StudentScreen(ctk.CTkFrame):
             widget.destroy()
 
         year_level = self.selected_year_semester.get()
-
         db_handler = DatabaseHandler()
+        
         try:
-            #student_data = db_handler.fetch_student_data(id_no, year_level)
-            #print(f"Received grades data:  {student_data['grades_data']}")
-            # Get student data
-            student_data = db_handler.fetch_student_data(id_no, None)  # Pass None for year_level initially
-            
-            # Get student's current year level and completed semesters
-            current_yr = None
-            completed_semesters = set()
-            
+            # Implement caching mechanism for frequently searched IDs
+            if not hasattr(self, 'student_cache'):
+                self.student_cache = {}  # Initialize cache if not exists
+                
+            # Check cache first
+            if id_no in self.student_cache:
+                student_data = self.student_cache[id_no]
+                print("Retrieved from cache")
+            else:
+                # If not in cache, fetch from database
+                student_data = db_handler.fetch_student_data(id_no, None)
+                
+                # Cache the result (with a maximum cache size)
+                MAX_CACHE_SIZE = 100
+                if len(self.student_cache) >= MAX_CACHE_SIZE:
+                    # Remove oldest entry if cache is full
+                    self.student_cache.pop(next(iter(self.student_cache)))
+                self.student_cache[id_no] = student_data
+                print("Retrieved from database")
+
+            # Process the student data
             if student_data["curriculum_data"]:
                 current_yr = student_data["curriculum_data"][0].get("YR", "1")
                 
-                # Get completed semesters
-                grades_data = db_handler.check_all_tables_for_grades(id_no)
-                completed_semesters = set(grades_data.keys())
+                # Use set for O(1) lookup time
+                completed_semesters = set(db_handler.check_all_tables_for_grades(id_no).keys())
                 
-                # Determine next enrollable semester
+                # Use dictionary for O(1) lookup time
                 year_semester_mapping = {
                     '1': ['1.1', '1.2'],
                     '2': ['2.1', '2.2'],
@@ -300,10 +312,7 @@ class StudentScreen(ctk.CTkFrame):
                     '4': ['4.1', '4.2']
                 }
                 
-                current_year_semesters = year_semester_mapping.get(str(current_yr), [])
-                next_semester = None
-                
-                # Convert semester table names to year.semester format
+                # Use dictionary for O(1) lookup time
                 semester_conversion = {
                     'first_year_first_semester': '1.1',
                     'first_year_second_semester': '1.2',
@@ -315,51 +324,59 @@ class StudentScreen(ctk.CTkFrame):
                     'fourth_year_second_semester': '4.2'
                 }
                 
-                # Convert completed semesters to year.semester format
-                completed_yr_sem = {semester_conversion[sem] for sem in completed_semesters if sem in semester_conversion}
+                # Convert to set for O(1) lookup time
+                completed_yr_sem = {semester_conversion[sem] for sem in completed_semesters 
+                                if sem in semester_conversion}
                 
-                # Find next enrollable semester
-                for sem in current_year_semesters:
-                    if sem not in completed_yr_sem:
-                        next_semester = sem
-                        break
+                # Find next semester efficiently
+                current_year_semesters = year_semester_mapping.get(str(current_yr), [])
+                next_semester = next((sem for sem in current_year_semesters 
+                                    if sem not in completed_yr_sem), None)
                 
-                # If both semesters of current year are complete, move to next year's first semester
+                # If no next semester in current year, calculate next year's first semester
                 if not next_semester and int(current_yr) < 4:
                     next_yr = str(int(current_yr) + 1)
                     next_semester = f"{next_yr}.1"
                 
-                # Set the combobox value
+                # Update UI
                 if next_semester:
                     self.selected_year_semester.set(next_semester)
                     print(f"Setting semester to: {next_semester}")
                 else:
                     self.selected_year_semester.set("Select")
                     print("No next semester found")
-        except Exception as e:
-            ctk.CTkMessageBox(title="Database Error", message=f"An error occurred while fetching student data: {str(e)}")
-            return
 
+        except Exception as e:
+            ctk.CTkMessageBox(title="Database Error", 
+                            message=f"An error occurred while fetching student data: {str(e)}")
+            return
+        
         # Create a frame to hold the student data and curriculum data
-        student_frame = tk.Frame(self.student_list_frame)
+        student_frame = ttk.Frame(self.student_list_frame)
         student_frame.pack(fill="both", expand=True)
         # Configure style for reduced row height
+
         style = ttk.Style()
         style.configure("Treeview", font=("Helvetica", 10), rowheight=20)
 
         # Treeview widget for displaying student data
-        table_student = ("ID_NO", "STUDENT_NAME", "YEAR", "AGE", "SEX", "EMAIL_ADDRESS")
+        table_student = ("ID NO", "STUDENT NAME", "YEAR", "AGE", "SEX", "EMAIL_ADDRESS")
         self.tree = ttk.Treeview(student_frame, columns=table_student, show='headings', height=2)
         self.tree.pack(fill="both", expand=True)
 
+        column_widths = {
+            "ID NO": 130,
+            "STUDENT NAME": 300,
+            "YEAR": 80,
+            "AGE": 80,
+            "SEX": 80,
+            "EMAIL_ADDRESS": 300
+        }
+
         for column in table_student:
             self.tree.heading(column, text=column)
-            if column == "STUDENT_NAME" or column == "EMAIL_ADDRESS":
-                self.tree.column(column, width=210, anchor='center')
-            elif column == "ID_NO":
-                self.tree.column(column, width=100, anchor='center')
-            else:
-                self.tree.column(column, width=80, anchor='center')
+            self.tree.column(column, width=column_widths.get(column, 150), anchor='center', stretch=True)
+
 
         # Maintain a set of inserted ID_NO to avoid duplicates
         inserted_ids = set()
@@ -385,50 +402,71 @@ class StudentScreen(ctk.CTkFrame):
         treeview_frame.pack(fill="both", expand=True)
 
         style = ttk.Style()
-        style.configure("Treeview", font=("Helvetica", 12),  rowheight=35, background="white", fieldbackground="white", foreground="black") 
+        style.configure("Treeview", font=("Helvetica", 12),  rowheight=36, background="white", fieldbackground="white", foreground="black") 
         style.configure("Treeview.Heading", font=("Helvetica", 12, "bold"), background="white", foreground="black")
 
 
         # Treeview widget for displaying curriculum data
-        table_curriculum = ("Course_No", "Descriptive_Title", "Year_Level", "Units", "Lec", "Lab", "Pre-requisite", "Grade")
+        table_curriculum = ("Course No.", "Descriptive Title", "Year Level", "Units", "Lec", "Lab", "Pre-requisite", "Grade")
         self.curriculum_tree = ttk.Treeview(treeview_frame, columns=table_curriculum, show='headings', height=10, style="Treeview",)
         self.curriculum_tree.pack(side="left",fill="both", expand=True)
 
         # Replace with standard ttk.Scrollbar for guaranteed visibility
-        vsb = ttk.Scrollbar(treeview_frame, 
-                            orient="vertical", 
-                            command=self.curriculum_tree.yview)
+        vsb = ttk.Scrollbar(treeview_frame, orient="vertical", 
+        command=self.curriculum_tree.yview)
         self.curriculum_tree.configure(yscrollcommand=vsb.set)
         vsb.pack(side="right", fill="y")
 
+        # Adjust column widths for curriculum tree
+        curriculum_column_widths = {
+            "Course No.": 130,
+            "Descriptive Title": 300,
+            "Year Level": 90,
+            "Units": 80,
+            "Lec": 80,
+            "Lab": 80,
+            "Pre-requisite": 150,
+            "Grade": 90
+        }
+
         for column in table_curriculum:
             self.curriculum_tree.heading(column, text=column)
-            if column == "Descriptive_Title":
-                self.curriculum_tree.column(column, width=250, anchor='center')
-            elif column == "Course_No":
-                self.curriculum_tree.column(column, width=100, anchor='center')
-            else:
-                self.curriculum_tree.column(column, width=80, anchor='center')
-
+            self.curriculum_tree.column(
+                column, 
+                width=curriculum_column_widths.get(column, 150), 
+                anchor='center',
+                stretch=True
+            )
         # Clear existing data
         for item in self.curriculum_tree.get_children():
             self.curriculum_tree.delete(item)
 
+        displayed_courses = set()
         # Check if the data is not empty
         if student_data["curriculum_regular_data"]:
             current_year = None
             year_totals = {'units': 0, 'lec': 0, 'lab': 0}
+            sorted_curriculum = sorted(student_data["curriculum_regular_data"],
+            key=lambda x: ( float(x.get('YEAR_LEVEL', '0')), x.get('COURSE_NO', '')))
+            def wrap_text(text, width=30):
+                """Function to wrap text to multiple lines"""
+                import textwrap
+                return '\n'.join(textwrap.wrap(text, width=width))
             
-            for i, row in enumerate(student_data["curriculum_regular_data"]):
+            for i, row in enumerate(sorted_curriculum):
                 if row:
+                    course_key = (row.get('COURSE_NO', '').strip(), row.get('YEAR_LEVEL', ''))
+                    if course_key in displayed_courses:
+                        continue
+                    displayed_courses.add(course_key)
                     # Convert values to strings
                     course_no = row.get('COURSE_NO', '').strip()
-                    descriptive_title = row.get('DESCRIPTIVE_TITLE', '').strip()
+                    descriptive_title = wrap_text(row.get('DESCRIPTIVE_TITLE', '').strip(), width=40)
                     year_level = row.get('YEAR_LEVEL', '')
                     units = row.get('UNITS', '')
                     lec = row.get('LEC', '')
                     lab = row.get('LAB', '')
-                    prerequisite = row.get('PREREQUISITE', '').strip()
+                    prerequisite = wrap_text(row.get('PREREQUISITE', '').strip(), width=18)
 
                     # If year level changes, insert total row for previous year
                     if current_year is not None and current_year != year_level:
@@ -436,9 +474,7 @@ class StudentScreen(ctk.CTkFrame):
                         self.curriculum_tree.insert("", "end", values=total_values, tags=('total',))
                         
                         #empty row after total
-                        empty_row = ["", "", "", "", "", "", "", ""]
-                        self.curriculum_tree.insert("", "end", values=empty_row, tags=('empty_row',))
-                        
+                        self.curriculum_tree.insert("", "end", values=[""] * 8, tags=('empty_row',))
                         # Reset totals for new year
                         year_totals = {'units': 0, 'lec': 0, 'lab': 0}
 
@@ -696,10 +732,24 @@ class StudentScreen(ctk.CTkFrame):
         print_window.bind('<Control-p>', lambda event: self.print_content(print_window))
 
     def print_content(self, print_window):
-        # Create a temporary PDF file
-        temp_pdf = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
-        pdf_path = temp_pdf.name
-        temp_pdf.close()
+
+        # Create a sanitized filename from student name
+        def sanitize_filename(name):
+            # Remove invalid filename characters and replace spaces with underscores
+            invalid_chars = '<>:"/\\|?*'
+            filename = ''.join(c for c in name if c not in invalid_chars)
+            filename = filename.replace(' ', '_')
+            return filename
+
+        # Create filename with student name and timestamp
+        student_filename = sanitize_filename(self.student_name)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        pdf_filename = f"{student_filename}_{timestamp}.pdf"
+        
+        # Create the PDF in temp directory with custom filename
+        temp_dir = tempfile.gettempdir()
+        pdf_path = os.path.join(temp_dir, pdf_filename)
+
         # Year level mapping
         year_mapping = {
             '1': '1st Year',
@@ -861,6 +911,10 @@ class StudentScreen(ctk.CTkFrame):
         y -= 20
         c.drawRightString(462, y, "College Registrar")        
         
+        # Draw footer image
+        footer_image_path = "C:/Users/Admin/Documents/Thesis_Estorque/Image/Footer.jpg"  # Update this path to your footer image
+        footer_height = 50  # Adjust height as needed
+        c.drawImage(footer_image_path, 0, 0, width=width, height=footer_height)
         # Save the PDF
         c.save()
 
@@ -868,7 +922,6 @@ class StudentScreen(ctk.CTkFrame):
             if os.name == 'nt':  # Windows
                 chrome_path = r'c:/Program Files/Google/Chrome/Application/chrome.exe'
                 if os.path.exists(chrome_path):
-                    pdf_path = temp_pdf.name
                     if os.path.exists(pdf_path):
                         subprocess.run([chrome_path, pdf_path], shell=False)
                     else:
@@ -876,7 +929,6 @@ class StudentScreen(ctk.CTkFrame):
                 else:
                     chrome_path = r'c:/Program Files/Google/Chrome/Application/chrome.exe'
                     if os.path.exists(chrome_path):
-                        pdf_path = temp_pdf.name
                         if os.path.exists(pdf_path):
                             subprocess.run([chrome_path, pdf_path], shell=False)
                         else:
@@ -887,13 +939,14 @@ class StudentScreen(ctk.CTkFrame):
                 messagebox.showerror("Printing Error", "Printing is only supported on Windows.")
         except Exception as e:
             messagebox.showerror("Printing Error", f"An error occurred while printing: {str(e)}")
-        print_window.destroy ()
-
+        finally:
+            print_window.destroy()
+        
     def show_search_irregular(self):
         # Clear search frame before showing new search bar
         for widget in self.search_frame.winfo_children():
             widget.destroy()
-
+ 
         # Search label
         ctk.CTkLabel(self.search_frame, text="Irregular Students ID NO:",font=ctk.CTkFont(size=14)).pack(side="left", padx=5)
         def validate_input(new_value):
@@ -924,217 +977,253 @@ class StudentScreen(ctk.CTkFrame):
         # Bind the Enter key to search functionality
         self.search_entry.bind("<Return>", lambda event: self.search_student_irregular())
         
-
     def check_enrollment_irregular(self, event=None):
-        id_no = self.search_var.get().strip()
-        selected_year_level = self.selected_year_semester.get().strip()  # Assuming this variable holds the selected year level
+            id_no = self.search_var.get().strip()
+            selected_year_level = self.selected_year_semester.get().strip()
 
-        if not id_no:
-            messagebox.showwarning("Input Error", "Please Enter a student ID_NO")
-            self.print_button.config(state="disabled")
-            return None  # Return None to indicate failure
+            if not id_no:
+                messagebox.showwarning("Input Error", "Please Enter a student ID_NO")
+                self.print_button.configure(state="disabled")
+                return None
 
-        db_handler = DatabaseHandler()
-        try:
-            # Fetch all student data from appraised_curriculum
-            appraised_data = db_handler.fetch_irregular_students(id_no)
+            valid_year_levels = ['1.1', '1.2', '2.1', '2.2', '3.1', '3.2', '4.1', '4.2']
+            
+            db_handler = DatabaseHandler()
+            try:
+                appraised_data = db_handler.fetch_irregular_students(id_no)
 
-            if not appraised_data:
-                logging.info(f"No data found for ID_NO: {id_no}. Allowing new enrollment.")
-                messagebox.showinfo("Enrollment Status", f"No records found. Student can enroll.")
-                self.print_button.config(state="normal")
-                return appraised_data  # Return empty list
+                if not appraised_data:
+                    suggested_year = '1.1'
+                    logging.info(f"No records found. Suggesting year level: {suggested_year}")
+                    messagebox.showinfo("Enrollment Status", 
+                        f"No records found. Student should enroll in {suggested_year}")
+                    self.selected_year_semester.set(suggested_year)
+                    self.print_button.configure(state="normal")
+                    return appraised_data
 
-            # Filter appraised_data for the selected year level
-            filtered_data = [record for record in appraised_data if record['year_level'] == selected_year_level]
+                # Debug print for all records
+                print("\nAll Records:")
+                for record in appraised_data:
+                    print(f"Course: {record.get('course_no')}, Year Level: {record.get('year_level')}, Grade: {record.get('grades')}")
 
-            if not filtered_data:
-                logging.info(f"No records found for ID_NO: {id_no} in year level {selected_year_level}. Allowing new enrollment.")
-                messagebox.showinfo("Enrollment Status", f"No records found for the selected year level. Student can enroll.")
-                self.print_button.config(state="normal")
-                return appraised_data  # Return all appraised data
+                def get_semester_value(year_level):
+                    try:
+                        year, sem = year_level.split('.')
+                        return float(f"{year}.{sem}")
+                    except (ValueError, AttributeError):
+                        return 0.0
 
-            # Extract year levels for clustering
-            year_levels = np.array([record['year_level'] for record in filtered_data]).reshape(-1, 1)
+                def is_semester_completed(data, year_level):
+                    semester_courses = [
+                        record for record in data 
+                        if str(record.get('year_level', '')) == year_level
+                    ]
+                    
+                    if not semester_courses:
+                        return False
+                    
+                    # Check if all courses in the semester have valid grades
+                    for course in semester_courses:
+                        grade = str(course.get('grades', '0.00')).strip()
+                        try:
+                            grade_decimal = Decimal(grade)
+                            if grade_decimal == Decimal('0.00') or grade_decimal == Decimal('5.00'):
+                                return False
+                        except InvalidOperation:
+                            return False
+                    
+                    return True
 
-            # Apply Agglomerative Clustering
-            if len(year_levels) > 1:  # Ensure there is more than one data point for clustering
-                clustering_model = AgglomerativeClustering(n_clusters=1, metric='euclidean', linkage='ward')
-                clustering_model.fit(year_levels)
-                labels = clustering_model.labels_
+                # Find the latest completed semester
+                latest_completed = None
+                for year_level in valid_year_levels:
+                    if is_semester_completed(appraised_data, year_level):
+                        latest_completed = year_level
+                        print(f"Found completed semester: {year_level}")
 
-                # Log the clusters
-                unique_clusters = set(labels)
-                logging.info(f"Clusters formed for ID_NO: {id_no}: {unique_clusters}")
+                # Determine next semester
+                if latest_completed:
+                    year, sem = map(int, latest_completed.split('.'))
+                    if sem == 1:
+                        next_semester = f"{year}.2"
+                    else:
+                        next_semester = f"{year + 1}.1"
+                    
+                    # Verify next semester is valid
+                    if next_semester in valid_year_levels:
+                        suggested_year_level = next_semester
+                    else:
+                        suggested_year_level = valid_year_levels[-1]
+                else:
+                    # If no completed semesters, start with 1.1
+                    suggested_year_level = '1.1'
 
-            # Check if there are any enrollable subjects
-            enrollable_subjects = [record for record in filtered_data if record.get('prerequisite', '') == '']
+                print(f"\nSuggestion Details:")
+                print(f"Latest Completed Semester: {latest_completed}")
+                print(f"Suggested Year Level: {suggested_year_level}")
 
-            if not enrollable_subjects:
-                logging.info(f"No enrollable subjects found for ID_NO: {id_no} in year level {selected_year_level}. Student cannot enroll.")
-                messagebox.showinfo("Enrollment Status", "No enrollable subjects available for this semester.")
-                self.print_button.config(state="disabled")
-                return appraised_data  # Return all appraised data
+                # Update the selected year level
+                if selected_year_level != suggested_year_level:
+                    self.selected_year_semester.set(suggested_year_level)
+                    messagebox.showinfo("Year Level Suggestion", 
+                        f"Based on academic progress, student should enroll in {suggested_year_level}")
 
-            # Check grades and determine enrollment eligibility
-            can_enroll = False  # Flag to check if the student can enroll
-            for record in filtered_data:
-                grade = record.get('grades', '0.00')  # Default to '0.00' if grade is not found
+                # Check if student can enroll in suggested semester
+                semester_courses = [
+                    record for record in appraised_data 
+                    if str(record.get('year_level', '')) == suggested_year_level
+                ]
 
-                # Check for year level 3.1 with no grade or grade of '0.00'
-                if selected_year_level == '3.1' and (grade == '0.00' or grade == ''):
-                    can_enroll = True
-                    logging.info(f"Year level {selected_year_level} with no grade or grade 0.00 found for ID_NO: {id_no}. Enabling enrollment.")
-                    break  # No need to check further if enrollment is enabled
+                has_grades = any(
+                    Decimal(str(record.get('grades', '0.00'))) > Decimal('0.00')
+                    for record in semester_courses
+                )
 
-                # If there's a valid grade (not 0.00 and not empty)
-                elif grade and grade != '':
-                    logging.info(f"Valid grade found for ID_NO: {id_no}. Disabling enrollment.")
-                    self.print_button.config(state="disabled")
-                    messagebox.showinfo("Enrollment Status", "Student has grades for this semester. Cannot enroll again.")
-                    return appraised_data  # Return all appraised data
+                if has_grades:
+                    self.print_button.configure(state="disabled")
+                    messagebox.showinfo("Enrollment Status", 
+                        f"Student already has grades for {suggested_year_level}. Cannot enroll.")
+                else:
+                    self.print_button.configure(state="normal")
+                    messagebox.showinfo("Enrollment Status", 
+                        f"Student can enroll in {suggested_year_level}")
 
-            # Final decision based on the can_enroll flag
-            if can_enroll:
-                self.print_button.config(state="normal")
-                messagebox.showinfo("Enrollment Status", "Student can enroll.")
-            else:
-                logging.info(f"No grades found for ID_NO: {id_no }. Enabling enrollment.")
-                self.print_button.config(state="normal")
-                CTkMessagebox(title="Enrollment Status", message="Student can enroll.")
+                return appraised_data
 
-            return appraised_data  # Return all appraised data
-
-        except Exception as e:
-            logging.error(f"An error occurred while checking enrollment status: {str(e)}")
-            CTkMessagebox(title="Database Error", message="An error occurred while checking enrollment status: {str(e)}")
-            self.print_button.config(state="disabled")
-            return None  # Return None to indicate failure
-    
-
+            except Exception as e:
+                logging.error(f"An error occurred while checking enrollment status: {str(e)}")
+                messagebox.showerror("Database Error", 
+                    f"An error occurred while checking enrollment status: {str(e)}")
+                self.print_button.configure(state="disabled")
+                return None
+                
     def check_prerequisites_irregular(self, appraised_data, selected_year_semester):
         enrollable_subjects = []
         prerequisite_subjects = []
+        corequisite_subjects = []
         failed_subjects = []
         no_grade_courses = []
 
-        # Define year level order and semester prerequisite mapping
+        # Define year level order and mappings
         year_levels = ['1.1', '1.2', '2.1', '2.2', '3.1', '3.2', '4.1', '4.2']
-        semester_prerequisite_mapping = {
-            '1.2': ['1.1'],
-            '2.1': ['1.2'],
-            '2.2': ['2.1', '1.2'],
-            '3.1': ['2.1'],
-            '3.2': ['3.1', '2.2'],
-            '4.1': ['3.2'],
-            '4.2': ['4.1', '3.2']
-        }
-
-        selected_index = year_levels.index(selected_year_semester)
-        prerequisite_semesters = semester_prerequisite_mapping.get(selected_year_semester, [])
-
-        print(f"\nDEBUG: Selected Year Level: {selected_year_semester}")
-        print(f"Prerequisite Semesters: {prerequisite_semesters}")
-
-        # Track added no-grade courses and prerequisite subjects per semester
-        semester_no_grade_courses = {
-            '1.1': [], '1.2': [], 
-            '2.1': [], '2.2': [], 
-            '3.1': [], '3.2': [], 
-            '4.1': [], '4.2': []
-        }
         
-        semester_prerequisite_subjects = {
-            '1.1': [], '1.2': [], 
-            '2.1': [], '2.2': [], 
-            '3.1': [], '3.2': [], 
-            '4.1': [], '4.2': []
-        }
+        # Get current year and semester
+        current_year = selected_year_semester.split('.')[0]
+        current_semester = selected_year_semester.split('.')[1]
 
-        # First pass: Check for no grade courses and prerequisite subjects
-        for subject in appraised_data:
-            subject_year_level = str(subject.get('year_level', '0'))
-            course_no = subject.get('course_no', '').strip()
-            grade = str(subject.get('grades', '0.00'))
+        def is_current_or_previous_year(year_level):
+            """Check if the year level is current or previous"""
+            try:
+                year = year_level.split('.')[0]
+                return int(year) <= int(current_year)
+            except (ValueError, AttributeError, IndexError):
+                return False
 
-            print(f"Checking subject: {course_no}, Year Level: {subject_year_level}, Grade: {grade}")
-
-            # Convert grade to Decimal for comparison
+        def should_include_subject(subject):
+            """Check if subject should be included based on grade and year level"""
+            grade = str(subject.get('grades', '0.00')).strip()
+            year_level = str(subject.get('year_level', '')).strip()
+            
             try:
                 grade_decimal = Decimal(grade)
-            except:
-                grade_decimal = Decimal('0.00')
+                # Only include if grade is 0.00 and year level is current or previous
+                return (grade_decimal == Decimal('0.00') and 
+                        is_current_or_previous_year(year_level))
+            except (InvalidOperation, TypeError):
+                return False
 
-            try:
-                subject_index = year_levels.index(subject_year_level)
-                
-                # Check if subject has no grade
-                if grade_decimal == Decimal('0.00'):
-                    # No-grade courses logic
-                    if subject_index < selected_index:
-                        if selected_year_semester in ['4.1', '4.2']:
-                            # Final year: add all no-grade courses
-                            print(f"Found no grade course (Final Year): {course_no} (Year Level: {subject_year_level})")
-                            no_grade_courses.append(subject)
-                        else:
-                            # Other semesters: limit to one no-grade course per semester
-                            if not semester_no_grade_courses[subject_year_level]:
-                                print(f"Found no grade course: {course_no} (Year Level: {subject_year_level})")
-                                no_grade_courses.append(subject)
-                                semester_no_grade_courses[subject_year_level].append(course_no)
-                            else:
-                                print(f"Skipped additional no grade course: {course_no} (Year Level: {subject_year_level})")
-                    
-                    # Prerequisite subjects logic
-                    # Only add if the subject's year level matches any of the prerequisite semesters
-                    for prerequisite_semester in prerequisite_semesters:
-                        if subject_year_level == prerequisite_semester:
-                            # Check if the prerequisite subject specifically has a grade of 0.00
-                            if grade_decimal == Decimal('0.00'):
-                                if not semester_prerequisite_subjects[subject_year_level]:
-                                    print(f"Found prerequisite subject for {selected_year_semester}: {course_no} (Year Level: {subject_year_level})")
-                                    prerequisite_subjects.append(subject)
-                                    semester_prerequisite_subjects[subject_year_level].append(course_no)
-                                else:
-                                    print(f"Skipped additional prerequisite subject: {course_no} (Year Level: {subject_year_level})")
+        # First pass: Build requirement mappings
+        course_requirements = {}
+        requirement_status = {}
+        requirement_type = {}
+
+        for subject in appraised_data:
+            course_no = subject.get('course_no', '').strip()
+            requirements = subject.get('prerequisite', '')
             
-            except ValueError:
-                print(f"Invalid year level: {subject_year_level}")
+            if requirements and isinstance(requirements, str):
+                requirements = requirements.strip()
+                req_list = [r.strip() for r in requirements.split(',') if r.strip()]
+                if req_list:
+                    course_requirements[course_no] = req_list
+                    requirement_type[course_no] = ('corequisite' 
+                        if len(req_list) >= 3 else 'prerequisite')
+
+        # Second pass: Check requirement completion status
+        for subject in appraised_data:
+            course_no = subject.get('course_no', '').strip()
+            grade = str(subject.get('grades', '0.00')).strip()
+            
+            try:
+                grade_decimal = Decimal(grade)
+                requirement_status[course_no] = {
+                    'grade': grade_decimal,
+                    'completed': grade_decimal > Decimal('0.00') and grade_decimal != Decimal('5.00')
+                }
+            except (InvalidOperation, TypeError):
+                requirement_status[course_no] = {
+                    'grade': Decimal('0.00'),
+                    'completed': False
+                }
+
+        # Main processing loop
+        for subject in appraised_data:
+            course_no = subject.get('course_no', '').strip()
+            subject_year_level = str(subject.get('year_level', '0'))
+            grade_info = requirement_status.get(course_no, {})
+            grade = grade_info.get('grade', Decimal('0.00'))
+
+            # Skip if subject has a grade or is from a future year
+            if not should_include_subject(subject):
                 continue
 
-        # Get current year subjects
-        current_year_subjects = [
-            subject for subject in appraised_data 
-            if str(subject.get('year_level', '0')) == selected_year_semester
-        ]
+            # Check requirements
+            if course_no in course_requirements:
+                missing_reqs = []
+                for req in course_requirements[course_no]:
+                    req_subject = next(
+                        (s for s in appraised_data if s.get('course_no', '').strip() == req), 
+                        None
+                    )
+                    if req_subject and should_include_subject(req_subject):
+                        if requirement_type[course_no] == 'prerequisite':
+                            if req_subject not in prerequisite_subjects:
+                                prerequisite_subjects.append(req_subject)
+                                print(f"Added prerequisite: {req} (Year: {req_subject.get('year_level')})")
+                        else:  # corequisite
+                            if req_subject not in corequisite_subjects:
+                                corequisite_subjects.append(req_subject)
+                                print(f"Added corequisite: {req} (Year: {req_subject.get('year_level')})")
 
-        # Process current year subjects independently
-        for subject in current_year_subjects:
-            course_no = subject.get('course_no', '').strip()
-            grade = str(subject.get('grades', '0.00'))
-
-            print(f"\nProcessing current year course: {course_no}")
-            print(f"Grade: {grade}")
-
-            # Current year courses can be enrolled directly
-            enrollable_subjects.append(subject)
+            # Handle current year level subjects
+            if subject_year_level == selected_year_semester:
+                if grade == Decimal('5.00'):
+                    failed_subjects.append(subject)
+                elif grade == Decimal('0.00'):
+                    no_grade_courses.append(subject)
+                    # Only add to enrollable if it's the current year level
+                    enrollable_subjects.append(subject)
 
         # Debug logging
-        print(f"\nDEBUG Summary:")
-        print(f"Total Enrollable Subjects: {len(enrollable_subjects)}")
-        print(f"Total No Grade Courses: {len(no_grade_courses)}")
-        print(f"Total Prerequisite Subjects: {len(prerequisite_subjects)}")
-        print(f"Total Failed Subjects: {len(failed_subjects)}")
+        print(f"\nFinal Summary for {selected_year_semester}:")
+        print(f"Enrollable Subjects: {len(enrollable_subjects)}")
+        for subj in enrollable_subjects:
+            print(f"  - {subj.get('course_no')}: Year {subj.get('year_level')}")
         
-        print("\nNo Grade Courses Details:")
-        for course in no_grade_courses:
-            print(f"Course: {course['course_no']} - Year Level: {course['year_level']} - Grade: {course.get('grades', '0.00')}")
+        print(f"\nPrerequisite Subjects: {len(prerequisite_subjects)}")
+        for subj in prerequisite_subjects:
+            print(f"  - {subj.get('course_no')}: Year {subj.get('year_level')}")
+        
+        print(f"\nCorequisite Subjects: {len(corequisite_subjects)}")
+        for subj in corequisite_subjects:
+            print(f"  - {subj.get('course_no')}: Year {subj.get('year_level')}")
 
         return {
             'enrollable_subject': enrollable_subjects,
-            'no_grade_course': no_grade_courses,
             'prerequisite_subject': prerequisite_subjects,
-            'failed_subject': failed_subjects
+            'corequisite_subject': corequisite_subjects,
+            'failed_subject': failed_subjects,
+            'no_grade_course': no_grade_courses
         }
 
     def search_student_irregular(self):
@@ -1181,18 +1270,26 @@ class StudentScreen(ctk.CTkFrame):
             style = ttk.Style()
             style.configure("Treeview", font=("Helvetica", 12), rowheight=20)
             # Treeview widget for displaying student data
-            table_student = ("ID_NO", "STUDENT_NAME", "YEAR", "AGE", "SEX", "EMAIL_ADDRESS")
+
+            table_student = ("ID NO", "STUDENT NAME", "YEAR", "AGE", "SEX", "EMAIL_ADDRESS")
             self.tree = ttk.Treeview(student_frame, columns=table_student, show='headings', height=2)
             self.tree.pack(fill="both", expand=True)
 
+            column_widths = {
+                "ID NO": 130,
+                "STUDENT NAME": 300,
+                "YEAR": 80,
+                "AGE": 80,
+                "SEX": 80,
+                "EMAIL_ADDRESS": 300
+            }
+
             for column in table_student:
                 self.tree.heading(column, text=column)
-                if column == "STUDENT_NAME" or column == "EMAIL_ADDRESS":
-                    self.tree.column(column, width=210, anchor=tk.W)
-                elif column == "ID_NO":
-                    self.tree.column(column, width=100, anchor=tk.W)
-                else:
-                    self.tree.column(column, width=80, anchor=tk.W)
+                self.tree.column(column, width=column_widths.get(column, 150), anchor='center', stretch=True)
+
+
+
             self.student_record = {}
             # Insert student data
             if self.appraised_data:
@@ -1230,15 +1327,25 @@ class StudentScreen(ctk.CTkFrame):
             self.curriculum_tree.configure(yscrollcommand=vsb.set)
             vsb.pack(side="right", fill="y")
 
+            curriculum_column_widths = {
+                "Course No.": 130,
+                "Descriptive Title": 300,
+                "Year Level": 90,
+                "Units": 80,
+                "Lec": 80,
+                "Lab": 80,
+                "Pre-requisite": 150,
+                "Grade": 90
+            }
+
             for column in table_curriculum:
                 self.curriculum_tree.heading(column, text=column)
-                if column == "Descriptive_Title":
-                    self.curriculum_tree.column(column, width=250, anchor='center')
-                elif column == "Course_No":
-                    self.curriculum_tree.column(column, width=100, anchor='center')
-                else:
-                    self.curriculum_tree.column(column, width=80, anchor='center')
-
+                self.curriculum_tree.column(
+                    column, 
+                    width=curriculum_column_widths.get(column, 150), 
+                    anchor='center',
+                    stretch=True
+                )
             # Clear existing data
             for item in self.curriculum_tree.get_children():
                 self.curriculum_tree.delete(item)
@@ -1375,6 +1482,9 @@ class StudentScreen(ctk.CTkFrame):
         ttk.Label(left_frame, text="Parent/Guardian:______________________", font=("Times New Roman", 12)).pack(anchor="w")
         ttk.Label(left_frame, text="Contact No:__________________________", font=("Times New Roman", 12)).pack(anchor="w")
 
+        # Button to select fallback subject
+        fallback_button = ctk.CTkButton(left_frame, bg_color="transparent", corner_radius= 30, text_color="black" ,text="Select Special Class", command=self.select_fallback_subject)
+        fallback_button.pack(anchor="w", pady=(10, 0))
         # Table to display course information
         table_frame = tk.Frame(print_frame, padx=10, pady=10)
         table_frame.pack(side=tk.TOP, fill="both", expand=True)
@@ -1590,16 +1700,92 @@ class StudentScreen(ctk.CTkFrame):
         ttk.Label(received_frame, text="Received:", font=("Times New Roman", 11)).pack(anchor="sw", pady=(10, 0), padx=(0, 10))
         ttk.Label(received_frame, text="MARIA JONACEL B. SAZON", font=("Times New Roman", 11)).pack(anchor="sw", pady=(0, 0), padx=(0,10))
         ttk.Label(received_frame, text="College Registrar", font=("Times New Roman", 11)).pack(anchor="sw", pady=(0, 10), padx=(0, 10))
-
+        
         print_window.focus_set()
         print_window.bind('<Control-p>', lambda event: self.print_content_irregular(print_window))
+    
+    def select_fallback_subject(self):
+        # Open a new window to select a fallback subject
+        fallback_window = tk.Toplevel(self)
+        fallback_window.title("Special Class")
+        fallback_window.geometry("400x300")
+
+        # Create a listbox to display available subjects
+        subject_listbox = tk.Listbox(fallback_window, selectmode=tk.SINGLE)
+        subject_listbox.pack(expand=True, fill="both", padx=10, pady=10)
+
+        # Fetch available subjects from the database
+        db_handler = DatabaseHandler()
+        available_subjects = db_handler.fetch_available_fallback_subjects(self.selected_id_no)
+
+        # Populate the listbox with available subjects
+        for subject in available_subjects:
+            subject_listbox.insert(tk.END, f"{subject['course_no']} - {subject['descriptive_title']} ({subject['units']})")
+
+        # Button to confirm selection
+        confirm_button = ttk.Button(fallback_window, text="Add Subject", command=lambda: self.add_selected_subject(subject_listbox, fallback_window))
+        confirm_button.pack(pady=(10, 0))
+        
+    def add_selected_subject(self, listbox, window):
+        # Get the selected subject
+        selected_index = listbox.curselection()
+        if selected_index:
+            selected_subject = listbox.get(selected_index)
+            # Parse the selected subject to extract course number and title
+            course_no, title_info = selected_subject.split(" - ")
+            title, units_info = title_info.rsplit("(", 1)
+            units = units_info.split(")")[0].strip()
+
+            # Insert the selected subject into the Treeview
+            self.treeview.insert("", "end", values=(course_no, title.strip(), units, ""))
+            self.update_total_units()
+            window.destroy()  # Close the selection window
+        else:
+            messagebox.showwarning("No Selection", "Please select a subject to add.")
+
+    def update_total_units(self):
+        total_units = 0
+        for item in self.treeview.get_children():
+            values = self.treeview.item(item, 'values')
+            try:
+                # Check if the first value is 'Total', if so, skip it
+                if values[0] == "Total":
+                    continue
+                # Convert units to integer, handling potential string or float inputs
+                units = int(float(values[2]))
+                total_units += units
+
+            except (ValueError, IndexError):
+                continue  # Skip if there's an error converting units
+
+        # Clear the existing total units row if it exists
+        for item in self.treeview.get_children():
+            values = self.treeview.item(item, 'values')
+            if values[0] == "Total":
+                self.treeview.delete(item)
+
+        # Add the updated total units row
+        self.treeview.insert("", "end", values=("Total", "", total_units, ""))
+
 
     def print_content_irregular(self, print_window):
-        # Create a temporary PDF file
-        temp_pdf = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
-        pdf_path = temp_pdf.name
-        temp_pdf.close()
-            # Year level mapping
+        def sanitize_filename(name):
+            # Remove invalid filename characters and replace spaces with underscores
+            invalid_chars = '<>:"/\\|?*'
+            filename = ''.join(c for c in name if c not in invalid_chars)
+            filename = filename.replace(' ', '_')
+            return filename
+
+        # Create filename with student name and timestamp
+        student_filename = sanitize_filename(self.student_name_irreg)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        pdf_filename = f"{student_filename}_{timestamp}.pdf"
+        
+        # Create the PDF in temp directory with custom filename
+        temp_dir = tempfile.gettempdir()
+        pdf_path = os.path.join(temp_dir, pdf_filename)
+        
+        # Year level mapping
         year_mapping = {
             '1': '1st Year',
             '2': '2nd Year',
@@ -1655,80 +1841,26 @@ class StudentScreen(ctk.CTkFrame):
         c.drawString(40, y, "Contact No:___________________________")
         y -= 20
 
+
         table_columns = ["Course Number", "Course Title", "Unit Credit", "Faculty"]
         data = [table_columns]
+        total_units = 0        
+        # Retrieve courses from the Treeview
+        for item in self.treeview.get_children():
+            values = self.treeview.item(item, 'values')
+            course_no = textwrap.fill((values[0]),40)
+            descriptive_title = textwrap.fill((values[1]),40)
+            units = values[2]
+            faculty = values[3]
 
-        total_units = 0
-        seen_rows = set()
-        # Get prerequisite analysis for irregular students
-        prerequisite_analysis = self.check_prerequisites_irregular(self.curri_data_irreg, self.selected_year_semester.get())
-
-        # Define a comprehensive mapping of year levels to allowed no-grade course semesters
-        no_grade_semester_mapping = {
-            '2.1': ['1.1'],    # For 2.1, only 1.1 no-grade courses are allowed
-            '2.2': ['1.2'],    # For 2.2, only 1.2 no-grade courses are allowed
-            '3.1': ['2.1'],    # For 3.1, only 2.1 no-grade courses are allowed
-            '3.2': ['2.2'],    # For 3.2, only 2.2 no-grade courses are allowed
-            '4.1': ['3.1'],    # For 4.1, only 3.1 no-grade courses are allowed
-            '4.2': ['3.2']     # For 4.2, only 3.2 no-grade courses are allowed
-        }
-
-        semester_no_grade_courses = {
-            '1.1': [], '1.2': [], 
-            '2.1': [], '2.2': [], 
-            '3.1': [], '3.2': [], 
-            '4.1': [], '4.2': []
-        }
-
-        # Get the selected year semester
-        selected_year_semester = str(self.selected_year_semester.get())
-
-        # Process subjects in order
-        subject_categories = [
-            ('enrollable_subject', 'enrollable'), ('no_grade_course', 'no_grade'), ('prerequisite_subject', 'prerequisite'), ('failed_subject', 'failed')]
-
-        for category, category_name in subject_categories:
-            subjects = prerequisite_analysis.get(category, [])
-            
-            for subject in subjects:
-                course_no = subject.get('course_no', '')
-                
-                # Skip if course already seen
-                if course_no in seen_rows:
-                    continue
-                
-                # Special handling for no-grade courses
-                if category == 'no_grade_course':
-                    subject_year_level = str(subject.get('year_level', ''))
-                    
-                    # Check if the current selection has specific no-grade course restrictions
-                    if selected_year_semester in no_grade_semester_mapping:
-                        allowed_semesters = no_grade_semester_mapping[selected_year_semester]
-                        
-                        # Check if the subject's year level is in the allowed semesters
-                        if subject_year_level not in allowed_semesters or semester_no_grade_courses[subject_year_level]:
-                            continue
-                    
-                    # Mark this semester's no-grade course as used
-                    semester_no_grade_courses[subject_year_level].append(course_no)
-                
-                # Prepare subject data
-                descriptive_title = textwrap.fill(subject.get('descriptive_title', ''), 40)
-                units = subject.get('units', 0)
-                faculty = ""
-
-                data.append([course_no, descriptive_title, units, faculty])
-                seen_rows.add(course_no)
-                
-                # Calculate units
-                try:
-                    unit = int(units)
-                except (ValueError, TypeError):
-                    unit = 0
-                total_units += unit
-
-        # Add total units row
-        data.append(["Total ", "", total_units, ""])
+            # Prepare subject data for the table
+            data.append([course_no, descriptive_title, units, faculty])
+            #descriptive_title = textwrap.fill(subject.get('DESCRIPTIVE_TITLE', ''), 40)
+            # Add to total units
+            try:
+                total_units += int(units)  # Ensure units are summed correctly
+            except (ValueError, TypeError):
+                continue  # Skip if there's an error in conversion
 
         # Calculate dynamic row heights based on content
         row_heights = []
@@ -1760,7 +1892,7 @@ class StudentScreen(ctk.CTkFrame):
         t.drawOn(c, 30, y - h)
 
         # this to avoid overwriting
-        y -= h + 40
+        y -= h + 30
 
         # Certification and signature area
         c.drawString(50, y, f"This is to certify that the student indicated above is qualified to enroll this A.Y. {current_school_year or '_______________'}")
@@ -1792,35 +1924,28 @@ class StudentScreen(ctk.CTkFrame):
         y -= 20
         c.drawRightString(462, y, "College Registrar")        
 
-        # Save the PDF
+        # Draw footer image
+        footer_image_path = "C:/Users/Admin/Documents/Thesis_Estorque/Image/Footer.jpg"  # Update this path to your footer image
+        footer_height = 50  # Adjust height as needed
+        c.drawImage(footer_image_path, 0, 0, width=width, height=footer_height)
         c.save()
 
         try:
             if os.name == 'nt':  # Windows
                 chrome_path = r'c:/Program Files/Google/Chrome/Application/chrome.exe'
                 if os.path.exists(chrome_path):
-                    pdf_path = temp_pdf.name
                     if os.path.exists(pdf_path):
                         subprocess.run([chrome_path, pdf_path], shell=False)
                     else:
                         messagebox.showerror("Printing Error", "PDF file not found.")
                 else:
-                    chrome_path = r'c:/Program Files/Google/Chrome/Application/chrome.exe'
-                    if os.path.exists(chrome_path):
-                        pdf_path = temp_pdf.name
-                        if os.path.exists(pdf_path):
-                            subprocess.run([chrome_path, pdf_path], shell=False)
-                        else:
-                            messagebox.showerror("Printing Error", "PDF file not found.")
-                    else:
-                        messagebox.showerror("Printing Error", "Google Chrome executable not found.")
+                    messagebox.showerror("Printing Error", "Google Chrome executable not found.")
             else:
                 messagebox.showerror("Printing Error", "Printing is only supported on Windows.")
         except Exception as e:
             messagebox.showerror("Printing Error", f"An error occurred while printing: {str(e)}")
-
-        # Close the print window
-        print_window.destroy()
+        finally:
+            print_window.destroy()
 
 
     def import_students(self):
