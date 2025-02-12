@@ -9,34 +9,40 @@ from PIL import Image
 from tkinter import TclError
 import re
 
-
 ctk.set_default_color_theme("green")    
 class StudentApp(ctk.CTk):
-    def __init__(self):
+    def __init__(self, server_ip="192.168.254.125", server_port=65433):
         super().__init__()
         self.title("Computer Studies Grades Kiosk")
-        #self.server_running = False
+        self.server_ip = server_ip
+        self.server_port = server_port
         self.db_handler = DatabaseHandler()
+
         self.show_login()
-        
-    """def send_request(action, data):
-        request = {
-            "action": action,
-            "data": data
-        }
+            
+    def send_request(self, action, data=None):
+            """Send a request to the server dynamically."""
+            request = {
+                "action": action,
+                "data": data or {}  # Default to empty dictionary if no data is provided
+            }
 
-        # Connect to the server
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket:
-            client_socket.connect(('192.168.254.125', 65432))
-            client_socket.sendall(json.dumps(request).encode())
+            try:
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket:
+                    client_socket.connect((self.server_ip, self.server_port))
+                    client_socket.sendall(json.dumps(request).encode())
 
-            # Receive the response
-            response = client_socket.recv(1024).decode()
-            print("Server Response:", json.loads(response))
+                    # Receive the response
+                    response = client_socket.recv(1024).decode()
+                    return json.loads(response)  # Return JSON response
 
-    # Example usage:
-    send_request("get_grades", {"student_id": "12345"})"""
-        
+            except ConnectionRefusedError:
+                return {"status": "error", "message": "Server is not available"}
+            except json.JSONDecodeError:
+                return {"status": "error", "message": "Invalid response format"}
+            except Exception as e:
+                return {"status": "error", "message": str(e)}
+            
     def show_login(self):
         self.clear_frame()
         
@@ -104,7 +110,7 @@ class StudentApp(ctk.CTk):
         self.student_id_entry.bind("<Return>", lambda event: self.password_entry.focus_set())
         self.password_entry.bind("<Return>", lambda event: self.login())
 
-        ctk.CTkButton(login_frame, text="Login", font=("Helvetica", 15, "bold") ,command=self.login, width=100, corner_radius=30).pack(pady=20)
+        ctk.CTkButton(login_frame, text="Login", font=("Helvetica", 15, "bold") ,command=self.login, width=200, height=39, corner_radius=30).pack(pady=20)
         register_text = "Don't have an account? "
         register_label = ctk.CTkLabel(login_frame, text=register_text, fg_color="gainsboro", text_color="black")
         register_label.place(x=588, y=389)
@@ -225,7 +231,7 @@ class StudentApp(ctk.CTk):
         self.password_entry.bind("<Return>", lambda event: self.confirm_password_entry.focus_set())
         self.confirm_password_entry.bind("<Return>", lambda event: self.register())
 
-        ctk.CTkButton(register_frame, text="Register", font=("Helvetica", 15, "bold"),command=self.register, width=100, corner_radius=30).pack(pady=20)
+        ctk.CTkButton(register_frame, text="Register", font=("Helvetica", 15, "bold"),command=self.register, width=200, height=39, corner_radius=30).pack(pady=20)
         already_text = "Already have an account? "
         already_label = ctk.CTkLabel(register_frame, text=already_text, fg_color="gainsboro", text_color="black", font=("Helvetica", 12))
         already_label.place(x=582, y=420)
@@ -381,5 +387,8 @@ class StudentApp(ctk.CTk):
 
 if __name__ == "__main__":
     app = StudentApp()
+    # Example call: Fetching student grades dynamically
+    response = app.send_request("get_grades", {"student_id": "12345"})
+    print("Server Response:", response)
     app.mainloop()
         
