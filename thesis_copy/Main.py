@@ -6,7 +6,7 @@ import threading
 import sys , time
 import student_screen , curriculum_screen, archive_screen, appraisal_screen
 import grade_screen, admin_screen
-from server import Server
+from server import Peer
 from loginform import LoginForm
 from database import DatabaseHandler
 import database
@@ -21,11 +21,11 @@ class Application(ctk.CTk):
         self.title("BS Computer Science")
         #self.show_splash_screen()
         # Create and start the server in a separate thread
-        self.server = Server()  # Create the server instance
+        self.server = Peer()  # Create the server instance
         self.server_thread = threading.Thread(target=self.server.start_server)
         self.server_thread.daemon = True
         self.server_thread.start()
-
+        self.current_user_email = None
         # Get screen dimensions
         screen_width = self.winfo_screenwidth()
         screen_height = self.winfo_screenheight()
@@ -58,8 +58,8 @@ class Application(ctk.CTk):
         
     def start_server(self):
         # Start the server in a separate thread to avoid blocking the UI
-        server = Server()
-        server.start_server()
+        server = Peer()
+        server.start_server
 
     def preload_grade_data(self):
         """Preload grade data for all semesters"""
@@ -417,7 +417,6 @@ class Application(ctk.CTk):
             # Create and show new admin screen
             self.admin_screen = admin_screen.AdminScreen(self, self)
             self.admin_screen.pack(fill="both", expand=True)
-            
         except Exception as e:
             print(f"Error creating admin screen: {e}")
             messagebox.showerror("Error", f"Failed to load admin screen: {e}")

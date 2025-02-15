@@ -1,14 +1,14 @@
 import logging
 import threading
+from tkinter import simpledialog
 import customtkinter as ctk
 from CTkMessagebox import CTkMessagebox
 import tkinter as tk
 from tkinter import ttk, filedialog
 from tkinter import messagebox
 from database import DatabaseHandler
-from fuzzywuzzy import process  # Add this import at the top of the file
+from fuzzywuzzy import process 
 import pandas as pd
-
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -32,8 +32,7 @@ class GradeScreen(ctk.CTkFrame):
         self.cache_size_limit = 100 * 1024 * 1024
         self.cache_ttl = timedelta(minutes=30)
         self.master = master
-        
-        # Create database handler instance
+
         self.db_handler = DatabaseHandler()
         self.data_frame = None
 
@@ -203,8 +202,7 @@ class GradeScreen(ctk.CTkFrame):
             text="View and Edit", 
             image=self.edit_icon,
             command=self.open_view_edit_window, 
-            **button_style
-        )
+            **button_style)
         view_edit_button.pack(side=tk.RIGHT, padx=5)
 
         form_icon = Image.open("C:/Users/Admin/Documents/Thesis_Estorque/icons/form.png")
@@ -229,11 +227,11 @@ class GradeScreen(ctk.CTkFrame):
             self.update_idletasks()
             time.sleep(0.07)
         self.progress_bar.pack_forget()
-        back_button_style = {**button_style,"width": 32 }
+        back_button_style = {**button_style}
         
         back_icon = Image.open("C:/Users/Admin/Documents/Thesis_Estorque/icons/back.png")
         self.back_icon = ctk.CTkImage(light_image=back_icon, dark_image=back_icon, size=(20, 20))
-        ctk.CTkButton(self.back_frame, text="Back", image=self.back_icon, width=32 ,command=self.master.show_main_menu, **back_button_style).pack(side=tk.LEFT)
+        ctk.CTkButton(self.back_frame, text="Back", image=self.back_icon,command=self.master.show_main_menu, **back_button_style).pack(side=tk.LEFT)
 
     def open_completion_form(self):
         # Create a new top-level window for the completion form
@@ -1351,7 +1349,10 @@ class GradeScreen(ctk.CTkFrame):
             print(f"Error during window cleanup: {e}")
 
     def open_view_edit_window(self):
-        """Create window for viewing and editing grades"""
+        password = simpledialog.askstring("Password Required For Admin Only", "Enter password:", show="*")
+        if password != "BSCS@2024!":
+            messagebox.showerror("Invalid Password", "Password is incorrect.")
+            return  # Stop the function from executing further
         # Create a new top-level window for viewing and editing
         self.view_edit_window = ctk.CTkToplevel(self)
         self.view_edit_window.title("View and Edit Grades")
@@ -1647,3 +1648,4 @@ class GradeScreen(ctk.CTkFrame):
             self.db_handler.save_templates_to_database(file_paths)
 
             CTkMessagebox(title="Success", message="Templates have been uploaded successfully!")
+            

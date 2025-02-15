@@ -190,7 +190,6 @@ class LoginForm(ctk.CTkFrame):
         if not email or not password:
             self.error_label.configure(text="Please enter both email and password")
             return
-            
         # Admin credentials check - bypass all other validations
         if email == "admin@gmail.com" and password == "BSCS@2024!":
             self.error_label.configure(text="Admin Login Successful!", text_color="green")
@@ -220,7 +219,6 @@ class LoginForm(ctk.CTkFrame):
                         (user_data['id'],)
                     )
                     self.db_handler.conn.commit()
-
                     # Success case
                     self.error_label.configure(text="Login Successful!", text_color="green")
                     if self.login_success_callback:
