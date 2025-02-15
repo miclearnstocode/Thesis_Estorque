@@ -21,27 +21,32 @@ class StudentApp(ctk.CTk):
         self.show_login()
             
     def send_request(self, action, data=None):
-            """Send a request to the server dynamically."""
-            request = {
-                "action": action,
-                "data": data or {}  # Default to empty dictionary if no data is provided
-            }
+        request = {"action": action, "data": data or {}}
+        
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket:
+                client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 65536)
+                client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, 65536)
+                client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
 
-            try:
-                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket:
-                    client_socket.connect((self.server_ip, self.server_port))
-                    client_socket.sendall(json.dumps(request).encode())
+                client_socket.connect((self.server_ip, self.server_port))
+                client_socket.sendall(json.dumps(request).encode())
 
-                    # Receive the response
-                    response = client_socket.recv(1024).decode()
-                    return json.loads(response)  # Return JSON response
+                response = b""
+                while True:
+                    chunk = client_socket.recv(4096)
+                    if not chunk:
+                        break
+                    response += chunk
 
-            except ConnectionRefusedError:
-                return {"status": "error", "message": "Server is not available"}
-            except json.JSONDecodeError:
-                return {"status": "error", "message": "Invalid response format"}
-            except Exception as e:
-                return {"status": "error", "message": str(e)}
+                return json.loads(response.decode())
+
+        except ConnectionRefusedError:
+            return {"status": "error", "message": "Server is not available"}
+        except json.JSONDecodeError:
+            return {"status": "error", "message": "Invalid response format"}
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
             
     def show_login(self):
         self.clear_frame()

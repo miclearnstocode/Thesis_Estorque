@@ -1,5 +1,7 @@
 import csv
+from io import BytesIO
 import os, subprocess, tempfile
+import threading
 import tkinter as tk
 from tkinter import filedialog
 from tkinter import messagebox
@@ -114,9 +116,6 @@ class ArchiveScreen(ctk.CTkFrame):
                 label.grid(row=0, column=i, padx=5, pady=5, sticky="w")
             self.table_frame.grid_columnconfigure(i, weight=1, minsize=150)
 
-        # Load initial students list
-        self.load_students()
-
     def load_students(self, students=None):
         # Clear existing entries
         for widget in self.table_frame.winfo_children()[5:]:  # Assuming 5 header labels now
@@ -125,6 +124,8 @@ class ArchiveScreen(ctk.CTkFrame):
         # If no students provided, fetch all
         if students is None:
             students = self.db_handler.get_students_list()
+
+        self.selected_students = []
 
         # Populate table
         for row, student in enumerate(students, 1):
@@ -172,6 +173,7 @@ class ArchiveScreen(ctk.CTkFrame):
     # Register Times New Roman font
     pdfmetrics.registerFont(TTFont('TimesNewRoman', 'C:\\Windows\\Fonts\\times.ttf'))
     pdfmetrics.registerFont(TTFont('TimesNewRomanBold', 'C:\\Windows\\Fonts\\timesbd.ttf'))
+
 
     def on_student_click(self, student_data):
         def add_header_footer(canvas, doc):
@@ -243,9 +245,9 @@ class ArchiveScreen(ctk.CTkFrame):
             canvas.restoreState()
 
         try:
-            # Create a PDF file
-            pdf_filename = f"{student_data['ID_NO']}_report.pdf"
-
+            temp_pdf =tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
+            pdf_filename = temp_pdf.name
+            temp_pdf.close()
             # Adjust page layout to account for header and footer
             def page_layout(canvas, doc):
                 add_header_footer(canvas, doc)
@@ -403,7 +405,7 @@ class ArchiveScreen(ctk.CTkFrame):
             if os.name == 'nt':
                 chrome_path = r'C:/Program Files/Google/Chrome/Application/chrome.exe'
                 if os.path.exists(chrome_path):
-                    subprocess.run([chrome_path, os.path.abspath(pdf_filename)], shell=False)
+                    subprocess.run([chrome_path, pdf_filename], shell=False)
                 else:
                     messagebox.showerror("Printing Error", "Google Chrome executable not found.")
             else:
@@ -413,6 +415,7 @@ class ArchiveScreen(ctk.CTkFrame):
             import traceback
             traceback.print_exc()
             messagebox.showerror("Printing Error", f"An error occurred while printing: {str(e)}")
+
 
     def get_year_level_title(self, year_level):
         """Simple mapping of year levels to descriptive titles"""

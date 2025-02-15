@@ -16,7 +16,7 @@ import re
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 from database import DatabaseHandler
-from fuzzywuzzy import fuzz, process
+from fuzzywuzzy import fuzz
 from sklearn.cluster import AgglomerativeClustering
 import numpy as np
 from PIL import Image, ImageTk
@@ -44,7 +44,7 @@ class StudentScreen(ctk.CTkFrame):
         # Create and place the background label
         self.bg_label = tk.Label(self, image=self.main_bg_photo, compound='center')
         self.bg_label.place(x=0, y=0, relwidth=1, relheight=1)
-        # Update the title label to use CTk
+
         ctk.CTkLabel(self,  text="Student", font=("Vivaldi", 40, "bold"), text_color="black", fg_color="transparent",  corner_radius=50, padx=20, pady=10).pack(pady=30)
         # Button style configuration
         button_style = {
@@ -67,8 +67,8 @@ class StudentScreen(ctk.CTkFrame):
             regular_icon = Image.open("C:/Users/Admin/Documents/Thesis_Estorque/icons/regulars.png")
             self.regular_icon =ctk.CTkImage(light_image=regular_icon, dark_image=regular_icon, size=(30, 30))
 
-            ctk.CTkButton(self.regular_frame, text="Regular", image=self.regular_icon,**button_style,command=lambda: self.show_search("Regular")).pack(side=tk.RIGHT,padx=10)
-            ctk.CTkButton(self.regular_frame, text="Irregular", image=self.irreg_icon, **button_style,command=self.show_search_irregular).pack(side=tk.RIGHT, padx=10)
+            ctk.CTkButton(self.regular_frame, text="Regular", image=self.regular_icon,**button_style, font=('Helvetica',14, 'bold'),command=lambda: self.show_search("Regular")).pack(side=tk.RIGHT,padx=10)
+            ctk.CTkButton(self.regular_frame, text="Irregular", image=self.irreg_icon, **button_style,font=('Helvetica',14, 'bold'),command=self.show_search_irregular).pack(side=tk.RIGHT, padx=10)
         except Exception as e:
             print(f"Error loading Irregular/Regular icon: {e}")
         # Frames for search bar and student list
@@ -83,8 +83,111 @@ class StudentScreen(ctk.CTkFrame):
 
         back_icon = Image.open("C:/Users/Admin/Documents/Thesis_Estorque/icons/back.png")
         self.back_icon = ctk.CTkImage(light_image=back_icon, dark_image=back_icon, size=(20, 20))
-        ctk.CTkButton(self.back_frame, text="Back",image=self.back_icon,**button_style ,command=self.master.show_main_menu).pack(side=tk.LEFT)
+        ctk.CTkButton(self.back_frame, text="Back",image=self.back_icon,**button_style, width=32 ,font=('Helvetica',14, 'bold'),command=self.master.show_main_menu).pack(side=tk.LEFT)
+        # Add Summary button
+        summary_icon = Image.open("C:/Users/Admin/Documents/Thesis_Estorque/icons/summary.png")  # Load your summary icon
+        self.summary_icon = ctk.CTkImage(light_image=summary_icon, dark_image=summary_icon, size =(30, 30))
+        ctk.CTkButton(self, text="Summary", image=self.summary_icon, **button_style, font=('Helvetica',14, 'bold'),command=self.show_summary).place(x=700, y=147)  # Place the Summary button at the specified coordinates
     
+    def show_summary(self):
+        # Create a new frame for the summary with width and height specified in the constructor
+        summary_frame = ctk.CTkFrame(self, width=800, height=800, fg_color="gainsboro", corner_radius=30)
+        summary_frame.place(x=60, y=200)
+
+        # Title for the summary frame
+        ctk.CTkLabel(summary_frame, text="Enrollment Summary", font=("Vivaldi", 30, "bold")).pack(pady=20)
+        
+        # Create a notebook for different year levels
+        notebook = ttk.Notebook(summary_frame, width=950, height=320)
+        notebook.pack(pady=10, expand=True, fill='both')
+
+        # Sample student data organized by year
+        student_data = {
+            "1st Year": [
+                {"name": "John Doe", "status": "Not Enrolled", "year_to_enroll": "2024"},
+                {"name": "Alice Brown", "status": "Enrolled", "year_to_enroll": "2023"},
+            ],
+            "2nd Year": [
+                {"name": "Jane Smith", "status": "Enrolled", "year_to_enroll": "2023"},
+                {"name": "Bob White", "status": "Not Enrolled", "year_to_enroll": "2024"},
+            ],
+            "3rd Year": [
+                {"name": "Alice Johnson", "status": "Not Enrolled", "year_to_enroll": "2024"},
+                {"name": "Charlie Black", "status": "Enrolled", "year_to_enroll": "2023"},
+            ],
+            "4th Year": [
+                {"name": "David Green", "status": "Enrolled", "year_to_enroll": "2023"},
+                {"name": "Eve Blue", "status": "Not Enrolled", "year_to_enroll": "2024"},
+            ],
+        }
+
+        # Calculate total unenrolled students and total students across all years
+        total_unenrolled = sum(1 for students in student_data.values() for student in students if student['status'] == "Not Enrolled")
+        total_students = sum(len(students) for students in student_data.values())
+
+        # Create tabs for each year level
+        for year, students in student_data.items():
+            tab = ctk.CTkFrame(notebook)
+            notebook.add(tab, text=year)
+
+            tree_frame = ctk.CTkFrame(tab)
+            tree_frame.pack(pady=10, padx=10, fill='both', expand=True)
+
+            # Create a Treeview widget to display student data in a table format
+            columns = ("Name", "Status", "Year to Enroll")
+            tree = ttk.Treeview(tree_frame, columns=columns, show="headings", height=10)
+            tree.pack(side='left', fill='both', expand=True)
+ 
+            # Add a vertical scrollbar using ttk.Scrollbar
+            scrollbar = ttk.Scrollbar(tree_frame, orient="vertical", command=tree.yview)
+            scrollbar.pack(side="right", fill="y")
+            tree.configure(yscrollcommand=scrollbar.set)
+
+            # Set column headings and alignment
+            tree.heading("Name", text="Student Name", anchor="center")  # Align left
+            tree.heading("Status", text="Enroll Status", anchor="center")  # Center align
+            tree.heading("Year to Enroll", text="Year to Enroll", anchor="center")  # Align left
+
+            # Set column widths and alignment for values
+            tree.column("Name", width=200, anchor="w")  # Align left
+            tree.column("Status", width=150, anchor="center")  # Center align
+            tree.column("Year to Enroll", width=150, anchor="center")  # Align left
+
+            tree.tag_configure("oddrow", background="#f0f0f0")
+            tree.tag_configure("evenrow", background="#ffffff")
+
+            for i, student in enumerate(students):
+                tag = "evenrow" if i % 2 == 0 else "oddrow"
+                tree.insert("", "end", values=(student['name'], student['status'], student['year_to_enroll']), tags=(tag,))
+
+            # Calculate unenrolled percentage for this year based on the total number of students
+            unenrolled_count = sum(1 for student in students if student['status'] == "Not Enrolled")
+            unenrolled_percentage = (unenrolled_count / total_students) * 100 if total_students > 0 else 0
+
+            # Add a label for unenrolled students
+            progress_label = ctk.CTkLabel(summary_frame, text=f"Un-enrolled Students: {unenrolled_count} ({unenrolled_percentage:.2f}% of total)")
+            progress_label.place(x=20, y=433)
+
+            # Add a progress bar for unenrolled students
+            progress_bar = ctk.CTkProgressBar(summary_frame, width=300, height=15)
+            progress_bar.set(unenrolled_percentage / 100)  # Set progress bar value
+            progress_bar.place(x=20, y=453)
+
+        # Add a global progress bar for all unenrolled students
+        global_unenrolled_percentage = (total_unenrolled / total_students) * 100 if total_students > 0 else 0
+
+        global_progress_label = ctk.CTkLabel(summary_frame, text=f"Total Un-enrolled Students: {total_unenrolled} ({global_unenrolled_percentage:.2f}%)")
+        global_progress_label.place(x=20, y=480)
+
+        global_progress_bar = ctk.CTkProgressBar(summary_frame, width=300, height=15)
+        global_progress_bar.set(global_unenrolled_percentage / 100)  # Set progress bar value
+        global_progress_bar.place(x=20, y=500)
+
+        close_icon= Image.open("C:/Users/Admin/Documents/Thesis_Estorque/icons/close.png")
+        self.close_icon = ctk.CTkImage(light_image=close_icon, dark_image=close_icon, size=(30, 30))
+        ctk.CTkButton(summary_frame, text="Close", text_color="black" , font=('Helvetica',14, 'bold'),corner_radius=30, image=self.close_icon,command=summary_frame.destroy).pack(pady=30,padx=30 ,side="right")
+        
+
     def validate_input(self, new_value):
         if  len (new_value) > 11:
             return False
@@ -124,15 +227,29 @@ class StudentScreen(ctk.CTkFrame):
             self.print_button.pack(side="left", padx=(0, 5))
         except Exception as e:
             print(f"Error loading print icon: {e}")
+
+        # Checkbox for enrollment status
+        self.enroll_var = ctk.BooleanVar()
+        self.enroll_checkbox = ctk.CTkCheckBox(self.search_frame, text="", text_color="white",variable=self.enroll_var, command=self.update_enroll_label, state="disabled")
+        self.enroll_checkbox.pack(side="left", padx=5)
+        
+        # Enrollment status label
+        self.enroll_label = ctk.CTkLabel(self.search_frame, text="Enroll", font=ctk.CTkFont(size=14))
+        self.enroll_label.place(x=719, y=6)
+
         try:
             add_student = Image.open("C:/Users/Admin/Documents/Thesis_Estorque/icons/add_students.png")
             self.add_student=ctk.CTkImage(light_image=add_student, dark_image=add_student,size=(30,30))
             import_button = ctk.CTkButton( self.search_frame, text="Add Student", image=self.add_student, text_color="black", fg_color="transparent", border_width=1 ,hover_color="grey70",command=self.import_students, width=120, height=32)
             import_button.pack(side="left", padx=(0,5))
         except Exception as e:
-            print(f"Error loading add student icon: {e}")
+            CTkMessagebox(title="Error",message=f"Error loading add student icon: {e}")
         # Bind the Enter key to search functionality
         self.search_entry.bind("<Return>", lambda event: self.search_student())
+    
+    def update_enroll_label(self):
+        self.enroll_label.configure(text="Enrolled" if self.enroll_var.get() else "Enroll")
+    
 
     def clear_all_displays(self):
         # Clear search frame
@@ -161,7 +278,7 @@ class StudentScreen(ctk.CTkFrame):
         self.search_var = tk.StringVar()
         self.selected_year_semester = tk.StringVar()
 
-    def check_enrollment_status(self, event=None):
+    def check_enrollment_status(self, event=None): #add a year level parameter 
         id_no = self.search_var.get().strip()
         year_level = self.selected_year_semester.get()
 
@@ -545,6 +662,8 @@ class StudentScreen(ctk.CTkFrame):
         return ""
     
     def print_students(self):
+        self.enroll_var.set(True)
+        self.update_enroll_label()
         if not hasattr(self, 'selected_id_no'):
             messagebox.showinfo("No Student Selected", "Please search for a student first.")
             return
@@ -965,9 +1084,9 @@ class StudentScreen(ctk.CTkFrame):
 
         # Year and Semester dropdown
         self.selected_year_semester = ctk.StringVar()
-        year_semester_combobox = ctk.CTkComboBox(self.search_frame, values=['1.1', '1.2', '2.1', '2.2', '3.1', '3.2', '4.1', '4.2'],variable=self.selected_year_semester, width=100, height=32, state="readonly",command=lambda choice: self.check_enrollment_irregular(None))
-        year_semester_combobox.pack(side="left", padx=5)
-        year_semester_combobox.set("Select")  # Set default text
+        self.year_semester_combobox = ctk.CTkComboBox(self.search_frame, values=['1.1', '1.2', '2.1', '2.2', '3.1', '3.2', '4.1', '4.2'],variable=self.selected_year_semester, width=100, height=32, state="readonly",command=lambda choice: self.check_enrollment_irregular(None))
+        self.year_semester_combobox.pack(side="left", padx=5)
+        self.year_semester_combobox.set("Select")  # Set default text
 
         print_icon = Image.open("C:/Users/Admin/Documents/Thesis_Estorque/icons/prints.png")
         self.print_icons =ctk.CTkImage(light_image=print_icon, dark_image=print_icon, size=(30, 30))
@@ -977,126 +1096,143 @@ class StudentScreen(ctk.CTkFrame):
         # Bind the Enter key to search functionality
         self.search_entry.bind("<Return>", lambda event: self.search_student_irregular())
         
+        # Checkbox for enrollment status
+        self.enroll_vars = ctk.BooleanVar()
+        self.enroll_checkboxs = ctk.CTkCheckBox(self.search_frame, text="", text_color="white",variable=self.enroll_vars, command=self.update_enroll_labels, state="disabled")
+        self.enroll_checkboxs.pack(side="left", padx=5)
+        
+        # Enrollment status label
+        self.enroll_labels = ctk.CTkLabel(self.search_frame, text="Enroll", font=ctk.CTkFont(size=14))
+        self.enroll_labels.place(x=725, y=6)
+    
+    def update_enroll_labels(self):
+        self.enroll_labels.configure(text="Enrolled" if self.enroll_vars.get() else "Enroll")
+    
     def check_enrollment_irregular(self, event=None):
-            id_no = self.search_var.get().strip()
-            selected_year_level = self.selected_year_semester.get().strip()
+        id_no = self.search_var.get().strip()
+        selected_year_level = self.selected_year_semester.get().strip()
+        
+        if not id_no:
+            CTkMessagebox(title="Input Error", message="Please Enter a student ID_NO")
+            self.print_button.configure(state="disabled")
+            return None
 
-            if not id_no:
-                messagebox.showwarning("Input Error", "Please Enter a student ID_NO")
-                self.print_button.configure(state="disabled")
-                return None
+        db_handler = DatabaseHandler()
+        try:
+            # Fetch all student data from appraised_curriculum
+            appraised_data = db_handler.fetch_irregular_students(id_no)
 
-            valid_year_levels = ['1.1', '1.2', '2.1', '2.2', '3.1', '3.2', '4.1', '4.2']
-            
-            db_handler = DatabaseHandler()
-            try:
-                appraised_data = db_handler.fetch_irregular_students(id_no)
-
-                if not appraised_data:
-                    suggested_year = '1.1'
-                    logging.info(f"No records found. Suggesting year level: {suggested_year}")
-                    messagebox.showinfo("Enrollment Status", 
-                        f"No records found. Student should enroll in {suggested_year}")
-                    self.selected_year_semester.set(suggested_year)
-                    self.print_button.configure(state="normal")
-                    return appraised_data
-
-                # Debug print for all records
-                print("\nAll Records:")
-                for record in appraised_data:
-                    print(f"Course: {record.get('course_no')}, Year Level: {record.get('year_level')}, Grade: {record.get('grades')}")
-
-                def get_semester_value(year_level):
-                    try:
-                        year, sem = year_level.split('.')
-                        return float(f"{year}.{sem}")
-                    except (ValueError, AttributeError):
-                        return 0.0
-
-                def is_semester_completed(data, year_level):
-                    semester_courses = [
-                        record for record in data 
-                        if str(record.get('year_level', '')) == year_level
-                    ]
-                    
-                    if not semester_courses:
-                        return False
-                    
-                    # Check if all courses in the semester have valid grades
-                    for course in semester_courses:
-                        grade = str(course.get('grades', '0.00')).strip()
-                        try:
-                            grade_decimal = Decimal(grade)
-                            if grade_decimal == Decimal('0.00') or grade_decimal == Decimal('5.00'):
-                                return False
-                        except InvalidOperation:
-                            return False
-                    
-                    return True
-
-                # Find the latest completed semester
-                latest_completed = None
-                for year_level in valid_year_levels:
-                    if is_semester_completed(appraised_data, year_level):
-                        latest_completed = year_level
-                        print(f"Found completed semester: {year_level}")
-
-                # Determine next semester
-                if latest_completed:
-                    year, sem = map(int, latest_completed.split('.'))
-                    if sem == 1:
-                        next_semester = f"{year}.2"
-                    else:
-                        next_semester = f"{year + 1}.1"
-                    
-                    # Verify next semester is valid
-                    if next_semester in valid_year_levels:
-                        suggested_year_level = next_semester
-                    else:
-                        suggested_year_level = valid_year_levels[-1]
-                else:
-                    # If no completed semesters, start with 1.1
-                    suggested_year_level = '1.1'
-
-                print(f"\nSuggestion Details:")
-                print(f"Latest Completed Semester: {latest_completed}")
-                print(f"Suggested Year Level: {suggested_year_level}")
-
-                # Update the selected year level
-                if selected_year_level != suggested_year_level:
-                    self.selected_year_semester.set(suggested_year_level)
-                    messagebox.showinfo("Year Level Suggestion", 
-                        f"Based on academic progress, student should enroll in {suggested_year_level}")
-
-                # Check if student can enroll in suggested semester
-                semester_courses = [
-                    record for record in appraised_data 
-                    if str(record.get('year_level', '')) == suggested_year_level
-                ]
-
-                has_grades = any(
-                    Decimal(str(record.get('grades', '0.00'))) > Decimal('0.00')
-                    for record in semester_courses
-                )
-
-                if has_grades:
-                    self.print_button.configure(state="disabled")
-                    messagebox.showinfo("Enrollment Status", 
-                        f"Student already has grades for {suggested_year_level}. Cannot enroll.")
-                else:
-                    self.print_button.configure(state="normal")
-                    messagebox.showinfo("Enrollment Status", 
-                        f"Student can enroll in {suggested_year_level}")
-
+            if not appraised_data:
+                logging.info(f"No data found for ID_NO: {id_no}. Allowing new enrollment.")
+                CTkMessagebox(title="Enrollment Status", message="No records found. Student can enroll.")
+                self.print_button.configure(state="normal")
                 return appraised_data
 
-            except Exception as e:
-                logging.error(f"An error occurred while checking enrollment status: {str(e)}")
-                messagebox.showerror("Database Error", 
-                    f"An error occurred while checking enrollment status: {str(e)}")
-                self.print_button.configure(state="disabled")
-                return None
-                
+            # Prepare data for clustering
+            def convert_year_level_to_numeric(year_level):
+                # Ensure year_level is converted to string
+                year_level = str(year_level)
+                # Convert year level to a numeric representation
+                year, semester = map(int, year_level.split('.'))
+                return year + (semester / 10)  # e.g., 3.1 becomes 3.1, 3.2 becomes 3.2
+
+            year_levels = np.array([
+                convert_year_level_to_numeric(record['year_level']) 
+                for record in appraised_data
+            ]).reshape(-1, 1)
+            
+            # Apply Agglomerative Clustering
+            clustering_model = AgglomerativeClustering(n_clusters=1, metric='euclidean', linkage='ward')
+            clustering_model.fit(year_levels)
+            labels = clustering_model.labels_
+
+            # Determine the next semester based on completed courses
+            def suggest_next_semester(data, labels):
+                # Semester progression mapping
+                semester_progression = {
+                    '1.1': '1.2', '1.2': '2.1', 
+                    '2.1': '2.2', '2.2': '3.1', 
+                    '3.1': '3.2', '3.2': '4.1', 
+                    '4.1': '4.2', '4.2': 'Graduate'
+                }
+
+                # Track semester completion and labels
+                semester_info = {}
+                for i, record in enumerate(data):
+                    year_level = str(record['year_level'])
+                    
+                    # Check if grades indicate course completion
+                    is_completed = (
+                        record['grades'] not in ['', '0.00'] and 
+                        (isinstance(record['grades'], (int, float, Decimal)) and float(record['grades']) >= 1.0) or
+                        (isinstance(record['grades'], str) and record['grades'] != '' and float(record['grades']) >= 1.0)
+                    )
+                    
+                    # Store semester information with its cluster label
+                    semester_info[year_level] = {
+                        'completed': is_completed,
+                        'label': labels[i]
+                    }
+
+                # Sort semesters by year and semester
+                sorted_semesters = sorted(
+                    semester_info.keys(), 
+                    key=lambda x: (int(x.split('.')[0]), int(x.split('.')[1]))
+                )
+
+                # Find the most recent completed semester in the same cluster
+                current_cluster = labels[0]  # Use the first label as reference
+                for semester in reversed(sorted_semesters):
+                    # Check if semester is in the same cluster and completed
+                    if (semester_info[semester]['label'] == current_cluster and 
+                        semester_info[semester]['completed']):
+                        
+                        # Get the next semester in progression
+                        next_semester = semester_progression.get(semester)
+                        
+                        # Validate next semester
+                        while next_semester:
+                            # Check if next semester exists in original data and is not completed
+                            if (next_semester in semester_info and 
+                                not semester_info[next_semester]['completed']):
+                                return next_semester
+                            
+                            # Move to the next semester in progression
+                            next_semester = semester_progression.get(next_semester)
+
+                # Fallback: return the first semester if no progression found
+                return sorted_semesters[0] if sorted_semesters else '1.1'
+
+            # Get suggested semester
+            suggested_semester = suggest_next_semester(appraised_data, labels)
+
+            # Automatically set the combobox to the suggested semester
+            if suggested_semester in self.year_semester_combobox.cget("values"):
+                logging.info(f"Setting semester to: {suggested_semester}")
+                self.year_semester_combobox.set(suggested_semester)
+                self.selected_year_semester.set(suggested_semester)
+
+                # Provide feedback if selected semester differs from suggested
+                if selected_year_level != suggested_semester:
+                    CTkMessagebox(
+                        title="Semester Suggestion", 
+                        message=f"Recommended semester is {suggested_semester}. Please verify."
+                    )
+
+            # Enable print button
+            self.print_button.configure(state="normal")
+
+            return appraised_data
+
+        except Exception as e:
+            logging.error(f"Enrollment check error: {str(e)}")
+            CTkMessagebox(
+                title="Database Error", 
+                message=f"An error occurred while checking enrollment status: {str(e)}"
+            )
+            self.print_button.configure(state="disabled")
+            return None
+                                                
     def check_prerequisites_irregular(self, appraised_data, selected_year_semester):
         enrollable_subjects = []
         prerequisite_subjects = []
@@ -1246,7 +1382,7 @@ class StudentScreen(ctk.CTkFrame):
 
         db_handler = DatabaseHandler()
         try:
-            self.appraised_data = db_handler.fetch_irregular_students(identifier,)
+            self.appraised_data = db_handler.fetch_irregular_students(identifier)
             if self.appraised_data:
                 # Get current year from appraised_curriculum
                 current_yr = self.appraised_data[0].get('year')  # This gets the 'year' column value
@@ -1414,6 +1550,8 @@ class StudentScreen(ctk.CTkFrame):
             messagebox.showerror("Database Error", str(e))
 
     def print_students_irregular(self):
+        self.enroll_vars.set(True)
+        self.update_enroll_labels()
         if not hasattr(self, 'selected_id_no'):
             messagebox.showinfo("No Student Selected", "Please search for a student first.")
             return
@@ -1428,7 +1566,7 @@ class StudentScreen(ctk.CTkFrame):
         db_handler = DatabaseHandler()
         try:
             # Fetch irregular student data
-            self.curri_data_irreg = db_handler.fetch_irregular_students(id_no,)
+            self.curri_data_irreg = db_handler.fetch_irregular_students(id_no)
 
         except Exception as e:
             messagebox.showerror("Error", f"An error occurred while fetching curriculum data: {str(e)}")
@@ -1708,7 +1846,7 @@ class StudentScreen(ctk.CTkFrame):
         # Open a new window to select a fallback subject
         fallback_window = tk.Toplevel(self)
         fallback_window.title("Special Class")
-        fallback_window.geometry("400x300")
+        fallback_window.geometry("500x400")
 
         # Create a listbox to display available subjects
         subject_listbox = tk.Listbox(fallback_window, selectmode=tk.SINGLE)
@@ -1723,7 +1861,7 @@ class StudentScreen(ctk.CTkFrame):
             subject_listbox.insert(tk.END, f"{subject['course_no']} - {subject['descriptive_title']} ({subject['units']})")
 
         # Button to confirm selection
-        confirm_button = ttk.Button(fallback_window, text="Add Subject", command=lambda: self.add_selected_subject(subject_listbox, fallback_window))
+        confirm_button = ctk.CTkButton(fallback_window, corner_radius=30 , text_color="black",text="Add Subject", command=lambda: self.add_selected_subject(subject_listbox, fallback_window))
         confirm_button.pack(pady=(10, 0))
         
     def add_selected_subject(self, listbox, window):

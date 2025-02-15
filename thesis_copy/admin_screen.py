@@ -284,13 +284,13 @@ class AdminScreen(ctk.CTkFrame):
         BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
         # Create path to icons directory relative to your script
-        icon_path = os.path.join(BASE_DIR, "..", "icons", "user.png")
+        icon_path = os.path.join(BASE_DIR, "..", "icons", "C:/Users/Admin/Documents/Thesis_Estorque/icons/user.png")
 
         user_icon = Image.open(icon_path)
         self.user_icon = ctk.CTkImage(light_image=user_icon, dark_image=user_icon, size=(30, 30))
 
         try:
-            icon_path = os.path.join(BASE_DIR, "..", "icons", "user.png")
+            icon_path = os.path.join(BASE_DIR, "..", "icons", "C:/Users/Admin/Documents/Thesis_Estorque/icons/user.png")
             user_icon = Image.open(icon_path)
             self.user_icon = ctk.CTkImage(light_image=user_icon, dark_image=user_icon, size=(30, 30))
             title_label = ctk.CTkLabel(

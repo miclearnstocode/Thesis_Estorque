@@ -6,105 +6,25 @@ import threading
 import sys , time
 import student_screen , curriculum_screen, archive_screen, appraisal_screen
 import grade_screen, admin_screen
-from loginform import LoginForm, RegistrationForm
+from server import Server
+from loginform import LoginForm
 from database import DatabaseHandler
 import database
 import socket
 import urllib.request
 import psutil
 from tkinter import messagebox
-import json
-
-class Server:
-    def __init__(self, host='192.168.254.125', port=65432):
-        #self.host = host
-        #self.port = port
-        self.db_handler = DatabaseHandler()
-
-    """def start_server(self):
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
-            server_socket.bind((self.host, self.port))
-            server_socket.listen()
-
-            print(f"Server listening on {self.host}:{self.port}")
-
-            while True:
-                conn, addr = server_socket.accept()
-                with conn:
-                    print(f"Connected by {addr}")
-                    data = conn.recv(1024).decode()
-
-                    if not data:
-                        break
-
-                    request = json.loads(data)
-                    action = request.get("action")
-                    response = {}
-
-                    if action == "get_student":
-                        student_id = request["data"]["student_id"]
-                        student_info = self.db_handler.get_student(student_id)
-                        response = {
-                            "status": "success",
-                            "action": "get_student",
-                            "data": student_info
-                        }
-
-                    elif action == "get_grades":
-                        student_id = request["data"]["student_id"]
-                        grades = self.db_handler.get_grades(student_id)
-                        response = {
-                            "status": "success",
-                            "action": "get_grades",
-                            "data": {
-                                "student_id": student_id,
-                                "grades": grades
-                            }
-                        }
-
-                    elif action == "school_year":
-                        student_id = request["data"]["student_id"]
-                        semester = request["data"]["semester"]
-                        school_year = self.db_handler.school_year(student_id, semester)
-                        response = {
-                            "status": "success",
-                            "action": "school_year",
-                            "data": {
-                                "student_id": student_id,
-                                "semester": semester,
-                                "school_year": school_year
-                            }
-                        }
-
-                    elif action == "get_descriptive_title":
-                        course_no = request["data"]["course_no"]
-                        descriptive_title = self.db_handler.get_descriptive_title(course_no)
-                        response = {
-                            "status": "success",
-                            "action": "get_descriptive_title",
-                            "data": {
-                                "course_no": course_no,
-                                "descriptive_title": descriptive_title
-                            }
-                        }
-
-                    else:
-                        response = {
-                            "status": "error",
-                            "message": "Invalid action"
-                        }
-
-                    conn.sendall(json.dumps(response).encode())"""
-
 
 class Application(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.title("BS Computer Science")
-        # Start the socket server in a separate thread
-        """self.server_thread = threading.Thread(target=self.start_server)
+        #self.show_splash_screen()
+        # Create and start the server in a separate thread
+        self.server = Server()  # Create the server instance
+        self.server_thread = threading.Thread(target=self.server.start_server)
         self.server_thread.daemon = True
-        self.server_thread.start()"""
+        self.server_thread.start()
 
         # Get screen dimensions
         screen_width = self.winfo_screenwidth()
@@ -135,10 +55,12 @@ class Application(ctk.CTk):
             login_success_callback=self.login_success,
             admin_login_callback=self.admin_login_success)
         self.grade_data = self.preload_grade_data()
-    """def start_server(self):
+        
+    def start_server(self):
         # Start the server in a separate thread to avoid blocking the UI
         server = Server()
-        server.start_server()"""
+        server.start_server()
+
     def preload_grade_data(self):
         """Preload grade data for all semesters"""
         try:

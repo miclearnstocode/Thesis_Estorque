@@ -209,99 +209,135 @@ class DatabaseHandler:
             messagebox.showinfo("Success", "Appraised data saved to the database successfully!")
         except mysql.connector.Error as e:
             messagebox.showerror("Error", f"Failed to save data to the database: {e}")
+   
+    def fetch_available_fallback_subjects(self, id_no):
+        logging.debug(f"Fetching available fallback subjects for ID_NO: {id_no}")
+        query = """
+            SELECT 
+                ac.course_no,
+                ac.descriptive_title,
+                ac.units
+            FROM
+                appraised_curriculum ac
+            WHERE
+                ac.id_no = %s AND
+                (ac.grades IS NULL OR ac.grades = '0.00')  -- Assuming '0.00' indicates no grade
+        """
+        params = (id_no,)
 
+        try:
+            results = self.execute_query(query, params)
+
+            if not results:
+                logging.warning(f"No available fallback subjects found for ID_NO: {id_no}")
+                return []
+
+            logging.info(f"Found {len(results)} available fallback subjects for ID_NO: {id_no}")
+            return results
+
+        except mysql.connector.Error as err:
+            logging.error(f"An error occurred while fetching fallback subjects: {err.msg}")
+            return []
 
     # pag display sa irregular studnt baga
-    def fetch_irregular_students(self, id_no):
-            logging.debug(f"Fetching irregular student data for ID_NO: {id_no}")
-            appraised_query = """
-                SELECT 
-                    ac.appraised_id,
-                    ac.id_no, 
-                    ac.last_name,
-                    ac.first_name,
-                    ac.middle_name,
-                    ac.year, 
-                    ac.age, 
-                    ac.sex, 
-                    ac.email_address,
-                    ac.course_no, 
-                    ac.descriptive_title, 
-                    ac.year_level, 
-                    ac.units, 
-                    ac.lec, 
-                    ac.lab, 
-                    ac.prerequisite,
-                    ac.grades,
-                    CAST(SUBSTRING_INDEX(ac.year_level, '.', 1) AS UNSIGNED) as year_num,
-                    CAST(SUBSTRING_INDEX(ac.year_level, '.', -1) AS UNSIGNED) as sem_num
-                FROM
-                    appraised_curriculum ac
-                WHERE
-                    ac.id_no = %s
-                ORDER BY 
-                    year_num ASC,
-                    sem_num ASC,
-                    ac.course_no ASC
-            """
+    def fetch_irregular_students(self, id_no): 
+        logging.debug(f"Fetching irregular student data for ID_NO: {id_no}")
+        appraised_query = """
+            SELECT 
+                ac.appraised_id,
+                ac.id_no, 
+                ac.last_name,
+                ac.first_name,
+                ac.middle_name,
+                ac.year, 
+                ac.age, 
+                ac.sex, 
+                ac.email_address,
+                ac.course_no, 
+                ac.descriptive_title, 
+                ac.year_level, 
+                ac.units, 
+                ac.lec, 
+                ac.lab, 
+                ac.prerequisite,
+                ac.grades
+            FROM
+                appraised_curriculum ac
+            WHERE
+                ac.id_no = %s
+        """
 
-            appraised_params = (id_no,)
+        appraised_params = (id_no,)
 
-            try:
-                appraised_results = self.execute_query(appraised_query, appraised_params)
+        try:
+            appraised_results = self.execute_query(appraised_query, appraised_params)
 
-                if not appraised_results:
-                    logging.warning(f"No appraised curriculum data found for ID_NO: {id_no}")
-                    return []
+            if not appraised_results:
+                logging.warning(f"No appraised curriculum data found for ID_NO: {id_no}")
+                return []
 
-                # Process results to determine latest semester with grades
-                latest_completed_sem = {'year': 0, 'sem': 0}
-                current_sem = {'year': 0, 'sem': 0}
+            # Semester progression mapping
+            semester_progression = {
+                '1.1': '1.2', '1.2': '2.1', 
+                '2.1': '2.2', '2.2': '3.1', 
+                '3.1': '3.2', '3.2': '4.1', 
+                '4.1': '4.2', '4.2': 'Graduate'
+            }
+
+            # Group courses by year level
+            year_level_courses = {}
+            for record in appraised_results:
+                year_level = str(record['year_level'])
+                if year_level not in year_level_courses:
+                    year_level_courses[year_level] = []
+                year_level_courses[year_level].append(record)
+
+            # Determine the current and next semester
+            current_semester = None
+            next_semester = None
+
+            # Sort year levels to ensure progression
+            sorted_year_levels = sorted(year_level_courses.keys(), 
+                                        key=lambda x: (int(x.split('.')[0]), int(x.split('.')[1])))
+
+            for year_level in sorted_year_levels:
+                courses = year_level_courses[year_level]
                 
-                for record in appraised_results:
-                    year_level = str(record['year_level'])
-                    try:
-                        year, sem = map(int, year_level.split('.'))
-                        grade = str(record['grades']).strip()
-                        
-                        # Track the latest semester with grades
-                        if grade and grade != '0.00':
-                            if (year > latest_completed_sem['year'] or 
-                                (year == latest_completed_sem['year'] and sem > latest_completed_sem['sem'])):
-                                latest_completed_sem = {'year': year, 'sem': sem}
-                        
-                        # Track the current semester (with no grades)
-                        if grade == '0.00':
-                            if (year > current_sem['year'] or 
-                                (year == current_sem['year'] and sem > current_sem['sem'])):
-                                current_sem = {'year': year, 'sem': sem}
-                    except ValueError:
-                        continue
+                # Check if all courses in this year level have passing grades
+                all_passed = all(
+                    str(course['grades']).strip() not in ['', '0.00'] and 
+                    float(course['grades']) >= 1.0  # Assuming passing grade is 1.0 or above
+                    for course in courses
+                )
 
-                logging.info(f"Found {len(appraised_results)} records for ID_NO: {id_no}")
-                logging.info(f"Latest completed semester: {latest_completed_sem['year']}.{latest_completed_sem['sem']}")
-                logging.info(f"Current semester: {current_sem['year']}.{current_sem['sem']}")
+                if all_passed:
+                    # If all courses are passed, move to the next semester
+                    current_semester = year_level
+                    next_semester = semester_progression.get(year_level)
+                    
+                    logging.info(f"All courses in {year_level} are passed")
+                    logging.info(f"Current Semester: {current_semester}")
+                    logging.info(f"Next Semester: {next_semester}")
+                    
+                    break
 
-                # Add semester progression info to results
-                for record in appraised_results:
-                    record['latest_completed_sem'] = f"{latest_completed_sem['year']}.{latest_completed_sem['sem']}"
-                    record['current_sem'] = f"{current_sem['year']}.{current_sem['sem']}"
+            # If no progression found, use the lowest semester
+            if not current_semester:
+                current_semester = sorted_year_levels[0]
+                next_semester = semester_progression.get(current_semester, '1.2')
 
-                return appraised_results
+            # Prepare results with semester information
+            for record in appraised_results:
+                record['current_sem'] = current_semester
+                record['next_sem'] = next_semester
 
-            except mysql.connector.Error as err:
-                logging.error(f"An error occurred while fetching irregular student data: {err.msg}")
-                return []      
-        
+            return appraised_results
+
+        except Exception as err:
+            logging.error(f"An error occurred while fetching irregular student data: {err}")
+            return []
+                                    
     def update_student_yr(self, id_no): # para kat update ng year level ng student
-        """
-        Automatically updates student's year level based on completed semesters.
-        Prohibits update if there are any empty grades.
-        Args:
-            id_no (str): Student ID number
-        Returns:
-            str: New year level if updated, None if no update needed
-        """
         try:
             # Get all grades for the student
             all_grades = self.check_all_tables_for_grades(id_no)
@@ -368,6 +404,7 @@ class DatabaseHandler:
         except Exception as e:
             print(f"UNEXPECTED ERROR: {e}")
             return None
+        
     def insert_students(self, table_name, data):
         try:
             # Insert data
@@ -2307,13 +2344,11 @@ class DatabaseHandler:
             return []
         
     def get_course_data(self, student_id):
+        course_data = {}
+
         try:
-            # Close any existing cursor and create a new one
-            if hasattr(self, 'cursor'):
-                self.cursor.close()
-            
-            # Use dictionary cursor to handle column names with spaces
-            self.cursor = self.conn.cursor(dictionary=True)
+            #Use dictionary cursor correctly
+            cursor = self.conn.cursor(dictionary=True)
 
             # List of table names
             table_names = [
@@ -2327,20 +2362,17 @@ class DatabaseHandler:
                 'fourth_year_second_semester'
             ]
 
-            # Initialize course data dictionary
-            course_data = {}
-
             # Loop over table names to retrieve grades for each table
             for table_name in table_names:
-                # Dynamically get course columns
+                # Fix: Use the correct cursor reference
                 columns_query = f"""
                     SELECT COLUMN_NAME 
                     FROM INFORMATION_SCHEMA.COLUMNS 
                     WHERE TABLE_NAME = %s 
                     AND COLUMN_NAME NOT IN ('ID_NO', 'LAST_NAME', 'FIRST_NAME', 'MIDDLE_NAME', 'SCHOOL_YEAR', 'YR')
                 """
-                self.cursor.execute(columns_query, (table_name,))
-                course_columns = [col['COLUMN_NAME'] for col in self.cursor.fetchall()]
+                cursor.execute(columns_query, (table_name,))
+                course_columns = [col['COLUMN_NAME'] for col in cursor.fetchall() if isinstance(col, dict)]
 
                 # Debugging: Print columns
                 print(f"Columns for {table_name}: {course_columns}")
@@ -2361,17 +2393,18 @@ class DatabaseHandler:
                 """
 
                 try:
-                    # Execute query
-                    self.cursor.execute(grade_query, (student_id,))
-                    results = self.cursor.fetchall()
+                    #Fix: Use the correct cursor reference
+                    cursor.execute(grade_query, (student_id,))
+                    results = cursor.fetchall()
 
                     # Process results
                     table_grades = []
                     for row in results:
                         for col in course_columns:
                             grade = row.get(col)
-                            if grade and str(grade).strip() not in ['', 'N/A', '0']:
-                                # Ensure unique entries
+
+                            #Fix: Handle valid grades properly
+                            if grade is not None and str(grade).strip().upper() not in ['', 'N/A', '0', 'NULL']:
                                 if [col, grade] not in table_grades:
                                     table_grades.append([col, grade])
 
@@ -2384,7 +2417,7 @@ class DatabaseHandler:
                     print(f"Error in {table_name}: {query_error}")
                     continue
 
-            # Remove duplicate entries across tables
+            #Fix: Remove duplicate entries across tables
             unique_course_data = {}
             for table, grades in course_data.items():
                 for grade_entry in grades:
@@ -2404,10 +2437,10 @@ class DatabaseHandler:
             print(f"Database error: {err}")
             return None
         finally:
-            # Ensure cursor is closed
-            if hasattr(self, 'cursor'):
-                self.cursor.close()
-                    
+            #Fix: Ensure cursor is closed properly
+            if 'cursor' in locals() and cursor is not None:
+                cursor.close()
+                        
     def get_course_columns(self, table_name):
         """
         Retrieve the column names for the specified course table.

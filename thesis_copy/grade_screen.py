@@ -233,7 +233,7 @@ class GradeScreen(ctk.CTkFrame):
         
         back_icon = Image.open("C:/Users/Admin/Documents/Thesis_Estorque/icons/back.png")
         self.back_icon = ctk.CTkImage(light_image=back_icon, dark_image=back_icon, size=(20, 20))
-        ctk.CTkButton(self.back_frame, text="Back", image=self.back_icon ,command=self.master.show_main_menu, **back_button_style).pack(side=tk.LEFT)
+        ctk.CTkButton(self.back_frame, text="Back", image=self.back_icon, width=32 ,command=self.master.show_main_menu, **back_button_style).pack(side=tk.LEFT)
 
     def open_completion_form(self):
         # Create a new top-level window for the completion form
