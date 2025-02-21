@@ -88,105 +88,100 @@ class StudentScreen(ctk.CTkFrame):
         summary_icon = Image.open("C:/Users/Admin/Documents/Thesis_Estorque/icons/summary.png")  # Load your summary icon
         self.summary_icon = ctk.CTkImage(light_image=summary_icon, dark_image=summary_icon, size =(30, 30))
         ctk.CTkButton(self, text="Summary", image=self.summary_icon, **button_style, font=('Helvetica',14, 'bold'),command=self.show_summary).place(x=700, y=147)  # Place the Summary button at the specified coordinates
-    
+ 
     def show_summary(self):
-        # Create a new frame for the summary with width and height specified in the constructor
+        # Create a summary frame
         summary_frame = ctk.CTkFrame(self, width=800, height=800, fg_color="gainsboro", corner_radius=30)
         summary_frame.place(x=60, y=200)
 
-        # Title for the summary frame
         ctk.CTkLabel(summary_frame, text="Enrollment Summary", font=("Vivaldi", 30, "bold")).pack(pady=20)
-        
-        # Create a notebook for different year levels
+
+        # Create a Notebook for year levels
         notebook = ttk.Notebook(summary_frame, width=950, height=320)
         notebook.pack(pady=10, expand=True, fill='both')
 
-        # Sample student data organized by year
-        student_data = {
-            "1st Year": [
-                {"name": "John Doe", "status": "Not Enrolled", "year_to_enroll": "2024"},
-                {"name": "Alice Brown", "status": "Enrolled", "year_to_enroll": "2023"},
-            ],
-            "2nd Year": [
-                {"name": "Jane Smith", "status": "Enrolled", "year_to_enroll": "2023"},
-                {"name": "Bob White", "status": "Not Enrolled", "year_to_enroll": "2024"},
-            ],
-            "3rd Year": [
-                {"name": "Alice Johnson", "status": "Not Enrolled", "year_to_enroll": "2024"},
-                {"name": "Charlie Black", "status": "Enrolled", "year_to_enroll": "2023"},
-            ],
-            "4th Year": [
-                {"name": "David Green", "status": "Enrolled", "year_to_enroll": "2023"},
-                {"name": "Eve Blue", "status": "Not Enrolled", "year_to_enroll": "2024"},
-            ],
-        }
+        # Connect to the database
+        db_handler = DatabaseHandler()
+        try:
+            query = """
+                SELECT ID_NO, LAST_NAME, FIRST_NAME, MIDDLE_NAME, YR, TO_BE_ENROLLED_YEAR
+                FROM student_information
+            """
+            db_handler.cursor.execute(query)
+            results = db_handler.cursor.fetchall()
 
-        # Calculate total unenrolled students and total students across all years
-        total_unenrolled = sum(1 for students in student_data.values() for student in students if student['status'] == "Not Enrolled")
-        total_students = sum(len(students) for students in student_data.values())
+            # Organize data by year
+            student_data = {"1st Year": [], "2nd Year": [], "3rd Year": [], "4th Year": []}
+            unenrolled_students = []  # Store students who are not enrolled
 
-        # Create tabs for each year level
-        for year, students in student_data.items():
-            tab = ctk.CTkFrame(notebook)
-            notebook.add(tab, text=year)
+            for row in results:
+                id_no, last_name, first_name, middle_name, year, enrolled_year = row
+                full_name = f"{last_name}, {first_name} {middle_name}".strip()
+                status = "Enrolled" if enrolled_year else "Not Enrolled"
 
-            tree_frame = ctk.CTkFrame(tab)
-            tree_frame.pack(pady=10, padx=10, fill='both', expand=True)
+                student_data[f"{year}st Year"].append({"id_no": id_no, "name": full_name, "status": status, "year_to_enroll": enrolled_year or "N/A"})
 
-            # Create a Treeview widget to display student data in a table format
-            columns = ("Name", "Status", "Year to Enroll")
-            tree = ttk.Treeview(tree_frame, columns=columns, show="headings", height=10)
-            tree.pack(side='left', fill='both', expand=True)
- 
-            # Add a vertical scrollbar using ttk.Scrollbar
-            scrollbar = ttk.Scrollbar(tree_frame, orient="vertical", command=tree.yview)
-            scrollbar.pack(side="right", fill="y")
-            tree.configure(yscrollcommand=scrollbar.set)
+                if not enrolled_year:  # If unenrolled, store their ID for printing
+                    unenrolled_students.append(id_no)
 
-            # Set column headings and alignment
-            tree.heading("Name", text="Student Name", anchor="center")  # Align left
-            tree.heading("Status", text="Enroll Status", anchor="center")  # Center align
-            tree.heading("Year to Enroll", text="Year to Enroll", anchor="center")  # Align left
+            self.unenrolled_students = unenrolled_students  # Store for printing
 
-            # Set column widths and alignment for values
-            tree.column("Name", width=200, anchor="w")  # Align left
-            tree.column("Status", width=150, anchor="center")  # Center align
-            tree.column("Year to Enroll", width=150, anchor="center")  # Align left
+            # Compute total unenrolled students
+            total_students = sum(len(students) for students in student_data.values())
+            total_unenrolled = len(unenrolled_students)
 
-            tree.tag_configure("oddrow", background="#f0f0f0")
-            tree.tag_configure("evenrow", background="#ffffff")
+            # Generate tabs for each year level
+            for year, students in student_data.items():
+                tab = ctk.CTkFrame(notebook)
+                notebook.add(tab, text=year)
 
-            for i, student in enumerate(students):
-                tag = "evenrow" if i % 2 == 0 else "oddrow"
-                tree.insert("", "end", values=(student['name'], student['status'], student['year_to_enroll']), tags=(tag,))
+                tree_frame = ctk.CTkFrame(tab)
+                tree_frame.pack(pady=10, padx=10, fill="both", expand=True)
 
-            # Calculate unenrolled percentage for this year based on the total number of students
-            unenrolled_count = sum(1 for student in students if student['status'] == "Not Enrolled")
-            unenrolled_percentage = (unenrolled_count / total_students) * 100 if total_students > 0 else 0
+                # Create Treeview for student data
+                columns = ("Name", "Status", "Year to Enroll")
+                tree = ttk.Treeview(tree_frame, columns=columns, show="headings", height=10)
+                tree.pack(side="left", fill="both", expand=True)
 
-            # Add a label for unenrolled students
-            progress_label = ctk.CTkLabel(summary_frame, text=f"Un-enrolled Students: {unenrolled_count} ({unenrolled_percentage:.2f}% of total)")
-            progress_label.place(x=20, y=433)
+                # Add scrollbar
+                scrollbar = ttk.Scrollbar(tree_frame, orient="vertical", command=tree.yview)
+                scrollbar.pack(side="right", fill="y")
+                tree.configure(yscrollcommand=scrollbar.set)
 
-            # Add a progress bar for unenrolled students
-            progress_bar = ctk.CTkProgressBar(summary_frame, width=300, height=15)
-            progress_bar.set(unenrolled_percentage / 100)  # Set progress bar value
-            progress_bar.place(x=20, y=453)
+                # Set column headings
+                tree.heading("Name", text="Student Name", anchor="center")
+                tree.heading("Status", text="Enroll Status", anchor="center")
+                tree.heading("Year to Enroll", text="Year to Enroll", anchor="center")
 
-        # Add a global progress bar for all unenrolled students
-        global_unenrolled_percentage = (total_unenrolled / total_students) * 100 if total_students > 0 else 0
+                # Set column widths
+                tree.column("Name", width=200, anchor="w")
+                tree.column("Status", width=150, anchor="center")
+                tree.column("Year to Enroll", width=150, anchor="center")
 
-        global_progress_label = ctk.CTkLabel(summary_frame, text=f"Total Un-enrolled Students: {total_unenrolled} ({global_unenrolled_percentage:.2f}%)")
-        global_progress_label.place(x=20, y=480)
+                # Add row styles
+                tree.tag_configure("oddrow", background="#f0f0f0")
+                tree.tag_configure("evenrow", background="#ffffff")
 
-        global_progress_bar = ctk.CTkProgressBar(summary_frame, width=300, height=15)
-        global_progress_bar.set(global_unenrolled_percentage / 100)  # Set progress bar value
-        global_progress_bar.place(x=20, y=500)
+                for i, student in enumerate(students):
+                    tag = "evenrow" if i % 2 == 0 else "oddrow"
+                    tree.insert("", "end", values=(student["name"], student["status"], student["year_to_enroll"]), tags=(tag,))
 
-        close_icon= Image.open("C:/Users/Admin/Documents/Thesis_Estorque/icons/close.png")
-        self.close_icon = ctk.CTkImage(light_image=close_icon, dark_image=close_icon, size=(30, 30))
-        ctk.CTkButton(summary_frame, text="Close", text_color="black" , font=('Helvetica',14, 'bold'),corner_radius=30, image=self.close_icon,command=summary_frame.destroy).pack(pady=30,padx=30 ,side="right")
-        
+            # Add a print button for unenrolled students
+            if total_unenrolled > 0:
+                print_button = ctk.CTkButton(
+                    summary_frame, text="Print Unenrolled", text_color="black", font=('Helvetica', 14, 'bold'),
+                    corner_radius=30, command=self.print_unenrolled_students
+                )
+                print_button.place(x=20, y=540)
+
+            # Close button
+            close_icon = Image.open("C:/Users/Admin/Documents/Thesis_Estorque/icons/close.png")
+            self.close_icon = ctk.CTkImage(light_image=close_icon, dark_image=close_icon, size=(30, 30))
+            ctk.CTkButton(summary_frame, text="Close", text_color="black", font=('Helvetica', 14, 'bold'),
+                        corner_radius=30, image=self.close_icon, command=summary_frame.destroy).pack(pady=30, padx=30, side="right")
+
+        except Exception as e:
+            messagebox.showerror("Database Error", f"Failed to fetch student data: {str(e)}")
 
     def validate_input(self, new_value):
         if  len (new_value) > 11:
@@ -661,6 +656,40 @@ class StudentScreen(ctk.CTkFrame):
         
         return ""
     
+    def enable_enrollment_and_save(self, id_no):
+        """
+        Enables the enrollment checkbox and updates the database with the enrolled year.
+        """
+        # Enable the checkbox
+        self.enroll_var.set(True)
+        self.enroll_checkbox.configure(state="normal")
+        self.update_enroll_label()
+
+        # Get current year and the next academic year
+        enrolled_year = datetime.now().year
+        to_be_enrolled_years = f"{enrolled_year}-{enrolled_year + 1}"  # Example: "2025-2026"
+
+        # Fetch student details
+        db_handler = DatabaseHandler()
+        try:
+            student_data = db_handler.fetch_student_data(id_no, self.selected_year_semester.get())
+
+            if student_data and student_data["curriculum_data"]:
+                student_info = student_data["curriculum_data"][0]  # Assuming we use the first entry
+                last_name = student_info.get("LAST_NAME", "")
+                first_name = student_info.get("FIRST_NAME", "")
+                middle_name = student_info.get("MIDDLE_NAME", "")
+                bday = student_info.get("BDAY", "")
+
+                # Save to the database
+                self.saving_student(last_name, first_name, middle_name, [student_info], enrolled_year, bday, to_be_enrolled_years)
+                messagebox.showinfo("Success", "Student enrollment status updated.")
+            else:
+                messagebox.showerror("Error", "No student data found.")
+
+        except Exception as e:
+            messagebox.showerror("Database Error", f"Failed to update enrollment status: {str(e)}")
+
     def print_students(self):
         self.enroll_var.set(True)
         self.update_enroll_label()
@@ -676,6 +705,7 @@ class StudentScreen(ctk.CTkFrame):
             return
 
         db_handler = DatabaseHandler()
+        self.enable_enrollment_and_save(id_no)
         try:
             self.curriculum_data = db_handler.fetch_student_data(id_no, year_level)
         except Exception as e:
@@ -685,6 +715,7 @@ class StudentScreen(ctk.CTkFrame):
         if not hasattr(self, 'curriculum_data') or not self.curriculum_data:
             messagebox.showerror("Error", "No curriculum data found")
             return
+        
         # Create a new window for printing
         print_window = tk.Toplevel(self)
         print_window.title("Pre-Registration Form")

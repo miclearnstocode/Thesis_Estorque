@@ -6,8 +6,6 @@ from tkinter import filedialog, messagebox
 from database import DatabaseHandler
 from PIL import Image
 import customtkinter as ctk
-from sklearn.cluster import AgglomerativeClustering
-import numpy as np
 
 class CurriculumScreen(ctk.CTkFrame):
     def __init__(self, master):

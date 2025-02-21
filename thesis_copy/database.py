@@ -79,9 +79,9 @@ class DatabaseHandler:
                 self.conn.close()
 
     # ini sa pag add student           
-    def saving_student(self, last_name, first_name, middle_name, data, enrolled_year, table_name=None):
+    def saving_student(self, last_name, first_name, middle_name, data, enrolled_year, bday, to_be_enrolled_years, table_name=None):
         try:
-            # Create table with separate name fields and ENROLLED_YEAR using YEAR type
+            # Ensure the student_information table exists with the correct structure
             create_table_query = """
                 CREATE TABLE IF NOT EXISTS student_information (
                     ID_NO VARCHAR(255) PRIMARY KEY,
@@ -90,16 +90,23 @@ class DatabaseHandler:
                     MIDDLE_NAME VARCHAR(100),
                     YR VARCHAR(255),
                     AGE INT,
+                    BDAY DATE,
                     SEX CHAR(25),
                     EMAIL_ADDRESS VARCHAR(255),
                     SHS VARCHAR(255),
                     ADDRESS VARCHAR(255),
-                    ENROLLED_YEAR YEAR
+                    ENROLLED_YEAR YEAR,
+                    TO_BE_ENROLLED_YEAR VARCHAR(255) DEFAULT NULL
                 )
             """
             self.cursor.execute(create_table_query)
 
-            # Process the data with separate name fields and ENROLLED_YEAR
+            # Generate a default academic year if none is provided
+            if not to_be_enrolled_years:
+                current_year = datetime.now().year
+                to_be_enrolled_years = f"{current_year}-{current_year + 1}"  # Example: "2025-2026"
+
+            # Process the student data
             processed_data = []
             for row in data:
                 processed_row = (
@@ -109,23 +116,43 @@ class DatabaseHandler:
                     middle_name,   # MIDDLE_NAME
                     row[2],        # YR
                     row[3],        # AGE
+                    bday,          # BDAY from the function parameter
                     row[4],        # SEX
                     row[5],        # EMAIL_ADDRESS
                     row[6],        # SHS
                     row[7],        # ADDRESS
-                    enrolled_year  # ENROLLED_YEAR from selection
+                    enrolled_year, # ENROLLED_YEAR from selection
+                    to_be_enrolled_years  # Ensure a value is always inserted
                 )
                 processed_data.append(processed_row)
 
-            # Insert data
-            insert_query = """
-                INSERT INTO student_information (
-                    ID_NO, LAST_NAME, FIRST_NAME, MIDDLE_NAME,
-                    YR, AGE, SEX, EMAIL_ADDRESS, SHS, ADDRESS, ENROLLED_YEAR
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """
-            self.cursor.executemany(insert_query, processed_data)
+            # Check if the student already exists to prevent duplicates
+            for row in processed_data:
+                id_no = row[0]
+                self.cursor.execute("SELECT COUNT(*) FROM student_information WHERE ID_NO = %s", (id_no,))
+                exists = self.cursor.fetchone()[0]
 
+                if exists:
+                    # Update existing student record
+                    update_query = """
+                        UPDATE student_information
+                        SET LAST_NAME = %s, FIRST_NAME = %s, MIDDLE_NAME = %s,
+                            YR = %s, AGE = %s, BDAY = %s, SEX = %s, EMAIL_ADDRESS = %s, 
+                            SHS = %s, ADDRESS = %s, ENROLLED_YEAR = %s, TO_BE_ENROLLED_YEAR = %s
+                        WHERE ID_NO = %s
+                    """
+                    self.cursor.execute(update_query, (*row[1:], id_no))
+                else:
+                    # Insert new student record
+                    insert_query = """
+                        INSERT INTO student_information (
+                            ID_NO, LAST_NAME, FIRST_NAME, MIDDLE_NAME, YR, AGE, BDAY, SEX, 
+                            EMAIL_ADDRESS, SHS, ADDRESS, ENROLLED_YEAR, TO_BE_ENROLLED_YEAR
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    """
+                    self.cursor.execute(insert_query, row)
+
+            # Commit changes
             self.conn.commit()
             messagebox.showinfo("Success", "Student information saved successfully.")
 
