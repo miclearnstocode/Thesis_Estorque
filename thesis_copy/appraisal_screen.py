@@ -20,7 +20,7 @@ class AppraisalScreen(ctk.CTkFrame):
         self.hover_color = "gray70"
         
         try:
-            self.dept_bg = Image.open("C:/Users/Admin/Documents/Thesis_Estorque/Image/Gradient.jpg")
+            self.dept_bg = Image.open("Image/Gradient.jpg")
             self.bg_image_pil = self.dept_bg  
             
             # Create initial CTkImage with frame's size
@@ -78,7 +78,7 @@ class AppraisalScreen(ctk.CTkFrame):
 
         # Replace the original entries creation with this call
         self.create_entries()
-        right_icon = Image.open("C:/Users/Admin/Documents/Thesis_Estorque/icons/right.png")
+        right_icon = Image.open("icons/right.png")
         self.right_icon = ctk.CTkImage(light_image=right_icon, dark_image=right_icon, size=(20, 20))
         self.next_button = ctk.CTkButton(self.basic_info_frame, text="", image=self.right_icon, command=self.check_basic_info, width=50, **button_style, border_color="grey70", border_width=1)
         self.next_button.grid(row=13, column=1, pady=10)
@@ -153,11 +153,11 @@ class AppraisalScreen(ctk.CTkFrame):
         self.back_frame = ctk.CTkFrame(self, fg_color="transparent", corner_radius=10)
         self.back_frame.place(x=5, y=86)
 
-        appraise_icon = Image.open("C:/Users/Admin/Documents/Thesis_Estorque/icons/appraisal.png")
+        appraise_icon = Image.open("icons/appraisal.png")
         self.appraise_icon = ctk.CTkImage(light_image=appraise_icon, dark_image=appraise_icon, size=(30, 30))
         self.appraise_button = ctk.CTkButton(button_frame, text="Appraise", image=self.appraise_icon, command=self.start_appraisal, **button_style, border_color="grey70", border_width=1)
         self.appraise_button.grid(row=0, column=0)
-        save_icon = Image.open("C:/Users/Admin/Documents/Thesis_Estorque/icons/save.png")
+        save_icon = Image.open("icons/save.png")
         self.save_icon = ctk.CTkImage(light_image=save_icon, dark_image=save_icon, size=(30, 30))
         self.save_button = ctk.CTkButton(button_frame, text="Save", image=self.save_icon, command=self.save_to_database, state="disabled", **button_style, border_color="grey70", border_width=1)
         self.save_button.grid(row=0, column=1)
@@ -165,7 +165,7 @@ class AppraisalScreen(ctk.CTkFrame):
         self.note_label = ctk.CTkLabel(button_frame, text="NOTE: Please select student curriculum first, then existing curriculum when appraising", font=("Helvetica", 12, 'italic'), fg_color="transparent")
         self.note_label.grid(row=0, column=2, padx=10)
 
-        back_icon = Image.open("C:/Users/Admin/Documents/Thesis_Estorque/icons/back.png")
+        back_icon = Image.open("icons/back.png")
         self.back_icon = ctk.CTkImage(light_image=back_icon, dark_image=back_icon, size=(20, 20))
         back_button = ctk.CTkButton(self.back_frame, text="Back", image=self.back_icon ,command=self.master.show_main_menu, border_color="grey70", border_width=1, **button_style)
         back_button.grid(row=1, column=1, padx=0.5)
@@ -200,7 +200,7 @@ class AppraisalScreen(ctk.CTkFrame):
                 messagebox.showerror("Error", "'Descriptive_Title' column is missing in one of the files.")
                 return
 
-            # Filter old curriculum to keep only rows where 'Grades' are not NaN
+            # Filter old curriculum to keep only rows where 'Grades' are not NaN like if the course no is credited or not
             filtered_old = df_old[df_old['Grades'].notna()]
 
             # Initialize a dictionary to store matched Descriptive_Titles and their corresponding grades

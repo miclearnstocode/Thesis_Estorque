@@ -1,4 +1,3 @@
-import logging
 import threading
 from tkinter import simpledialog
 import customtkinter as ctk
@@ -39,7 +38,7 @@ class GradeScreen(ctk.CTkFrame):
         # Set up the background
         try:
             # Load the background image
-            bg_image = Image.open("C:/Users/Admin/Documents/Thesis_Estorque/Image/Gradient.jpg")
+            bg_image = Image.open("Image/Gradient.jpg")
             self.bg_image = ctk.CTkImage(
                 light_image=bg_image,
                 dark_image=bg_image,
@@ -126,7 +125,7 @@ class GradeScreen(ctk.CTkFrame):
         semester_option = ctk.CTkOptionMenu(selection_frame, variable=semester_var, values=["1st Semester", "2nd Semester"], fg_color="white", button_color="white", button_hover_color="#707070", text_color="black", dropdown_fg_color="white", dropdown_text_color="black", dropdown_hover_color="#707070")
         semester_option.pack(side=tk.LEFT, padx=5)
 
-        import_icon = Image.open("C:/Users/Admin/Documents/Thesis_Estorque/icons/import.png")
+        import_icon = Image.open("icons/import.png")
         self.import_icon = ctk.CTkImage(light_image=import_icon, dark_image=import_icon, size=(30, 30))
 
         # Add label for the import dropdown
@@ -149,7 +148,7 @@ class GradeScreen(ctk.CTkFrame):
         )
         import_dropdown.pack(side=tk.LEFT, padx=5)
 
-        save_icon = Image.open("C:/Users/Admin/Documents/Thesis_Estorque/icons/save.png")
+        save_icon = Image.open("icons/save.png")
         self.save_icon =ctk.CTkImage(light_image=save_icon, dark_image=save_icon, size=(30, 30))
         self.save_button = ctk.CTkButton(selection_frame, text="Save Grade", image=self.save_icon,state="disabled", command=self.on_save_button_click, **button_style)
         self.save_button.pack(side=tk.LEFT, padx=5)
@@ -185,7 +184,7 @@ class GradeScreen(ctk.CTkFrame):
         )
         template_dropdown.pack(side=tk.RIGHT, padx=5)
         # Add upload template button
-        upload_icon= Image.open("C:/Users/Admin/Documents/Thesis_Estorque/icons/upload.png")
+        upload_icon= Image.open("icons/upload.png")
         self.upload_icon= ctk.CTkImage(light_image=upload_icon, dark_image=upload_icon, size=(30, 30))
         upload_button = ctk.CTkButton(
             self.back_frame, image=self.upload_icon,
@@ -195,7 +194,7 @@ class GradeScreen(ctk.CTkFrame):
         )
         upload_button.pack(side=tk.RIGHT, padx=5)
 
-        edit_icon = Image.open("C:/Users/Admin/Documents/Thesis_Estorque/icons/edit.png")
+        edit_icon = Image.open("icons/edit.png")
         self.edit_icon = ctk.CTkImage(light_image=edit_icon, dark_image=edit_icon, size=(30, 30))
         view_edit_button = ctk.CTkButton(
             self.back_frame, 
@@ -205,7 +204,7 @@ class GradeScreen(ctk.CTkFrame):
             **button_style)
         view_edit_button.pack(side=tk.RIGHT, padx=5)
 
-        form_icon = Image.open("C:/Users/Admin/Documents/Thesis_Estorque/icons/form.png")
+        form_icon = Image.open("icons/form.png")
         self.form_icon = ctk.CTkImage(light_image=form_icon, dark_image=form_icon, size=(30, 30))
         completion_button = ctk.CTkButton(
             self.back_frame, 
@@ -229,7 +228,7 @@ class GradeScreen(ctk.CTkFrame):
         self.progress_bar.pack_forget()
         back_button_style = {**button_style}
         
-        back_icon = Image.open("C:/Users/Admin/Documents/Thesis_Estorque/icons/back.png")
+        back_icon = Image.open("icons/back.png")
         self.back_icon = ctk.CTkImage(light_image=back_icon, dark_image=back_icon, size=(20, 20))
         ctk.CTkButton(self.back_frame, text="Back", image=self.back_icon,command=self.master.show_main_menu, **back_button_style).pack(side=tk.LEFT)
 

@@ -78,7 +78,7 @@ class Application(ctk.CTk):
 
     def show_splash_screen(self):
         # Load and set background image first (behind splash)
-        bg_image = Image.open("C:/Users/Admin/Documents/Thesis_Estorque/Image/Gradient.jpg")
+        bg_image = Image.open("Image/Gradient.jpg")
         self.splash_bg = ctk.CTkImage(
             light_image=bg_image,
             dark_image=bg_image,
@@ -115,7 +115,7 @@ class Application(ctk.CTk):
         
         # Load CSU logo
         try:
-            csu_logo = Image.open("C:/Users/Admin/Documents/Thesis_Estorque/Image/Capiz_State_University 2.png")
+            csu_logo = Image.open("Image/Capiz_State_University 2.png")
             self.csu_logo_image = ctk.CTkImage(light_image=csu_logo,dark_image=csu_logo,size=(300, 300))
             
             # Create and pack logo label
@@ -401,7 +401,7 @@ class Application(ctk.CTk):
         """Load and store all images used in the application"""
         try:
             # Department logo
-            dept_logo = Image.open("C:/Users/Admin/Documents/Thesis_Estorque/thesis_copy/pictures/department_logo.jpg")
+            dept_logo = Image.open("pictures/department_logo.jpg")
             self.dept_logo_image = ctk.CTkImage(light_image=dept_logo, dark_image=dept_logo, size=(300, 300))
 
         except Exception as e:
@@ -461,7 +461,7 @@ class Application(ctk.CTk):
     def setup_background(self):
         """Load and set up background image"""
         try:
-            self.dept_bg = Image.open("C:/Users/Admin/Documents/Thesis_Estorque/Image/background.jpg")
+            self.dept_bg = Image.open("Image/background.jpg")
             self.bg_image_pil = self.dept_bg
             
             initial_width = self.right_frame.winfo_width() or 736
@@ -518,19 +518,19 @@ class Application(ctk.CTk):
     def create_navigation_buttons(self):
         try:
             # Load icons with correct path
-            student_icon = Image.open("C:/Users/Admin/Documents/Thesis_Estorque/icons/student.png")
+            student_icon = Image.open("icons/student.png")
             self.student_icon = ctk.CTkImage(light_image=student_icon, dark_image=student_icon, size=(30, 30))
             
-            grade_icon = Image.open("C:/Users/Admin/Documents/Thesis_Estorque/icons/grade.png")
+            grade_icon = Image.open("icons/grade.png")
             self.grade_icon = ctk.CTkImage(light_image=grade_icon, dark_image=grade_icon, size=(30, 30))
             
-            curriculum_icon = Image.open("C:/Users/Admin/Documents/Thesis_Estorque/icons/curriculum2.png")
+            curriculum_icon = Image.open("icons/curriculum2.png")
             self.curriculum_icon = ctk.CTkImage(light_image=curriculum_icon, dark_image=curriculum_icon, size=(30, 30))
             
-            appraisal_icon = Image.open("C:/Users/Admin/Documents/Thesis_Estorque/icons/appraisal.png")
+            appraisal_icon = Image.open("icons/appraisal.png")
             self.appraisal_icon = ctk.CTkImage(light_image=appraisal_icon, dark_image=appraisal_icon, size=(30, 30))
             
-            archive_icon = Image.open("C:/Users/Admin/Documents/Thesis_Estorque/icons/archives.png")
+            archive_icon = Image.open("icons/archives.png")
             self.archive_icon = ctk.CTkImage(light_image=archive_icon, dark_image=archive_icon, size=(30, 30))
         except Exception as e:
             print(f"Error loading icons: {e}")
@@ -687,7 +687,7 @@ class Application(ctk.CTk):
         self.fullscreen_button = ctk.CTkButton(control_frame,text="⤡", width=30,height=30,font=("Times New Roman", 19),command=self.toggle_fullscreen,fg_color="transparent",text_color="black",hover_color=("gray70", "gray30"))
         self.fullscreen_button.pack(side="right", padx=5)
 
-        logout_icon = Image.open("C:/Users/Admin/Documents/Thesis_Estorque/icons/logout.png")
+        logout_icon = Image.open("icons/logout.png")
         self.logout_icon=ctk.CTkImage(light_image=logout_icon, dark_image=logout_icon, size=(30,30))
         self.close_button = ctk.CTkButton(control_frame,text="Logout", image=self.logout_icon,width=60,height=30,font=("Times New Roman", 19),command=self.logout, corner_radius=30,fg_color="transparent",text_color="black",hover_color=("gray70", "gray30"))
         self.close_button.pack(side="right", padx=5)

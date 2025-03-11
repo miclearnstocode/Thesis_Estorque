@@ -24,7 +24,7 @@ class LoginForm(ctk.CTkFrame):
         screen_height = self.master.winfo_screenheight()
 
         # Load and resize the background image to fit the screen
-        self.background_image = Image.open("C:/Users/Admin/Documents/Thesis_Estorque/Image/Gradient.jpg")
+        self.background_image = Image.open("Image/Gradient.jpg")
         self.background_image = self.background_image.resize((screen_width, screen_height), Image.LANCZOS)
         self.background_photo = ctk.CTkImage(light_image=self.background_image, dark_image=self.background_image, size=(screen_width, screen_height))
 
@@ -54,14 +54,14 @@ class LoginForm(ctk.CTkFrame):
         self.frame.configure(border_color="#E0E0E0", border_width=1)
         
         # Load and resize the CSD logo
-        self.nami_image = Image.open("C:/Users/Admin/Documents/Thesis_Estorque/Image/CSD.jpg")
+        self.nami_image = Image.open("Image/CSD.jpg")
         csd_width = 100
         csd_height = 100
         self.nami_image = self.nami_image.resize((csd_width, csd_height), Image.LANCZOS)
         self.nami_photo = ctk.CTkImage(light_image=self.nami_image, dark_image=self.nami_image, size=(100, 100))
 
         # Load and resize the Capiz State University logo
-        self.capsu_image = Image.open("C:/Users/Admin/Documents/Thesis_Estorque/Image/Capiz_State_University 2.png")
+        self.capsu_image = Image.open("Image/Capiz_State_University 2.png")
         capsu_width = 150
         capsu_height = 150
         self.capsu_image = self.capsu_image.resize((capsu_width, capsu_height), Image.LANCZOS)
@@ -141,7 +141,7 @@ class LoginForm(ctk.CTkFrame):
         )
         self.error_label.pack(pady=(5, 0))
 
-        login_icon= Image.open("C:/Users/Admin/Documents/Thesis_Estorque/icons/logins.png")
+        login_icon= Image.open("icons/logins.png")
         self.login_icon = ctk.CTkImage(light_image=login_icon, dark_image=login_icon, size=(30,30))
         login_button = ctk.CTkButton(self.container, text="Login", image=self.login_icon,command=self.validate_login, width=150, height=40, text_color="black",fg_color="transparent",hover_color="#707070",border_color= "black", border_width=1,corner_radius=30,font=ctk.CTkFont(size=15, weight="bold"))
         login_button.pack(pady=(20, 10))
@@ -272,7 +272,7 @@ class RegistrationForm:
                 widget.destroy()
 
         # Load and resize the background image to fit the entire screen
-        bg_image = Image.open("C:/Users/Admin/Documents/Thesis_Estorque/Image/loginform.jpg")
+        bg_image = Image.open("Image/loginform.jpg")
         self.background_photo = ctk.CTkImage(light_image=bg_image, dark_image=bg_image, size=(screen_width, screen_height))
 
         # Create a label to hold the background image
@@ -375,7 +375,7 @@ class RegistrationForm:
         )
         self.reg_error_label.pack(pady=(5, 0))
 
-        regis_icon =Image.open("C:/Users/Admin/Documents/Thesis_Estorque/icons/register.png")
+        regis_icon =Image.open("icons/register.png")
         self.regis_icon = ctk.CTkImage(light_image=regis_icon, dark_image=regis_icon, size=(30, 30))
         register_button = ctk.CTkButton(self.scrollable_frame, text="Register", image=self.regis_icon,command=self.register_user, corner_radius=30   ,height=40, font=ctk.CTkFont(size=15, weight="bold"))
         register_button.pack(pady=30)

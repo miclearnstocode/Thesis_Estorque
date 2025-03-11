@@ -31,7 +31,7 @@ class ArchiveScreen(ctk.CTkFrame):
         self.create_widgets()
         # Load and set up the background
         try:
-            bg_image = Image.open("C:/Users/Admin/Documents/Thesis_Estorque/Image/Gradient.jpg")
+            bg_image = Image.open("Image/Gradient.jpg")
             self.bg_image = ctk.CTkImage(light_image=bg_image,dark_image=bg_image,size=(self.master.winfo_width(), self.master.winfo_height()))
             
             self.bg_label = ctk.CTkLabel(self,image=self.bg_image,text="")
@@ -86,7 +86,7 @@ class ArchiveScreen(ctk.CTkFrame):
         back_frame = ctk.CTkFrame(self, fg_color="transparent")
         back_frame.place(x=30, y=108)
 
-        back_icon = Image.open("C:/Users/Admin/Documents/Thesis_Estorque/icons/back.png")
+        back_icon = Image.open("icons/back.png")
         self.back_icon = ctk.CTkImage(light_image=back_icon, dark_image=back_icon, size=(20, 20))
         ctk.CTkButton(back_frame, text="Back", image=self.back_icon,command=self.master.show_main_menu,**back_button_style).pack(side=tk.LEFT)
 
@@ -95,7 +95,7 @@ class ArchiveScreen(ctk.CTkFrame):
         self.search_entry.pack(side="left", padx=(0, 10))
 
         # Search button
-        search_icons = Image.open("C:/Users/Admin/Documents/Thesis_Estorque/icons/searchs.png")
+        search_icons = Image.open("icons/searchs.png")
         self.search_icons = ctk.CTkImage(light_image=search_icons, dark_image=search_icons,size=(30,30))
         search_button = ctk.CTkButton(search_frame, text="Search", image=self.search_icons, command=self.perform_search,width=120, **button_style, corner_radius=20)
         search_button.pack(side="left")
@@ -184,7 +184,7 @@ class ArchiveScreen(ctk.CTkFrame):
             page_height = doc.pagesize[1]
 
             # Header image on every page
-            header_image_path = "C:/Users/Admin/Documents/Thesis_Estorque/Image/Header.jpg"
+            header_image_path = "Image/Header.jpg"
             canvas.drawImage(header_image_path, x=0, y=page_height - 70, width=595.27, height=70)
 
             # Header text only on first page
@@ -196,11 +196,11 @@ class ArchiveScreen(ctk.CTkFrame):
                 canvas.drawString(x_centered, page_height - 120, text)
 
             # Footer image on every page
-            footer_image_path = "C:/Users/Admin/Documents/Thesis_Estorque/Image/Footer.jpg"
+            footer_image_path = "Image/Footer.jpg"
             canvas.drawImage(footer_image_path, x=0, y=0, width=595.27, height=70)
             
             # Non-official logo (watermark effect)
-            logo_path = "C:/Users/Admin/Documents/Thesis_Estorque/icons/non_official.jpg"
+            logo_path = "icons/non_official.jpg"
             
             # Load logo with transparency
             logo = ImageReader(logo_path)

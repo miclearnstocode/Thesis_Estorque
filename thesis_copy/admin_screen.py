@@ -261,7 +261,7 @@ class AdminScreen(ctk.CTkFrame):
         button_title = ctk.CTkLabel(button_container,text="Controls",font=ctk.CTkFont(size=16, weight="bold"))
         button_title.pack(pady=(0, 10))
         
-        home_icon =Image.open("C:/Users/Admin/Documents/Thesis_Estorque/icons/Home.png")
+        home_icon =Image.open("icons/Home.png")
         self.home_icon =ctk.CTkImage(light_image=home_icon, dark_image=home_icon, size=(20, 20))
         self.home_btn = ctk.CTkButton(button_container,text="Home",image=self.home_icon,command=self.return_to_home,width=150,**button_style)
         self.home_btn.pack(pady=5)
@@ -284,13 +284,13 @@ class AdminScreen(ctk.CTkFrame):
         BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
         # Create path to icons directory relative to your script
-        icon_path = os.path.join(BASE_DIR, "..", "icons", "C:/Users/Admin/Documents/Thesis_Estorque/icons/user.png")
+        icon_path = os.path.join(BASE_DIR, "..", "icons", "icons/user.png")
 
         user_icon = Image.open(icon_path)
         self.user_icon = ctk.CTkImage(light_image=user_icon, dark_image=user_icon, size=(30, 30))
 
         try:
-            icon_path = os.path.join(BASE_DIR, "..", "icons", "C:/Users/Admin/Documents/Thesis_Estorque/icons/user.png")
+            icon_path = os.path.join(BASE_DIR, "..", "icons", "icons/user.png")
             user_icon = Image.open(icon_path)
             self.user_icon = ctk.CTkImage(light_image=user_icon, dark_image=user_icon, size=(30, 30))
             title_label = ctk.CTkLabel(

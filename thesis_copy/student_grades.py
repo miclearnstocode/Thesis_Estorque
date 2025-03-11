@@ -64,7 +64,7 @@ class StudentApp(ctk.CTk):
         login_frame.pack(fill="both", expand=True, padx=10, pady=40)
         
         # Load and display the logo
-        logo_image = Image.open("C:/Users/Admin/Documents/Thesis_Estorque/Image/Capiz_State_University 2.png")
+        logo_image = Image.open("Image/Capiz_State_University 2.png")
         logo_image = logo_image.resize((150, 150), Image.LANCZOS)
         logo_photo = ctk.CTkImage(light_image=logo_image, dark_image=logo_image, size=(150, 150))
         logo_label = ctk.CTkLabel(login_frame, image=logo_photo, text="")
@@ -104,8 +104,8 @@ class StudentApp(ctk.CTk):
                 show_password_button.configure(image=show_icon)
 
         # Load the show/hide icons
-        show_icon = ctk.CTkImage(Image.open("C:/Users/Admin/Documents/Thesis_Estorque/icons/show_icon.png").resize((15, 15), Image.LANCZOS))
-        hide_icon = ctk.CTkImage(Image.open("C:/Users/Admin/Documents/Thesis_Estorque/icons/hide_icon.png").resize((15, 15), Image.LANCZOS))
+        show_icon = ctk.CTkImage(Image.open("icons/show_icon.png").resize((15, 15), Image.LANCZOS))
+        hide_icon = ctk.CTkImage(Image.open("icons/hide_icon.png").resize((15, 15), Image.LANCZOS))
 
         # Add a "Show Password" button with an icon
         show_password_button = ctk.CTkButton(login_frame, image=show_icon, text="", width=15, height=15, bg_color="white", fg_color="white",command=toggle_password)
@@ -137,7 +137,7 @@ class StudentApp(ctk.CTk):
         register_frame.pack(fill="both", expand=True, padx=10, pady=10)
 
         # Load and display the logo
-        logo_image = Image.open("C:/Users/Admin/Documents/Thesis_Estorque/Image/Capiz_State_University 2.png")
+        logo_image = Image.open("Image/Capiz_State_University 2.png")
         logo_image = logo_image.resize((150, 150), Image.LANCZOS)
         logo_photo = ctk.CTkImage(light_image=logo_image, dark_image=logo_image, size=(150, 150))
         logo_label = ctk.CTkLabel(register_frame, image=logo_photo, text="")
@@ -204,8 +204,8 @@ class StudentApp(ctk.CTk):
                 password_button.configure(image=show_icon)
 
         # Load the show/hide icons
-        show_icon = ctk.CTkImage(Image.open("C:/Users/Admin/Documents/Thesis_Estorque/icons/show_icon.png").resize((15, 15), Image.LANCZOS))
-        hide_icon = ctk.CTkImage(Image.open("C:/Users/Admin/Documents/Thesis_Estorque/icons/hide_icon.png").resize((15, 15), Image.LANCZOS))
+        show_icon = ctk.CTkImage(Image.open("icons/show_icon.png").resize((15, 15), Image.LANCZOS))
+        hide_icon = ctk.CTkImage(Image.open("icons/hide_icon.png").resize((15, 15), Image.LANCZOS))
 
         # Add a "Show Password" button with an icon
         password_button = ctk.CTkButton(register_frame, image=show_icon, text="", width=15, height=15, bg_color="white", fg_color="white",command=toggle_password)
@@ -221,8 +221,8 @@ class StudentApp(ctk.CTk):
                 show_password_button.configure(image=show_icon)
 
         # Load the show/hide icons
-        show_icon = ctk.CTkImage(Image.open("C:/Users/Admin/Documents/Thesis_Estorque/icons/show_icon.png").resize((15, 15), Image.LANCZOS))
-        hide_icon = ctk.CTkImage(Image.open("C:/Users/Admin/Documents/Thesis_Estorque/icons/hide_icon.png").resize((15, 15), Image.LANCZOS))
+        show_icon = ctk.CTkImage(Image.open("icons/show_icon.png").resize((15, 15), Image.LANCZOS))
+        hide_icon = ctk.CTkImage(Image.open("icons/hide_icon.png").resize((15, 15), Image.LANCZOS))
 
         # Add a "Show Password" button with an icon
         show_password_button = ctk.CTkButton(register_frame, image=show_icon, text="", width=15, height=15, bg_color="white", fg_color="white",command=toggle_password2)
