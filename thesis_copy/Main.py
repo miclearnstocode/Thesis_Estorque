@@ -401,7 +401,7 @@ class Application(ctk.CTk):
         """Load and store all images used in the application"""
         try:
             # Department logo
-            dept_logo = Image.open("pictures/department_logo.jpg")
+            dept_logo = Image.open("thesis_copy/pictures/department_logo.jpg")
             self.dept_logo_image = ctk.CTkImage(light_image=dept_logo, dark_image=dept_logo, size=(300, 300))
 
         except Exception as e:

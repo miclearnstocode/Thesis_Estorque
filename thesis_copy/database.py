@@ -537,6 +537,7 @@ class DatabaseHandler:
             "has_grades": bool(all_grades_data.get(current_table)),
             "grades_data": all_grades_data
         }
+    
         # pag check ng grade sa regular student
     def check_all_tables_for_grades(self, id_no):
         table_names = [
@@ -806,6 +807,7 @@ class DatabaseHandler:
             raise RuntimeError(f"An error occurred while fetching curriculum data: {err.msg}")
 
         return curriculum_results
+    
     #old execute query method
     """def execute_query(self, query, params=None):
         logging.debug(f"Executing query: {query} with params: {params}")
@@ -867,6 +869,9 @@ class DatabaseHandler:
                 if cursor:
                     cursor.close()
 
+    def get_existing_courses(self):
+        self.cursor.execute("SELECT COURSE_NO FROM curriculum_regular")
+        return set(row[0].strip().upper() for row in self.cursor.fetchall())
 
     def save_grading_data(self, grading_data, year, semester, school_year):
         try:
@@ -874,81 +879,67 @@ class DatabaseHandler:
             grading_data = grading_data.copy()
             grading_data.columns = grading_data.columns.str.strip()
 
+            # Mappings for table name
             year_mapping = {
                 "1st Year": "first_year",
                 "2nd Year": "second_year",
                 "3rd Year": "third_year",
-                "4th Year": "fourth_year"
-            }
+                "4th Year": "fourth_year"}
 
             semester_mapping = {
                 "1st Semester": "first_semester",
-                "2nd Semester": "second_semester"
-            }
-
+                "2nd Semester": "second_semester"}
             table_name = f"{year_mapping[year]}_{semester_mapping[semester]}"
 
-            # Get student info columns and course columns
+            # Get courses from the curriculum
+            existing_courses = self.get_existing_courses()
+            # Identify student info
             student_info_columns = ['ID_NO', 'LAST_NAME', 'FIRST_NAME', 'MIDDLE_NAME']
-            course_columns = [col for col in grading_data.columns if col not in student_info_columns]
+            # Identify valid course columns in the uploaded grading data
+            course_columns = [col for col in grading_data.columns if col not in student_info_columns and col.strip().upper() in existing_courses]
+            
+            missing_courses = [col for col in grading_data.columns 
+                            if col not in student_info_columns and col.strip().upper() not in existing_courses]
+            if missing_courses:
+                print("Skipping unknown courses not in curriculum_regular:", missing_courses)
 
-            # Create table if it doesn't exist
-            create_table_query = f"""
-            CREATE TABLE IF NOT EXISTS `{table_name}` (
+            # Create table
+            create_table_query = f""" CREATE TABLE IF NOT EXISTS `{table_name}` (
                 `ID_NO` VARCHAR(255),
                 `LAST_NAME` VARCHAR(100),
                 `FIRST_NAME` VARCHAR(100),
                 `MIDDLE_NAME` VARCHAR(100),
                 `SCHOOL_YEAR` VARCHAR(20),
-                {', '.join(f'`{col}` VARCHAR(10)' for col in course_columns)},
-                PRIMARY KEY (`ID_NO`, `SCHOOL_YEAR`)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-            """
-
-            print(f"Creating table with query: {create_table_query}")
+                `COURSE_NO` VARCHAR(30),
+                `GRADES` DECIMAL(5,2),
+                PRIMARY KEY (`ID_NO`, `COURSE_NO`, `SCHOOL_YEAR`)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci """
             self.execute_query_with_retry(create_table_query)
 
-            # Verify table exists
+            # Verify if table exists
             self.cursor.execute(f"SHOW TABLES LIKE '{table_name}'")
             if not self.cursor.fetchone():
                 raise Exception(f"Failed to create table {table_name}")
 
-            # Insert data
-            columns = student_info_columns + ['SCHOOL_YEAR'] + course_columns
-            placeholders = ', '.join(['%s'] * len(columns))
+            # Insert query for one row per course
             insert_query = f"""
-            INSERT INTO `{table_name}` 
-            (`{'`, `'.join(columns)}`)
-            VALUES ({placeholders})
-            ON DUPLICATE KEY UPDATE
-            {', '.join(f'`{col}` = VALUES(`{col}`)' for col in columns if col != 'ID_NO')}
-            """
+            INSERT INTO `{table_name}` (`ID_NO`, `LAST_NAME`, `FIRST_NAME`, `MIDDLE_NAME`, `SCHOOL_YEAR`, `COURSE_NO`, `GRADES`)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            ON DUPLICATE KEY UPDATE `GRADES` = VALUES(`GRADES`) """
 
-            # Prepare values for batch insertion
             values_list = []
             for _, row in grading_data.iterrows():
-                values = [
-                    str(row['ID_NO']).strip(),
-                    str(row['LAST_NAME']).strip(),
-                    str(row['FIRST_NAME']).strip(),
-                    str(row.get('MIDDLE_NAME', '')).strip(),
-                    school_year.strip()
-                ]
+                student_data = [ str(row['ID_NO']).strip(), str(row['LAST_NAME']).strip(), str(row['FIRST_NAME']).strip(),
+                    str(row.get('MIDDLE_NAME', '')).strip(), school_year.strip()]
                 
-                # Add grades for each course
                 for course in course_columns:
-                    grade = str(row[course]).strip().upper() if pd.notna(row[course]) else ''
-                    values.append(grade)
-
-                values_list.append(tuple(values))
+                    grade = row[course]
+                    if pd.notna(grade) and str(grade).strip() != "":
+                        values = student_data + [course.strip(), float(grade)]
+                        values_list.append(tuple(values))
 
             # Execute batch insert
-            try:
+            if values_list:
                 self.cursor.executemany(insert_query, values_list)
-            except mysql.connector.Error as err:
-                print(f"Error inserting rows: {err}")
-                print(f"Values: {values_list}")
-                raise
 
             self.conn.commit()
             return True
@@ -961,6 +952,7 @@ class DatabaseHandler:
             print(f"Error saving grades: {e}")
             self.conn.rollback()
             return False
+
             
     def save_irregular_grading_data(self, grading_data, year, semester):
         try:
@@ -1383,7 +1375,7 @@ class DatabaseHandler:
                 
     def save_manual_grades(self, grading_data, year_level, school_year):
         try:
-            # Map year levels to table names
+            # Map year levels to table names inug update man ni sa
             year_mapping = {
                 "1.1": "first_year_first_semester",
                 "1.2": "first_year_second_semester",
@@ -2078,6 +2070,7 @@ class DatabaseHandler:
             if cursor:
                 cursor.close()
                 
+
      #this is for the student grades.py           
     def register_student(self, student_id, last_name, middle_name, first_name, password):
         self.cursor.execute("""
@@ -2532,4 +2525,58 @@ class DatabaseHandler:
             # Additional detailed error tracking
             traceback.print_exc()
             return [], []
+
+    def get_unenrolled_students(self, year_level, current_sy):
+        """
+        Fetch students of a given year level who are not yet enrolled in both first and second semester.
         
+        :param year_level: The year level of students (1, 2, 3, or 4).
+        :param current_sy: The current school year (e.g., "2024-2025").
+        :return: List of dictionaries containing student details.
+        """
+        try:
+            query = f"""
+                SELECT s.ID_NO, s.LAST_NAME, s.FIRST_NAME, s.MIDDLE_NAME, s.YR, s.ENROLLED_YEAR
+                FROM student_information s
+                LEFT JOIN {year_level}_year_first_semester fyfs ON s.ID_NO = fyfs.ID_NO AND fyfs.SCHOOL_YEAR = %s
+                LEFT JOIN {year_level}_year_second_semester fyss ON s.ID_NO = fyss.ID_NO AND fyss.SCHOOL_YEAR = %s
+                WHERE s.YR = %s  
+                AND fyfs.ID_NO IS NULL AND fyss.ID_NO IS NULL;
+            """
+
+            # Debugging: Print query before executing
+            print(f"Executing query for {year_level}-year students: {query} with {current_sy}")
+
+            self.cursor.execute(query, (current_sy, current_sy, year_level))
+            students = self.cursor.fetchall()
+
+            # Debugging: Print fetched students
+            print(f"Fetched {year_level}-year students: {students}")
+
+            if not students:
+                print(f"No {year_level}-year students found.")
+                return []
+
+            # 🔹 Now using the format_students function to structure the data
+            return self.format_students(students)
+
+        except mysql.connector.Error as err:
+            print(f"{year_level} year Database error: {err}")
+            return []
+
+        
+    def format_students(self, students):
+        """
+        Helper function to format student data into a list of dictionaries.
+        """
+        student_list = []
+        for row in students:
+            student_list.append({
+                "ID_NO": row[0],
+                "LAST_NAME": row[1],
+                "FIRST_NAME": row[2],
+                "MIDDLE_NAME": row[3] if row[3] else "",
+                "YEAR_LEVEL": row[4],
+                "ENROLLMENT_STATUS": "Not Enrolled"
+            })
+        return student_list

@@ -1,0 +1,42 @@
+your_app/
+│
+├── main.py                         # Entry point
+├── app_config.py                  # Constants, global config
+│
+├── assets/                        # All static files
+│   ├── icons/
+│   ├── images/
+│   └── ...
+│
+├── database/                      # DB connection + schema definition
+│   ├── db_connection.py           # Connects to MySQL/XAMPP
+│   └── schema.sql                 # Initial table structure
+│
+├── models/                        # Data models (if any logic needed)
+│   └── student_model.py
+│
+├── screens/                       # UI code only
+│   ├── student_screen.py
+│   ├── grades_screen.py
+│   └── ...
+│
+├── controllers/                   # Button handlers, screen logic
+│   ├── student_controller.py
+│   └── grades_controller.py
+│
+├── services/                      # Interacts with DB only
+│   ├── student_service.py
+│   ├── grades_service.py
+│   └── curriculum_service.py
+│
+├── utils/                         # Reusable utilities
+│   ├── file_loader.py
+│   ├── logger.py
+│   └── validator.py
+│
+├── router.py                      # Central screen navigation
+└── theme/                         # Optional: styles/colors
+    └── theme.py
+
+
+If some settings might change per user/machine (like DB settings), consider loading them from a .env file or config.json.

@@ -91,55 +91,61 @@ class StudentScreen(ctk.CTkFrame):
  
     def show_summary(self):
         # Create a summary frame
-        summary_frame = ctk.CTkFrame(self, width=800, height=800, fg_color="gainsboro", corner_radius=30)
+        summary_frame = ctk.CTkFrame(self, width=950, height=350, fg_color="gainsboro", corner_radius=30)
         summary_frame.place(x=60, y=200)
 
         ctk.CTkLabel(summary_frame, text="Enrollment Summary", font=("Vivaldi", 30, "bold")).pack(pady=20)
 
+        # Create a search frame
+        search_frame = ctk.CTkFrame(summary_frame, fg_color="white", corner_radius=20)
+        search_frame.pack(fill="x", padx=20, pady=(10, 0))
+
+        ctk.CTkLabel(search_frame, text="Search:", font=("Helvetica", 14)).pack(side="left", padx=10)
+        self.search_var = tk.StringVar()
+
+        search_entry = ctk.CTkEntry(search_frame, textvariable=self.search_var, width=250, height=30, placeholder_text="Enter ID, Last Name, or First Name")
+        search_entry.pack(side="left", padx=10)
+        
+        search_button = ctk.CTkButton(search_frame, text="Search", fg_color="blue", text_color="white", corner_radius=10, command=self.filter_students)
+        search_button.pack(side="left", padx=10)
+
         # Create a Notebook for year levels
-        notebook = ttk.Notebook(summary_frame, width=950, height=320)
-        notebook.pack(pady=10, expand=True, fill='both')
+        self.notebook = ttk.Notebook(summary_frame, width=950, height=297)
+        self.notebook.pack(pady=10, expand=True, fill='both')
+
+        # Get current school year
+        current_year = datetime.now().year
+        current_sy = f"{current_year}-{current_year+1}"  # Example: "2024-2025"
 
         # Connect to the database
         db_handler = DatabaseHandler()
         try:
-            query = """
-                SELECT ID_NO, LAST_NAME, FIRST_NAME, MIDDLE_NAME, YR, TO_BE_ENROLLED_YEAR
-                FROM student_information
-            """
-            db_handler.cursor.execute(query)
-            results = db_handler.cursor.fetchall()
+            # 🔹 Fetch unenrolled students dynamically for each year level
+            self.student_data = {}
+            self.unenrolled_students = []
 
-            # Organize data by year
-            student_data = {"1st Year": [], "2nd Year": [], "3rd Year": [], "4th Year": []}
-            unenrolled_students = []  # Store students who are not enrolled
-
-            for row in results:
-                id_no, last_name, first_name, middle_name, year, enrolled_year = row
-                full_name = f"{last_name}, {first_name} {middle_name}".strip()
-                status = "Enrolled" if enrolled_year else "Not Enrolled"
-
-                student_data[f"{year}st Year"].append({"id_no": id_no, "name": full_name, "status": status, "year_to_enroll": enrolled_year or "N/A"})
-
-                if not enrolled_year:  # If unenrolled, store their ID for printing
-                    unenrolled_students.append(id_no)
-
-            self.unenrolled_students = unenrolled_students  # Store for printing
+            for year in range(1, 5):  # Loop through 1st to 4th year
+                students = db_handler.get_unenrolled_students(year, current_sy)
+                self.student_data[f"{year}st Year" if year == 1 else f"{year}nd Year" if year == 2 else f"{year}rd Year" if year == 3 else f"{year}th Year"] = students
+                self.unenrolled_students.extend(students)
 
             # Compute total unenrolled students
-            total_students = sum(len(students) for students in student_data.values())
-            total_unenrolled = len(unenrolled_students)
-
+            total_unenrolled = len(self.unenrolled_students)
+            if total_unenrolled == 0:
+                CTkMessagebox(title="Summary", message="No data available")
+                return
+                
             # Generate tabs for each year level
-            for year, students in student_data.items():
-                tab = ctk.CTkFrame(notebook)
-                notebook.add(tab, text=year)
+            self.treeviews = {}  # Store treeviews for filtering
+            for year, students in self.student_data.items():
+                tab = ctk.CTkFrame(self.notebook)
+                self.notebook.add(tab, text=year)
 
                 tree_frame = ctk.CTkFrame(tab)
                 tree_frame.pack(pady=10, padx=10, fill="both", expand=True)
 
                 # Create Treeview for student data
-                columns = ("Name", "Status", "Year to Enroll")
+                columns = ("ID", "Name", "Year Level", "Status")
                 tree = ttk.Treeview(tree_frame, columns=columns, show="headings", height=10)
                 tree.pack(side="left", fill="both", expand=True)
 
@@ -149,22 +155,28 @@ class StudentScreen(ctk.CTkFrame):
                 tree.configure(yscrollcommand=scrollbar.set)
 
                 # Set column headings
+                tree.heading("ID", text="Student ID", anchor="center")
                 tree.heading("Name", text="Student Name", anchor="center")
+                tree.heading("Year Level", text="Year", anchor="center")
                 tree.heading("Status", text="Enroll Status", anchor="center")
-                tree.heading("Year to Enroll", text="Year to Enroll", anchor="center")
 
                 # Set column widths
-                tree.column("Name", width=200, anchor="w")
+                tree.column("ID", width=120, anchor="center")
+                tree.column("Name", width=250, anchor="w")
+                tree.column("Year Level", width=100, anchor="center")
                 tree.column("Status", width=150, anchor="center")
-                tree.column("Year to Enroll", width=150, anchor="center")
 
                 # Add row styles
                 tree.tag_configure("oddrow", background="#f0f0f0")
                 tree.tag_configure("evenrow", background="#ffffff")
 
+                # Populate the treeview
                 for i, student in enumerate(students):
+                    full_name = f"{student['LAST_NAME']}, {student['FIRST_NAME']} {student['MIDDLE_NAME']}".strip()
                     tag = "evenrow" if i % 2 == 0 else "oddrow"
-                    tree.insert("", "end", values=(student["name"], student["status"], student["year_to_enroll"]), tags=(tag,))
+                    tree.insert("", "end", values=(student["ID_NO"], full_name, student["YEAR_LEVEL"], student["ENROLLMENT_STATUS"]), tags=(tag,))
+
+                self.treeviews[year] = tree  # Store treeview reference for filtering
 
             # Add a print button for unenrolled students
             if total_unenrolled > 0:
@@ -172,7 +184,7 @@ class StudentScreen(ctk.CTkFrame):
                     summary_frame, text="Print Unenrolled", text_color="black", font=('Helvetica', 14, 'bold'),
                     corner_radius=30, command=self.print_unenrolled_students
                 )
-                print_button.place(x=20, y=540)
+                print_button.place(x=20, y=620)
 
             # Close button
             close_icon = Image.open("icons/close.png")
@@ -182,6 +194,35 @@ class StudentScreen(ctk.CTkFrame):
 
         except Exception as e:
             messagebox.showerror("Database Error", f"Failed to fetch student data: {str(e)}")
+
+    def filter_students(self):
+        """
+        Filters the student Treeview lists based on the search input.
+        """
+        search_term = self.search_var.get().strip().lower()
+
+        if not search_term:
+            messagebox.showwarning("Search Error", "Please enter an ID, last name, or first name.")
+            return
+
+        for year, tree in self.treeviews.items():
+            # Clear the existing rows in the treeview
+            for item in tree.get_children():
+                tree.delete(item)
+
+            # Filter the stored student data
+            filtered_students = [
+                student for student in self.student_data[year]
+                if search_term in student["ID_NO"].lower() or
+                search_term in student["LAST_NAME"].lower() or
+                search_term in student["FIRST_NAME"].lower()
+            ]
+
+            # Repopulate the treeview with filtered results
+            for i, student in enumerate(filtered_students):
+                full_name = f"{student['LAST_NAME']}, {student['FIRST_NAME']} {student['MIDDLE_NAME']}".strip()
+                tag = "evenrow" if i % 2 == 0 else "oddrow"
+                tree.insert("", "end", values=(student["ID_NO"], full_name, student["YEAR_LEVEL"], student["ENROLLMENT_STATUS"]), tags=(tag,))
 
     def validate_input(self, new_value):
         if  len (new_value) > 11:
@@ -303,7 +344,7 @@ class StudentScreen(ctk.CTkFrame):
             # If no ID is entered, disable the print button
             self.print_button.configure(state="disabled")
             messagebox.showwarning("Input Error", f"Please Enter a student ID_NO")
-
+    #i need to fix this 
     def check_prerequisites(self, student_data, selected_year_semester):
         enrollable_subjects = []
         prerequisite_subjects = []
@@ -335,7 +376,9 @@ class StudentScreen(ctk.CTkFrame):
         for subject in current_year_subjects:
             course_no = subject.get('COURSE_NO', '').strip()
             prerequisite = subject.get('PREREQUISITE', '').strip()
-            
+            grade = [1.00, 1.50, 1.75, 2.00, 2.25, 2.50, 2.75, 3.00]
+
+
             if not prerequisite:
                 enrollable_subjects.append(subject)
                 continue
@@ -922,7 +965,7 @@ class StudentScreen(ctk.CTkFrame):
         pdfmetrics.registerFont(TTFont('TimesNewRoman-Bold', 'timesbd.ttf'))
         c.setFont('TimesNewRoman', 12)
 
-        image_path = "Image\Header.jpg"  # Update this path to your image
+        image_path = "Image/Header.jpg"  # Update this path to your image
         header_height = 80  
         c.drawImage(image_path, 0, height - header_height, width=width, height=header_height)
 
@@ -1977,7 +2020,7 @@ class StudentScreen(ctk.CTkFrame):
         pdfmetrics.registerFont(TTFont('TimesNewRoman-Bold', 'timesbd.ttf'))
         c.setFont('TimesNewRoman', 12)
 
-        image_path = "Image\Header.jpg"  # Update this path to your image
+        image_path = "Image/Header.jpg"  # Update this path to your image
         header_height = 80  
         c.drawImage(image_path, 0, height - header_height, width=width, height=header_height)
 

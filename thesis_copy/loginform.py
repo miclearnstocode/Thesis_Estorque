@@ -90,75 +90,54 @@ class LoginForm(ctk.CTkFrame):
         
         title_label = ctk.CTkLabel(self.container, text="Login", font=ctk.CTkFont(family="Helvetica", size=24, weight="bold"))
         title_label.pack(pady=(0, 20))
- 
-        def validate_email(*args):
-            email = self.email_entry.get().strip()
-            if email and '@' not in email:
-                self.error_label.configure(text="Email must contain @", text_color="red")
-                self.email_entry.configure(border_color="red")
-            else:
-                self.error_label.configure(text="")
-                self.email_entry.configure(border_color="gray")
-        # Email container
-        email_frame = ctk.CTkFrame(self.container, fg_color="transparent")
-        email_frame.pack(fill="x", pady=(0, 10), padx=20)
-        
-        email_label = ctk.CTkLabel(email_frame, text="Email", font=ctk.CTkFont(size=14))
-        email_label.pack(anchor="w")
-        # Create StringVar for email entry
-        email_var = ctk.StringVar()
-        email_var.trace('w', validate_email) 
-        
-        self.email_entry = ctk.CTkEntry(email_frame, width=80, height=35, placeholder_text="Enter your email", corner_radius=30)
-        self.email_entry.pack(fill="x")
+
+        # Email entry
+        email_label = ctk.CTkLabel(self.container, text="Email", font=ctk.CTkFont(size=14))
+        email_label.pack(anchor="w", padx=20)
+
+        self.email_entry = ctk.CTkEntry(self.container, width=280, height=40, placeholder_text="Enter your email", corner_radius=30)
+        self.email_entry.pack(fill="x", padx=20, pady=(0, 10))
         self.email_entry.bind("<Return>", lambda event: self.focus_next_widget())
 
-        # Password container
-        password_frame = ctk.CTkFrame(self.container, fg_color="transparent")
-        password_frame.pack(fill="x", pady=(0, 10), padx=20)
-        
-        password_label = ctk.CTkLabel(password_frame, text="Password", font=ctk.CTkFont(size=14))
-        password_label.pack(anchor="w")
-        
-        # Add password entry and show checkbox in a container
-        password_entry_frame = ctk.CTkFrame(password_frame, fg_color="transparent")
-        password_entry_frame.pack(fill='x')
-        
-        self.password_entry = ctk.CTkEntry(password_entry_frame, show="*", placeholder_text="Enter your password", height=35, corner_radius=30)
-        self.password_entry.pack(side="left", fill="x", expand=True)
+        # Password entry
+        password_label = ctk.CTkLabel(self.container, text="Password", font=ctk.CTkFont(size=14))
+        password_label.pack(anchor="w", padx=20)
+
+        self.password_entry = ctk.CTkEntry(self.container, show="*", placeholder_text="Enter your password", height=40, corner_radius=30)
+        self.password_entry.pack(fill="x", padx=20, pady=(0, 10))
         self.password_entry.bind("<Return>", lambda event: self.validate_login())
-        
-        self.show_password_cb = ctk.CTkCheckBox(self.container,text="Show",width=20,height=20,checkbox_width=16,checkbox_height=16,corner_radius=3,fg_color="#2196F3",hover_color="#1976D2",command=lambda: self.toggle_password_visibility(self.password_entry),font=("Helvetica", 12))
-        self.show_password_cb.place(x=28, y=318)
+
+        self.show_password_cb = ctk.CTkCheckBox(self.container, text="Show", width=20, height=20, checkbox_width=16, checkbox_height=16, corner_radius=3, fg_color="#2196F3", hover_color="#1976D2", command=lambda: self.toggle_password_visibility(self.password_entry), font=("Helvetica", 12))
+        self.show_password_cb.pack(anchor="w", padx=20)
 
         # Error label (add this before the login button)
         self.error_label = ctk.CTkLabel(
             self.container,
             text="",
             text_color="red",
-            font=ctk.CTkFont("Helvetica",size=14),
+            font=ctk.CTkFont("Helvetica", size=14),
             wraplength=280
         )
         self.error_label.pack(pady=(5, 0))
 
-        login_icon= Image.open("icons/logins.png")
-        self.login_icon = ctk.CTkImage(light_image=login_icon, dark_image=login_icon, size=(30,30))
-        login_button = ctk.CTkButton(self.container, text="Login", image=self.login_icon,command=self.validate_login, width=150, height=40, text_color="black",fg_color="transparent",hover_color="#707070",border_color= "black", border_width=1,corner_radius=30,font=ctk.CTkFont(size=15, weight="bold"))
-        login_button.pack(pady=(20, 10))
+        login_icon = Image.open("icons/logins.png")
+        self.login_icon = ctk.CTkImage(light_image=login_icon, dark_image=login_icon, size=(30, 30))
+        login_button = ctk.CTkButton(self.container, text="Login", image=self.login_icon, command=self.validate_login, width=80, height=40, text_color="black", fg_color="transparent", hover_color="#707070", border_color="grey", border_width=1, corner_radius=30, font=ctk.CTkFont(size=15, weight="bold"))
+        login_button.pack(fill='x', padx=20, pady=(1, 20))
 
-            # Registration link
+        # Registration link
         reg_label = ctk.CTkLabel(
             self.container, 
             text="Don't have an account?", 
             font=ctk.CTkFont(size=12), 
-            text_color="black")
+            text_color="black"
+        )
+        reg_label.place(x=91, y=431)
 
-        reg_label.place(x=91, y=430)
-
-        register_link = ctk.CTkLabel(self.container, text="Register",  font=ctk.CTkFont(size=12, underline=True),  text_color="blue",  cursor="hand2")
-        register_link.place(x=221, y=430)
+        register_link = ctk.CTkLabel(self.container, text="Register", font=ctk.CTkFont(size=12, underline=True), text_color="blue", cursor="hand2")
+        register_link.place(x=221, y=431)
         register_link.bind("<Button-1>", self.open_registration)
-
+        
     def focus_next_widget(self):
         """Move focus to password entry when Enter is pressed in email entry"""
         self.password_entry.focus_set()

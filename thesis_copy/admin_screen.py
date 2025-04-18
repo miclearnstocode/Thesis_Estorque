@@ -1,13 +1,9 @@
 import logging
-import tkinter as tk
 from tkinter import ttk, messagebox
 import customtkinter as ctk
 from database import DatabaseHandler
-from datetime import datetime
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-import numpy as np
-import tkinter as tk
 import customtkinter as ctk
 from tkinter import messagebox
 import threading
@@ -284,13 +280,13 @@ class AdminScreen(ctk.CTkFrame):
         BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
         # Create path to icons directory relative to your script
-        icon_path = os.path.join(BASE_DIR, "..", "icons", "icons/user.png")
+        icon_path = os.path.join(BASE_DIR, "..", "icons", "user.png")
 
         user_icon = Image.open(icon_path)
         self.user_icon = ctk.CTkImage(light_image=user_icon, dark_image=user_icon, size=(30, 30))
 
         try:
-            icon_path = os.path.join(BASE_DIR, "..", "icons", "icons/user.png")
+            icon_path = os.path.join(BASE_DIR, "..", "icons", "user.png")
             user_icon = Image.open(icon_path)
             self.user_icon = ctk.CTkImage(light_image=user_icon, dark_image=user_icon, size=(30, 30))
             title_label = ctk.CTkLabel(

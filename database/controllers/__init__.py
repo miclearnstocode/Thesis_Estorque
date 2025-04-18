@@ -1,0 +1,5 @@
+from .admin_controller import AdminController
+from .appraisal_controller import AppraisalController
+from .curriculum_controller import CurriculumController
+from .grade_controller import GradesController
+from .student_controller import StudentController
