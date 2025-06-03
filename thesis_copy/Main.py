@@ -50,10 +50,7 @@ class Application(ctk.CTk):
         self.login_frame.pack(expand=True, fill="both")
 
         # Then create login form with callbacks
-        self.login_form = LoginForm(
-            self.login_frame, 
-            login_success_callback=self.login_success,
-            admin_login_callback=self.admin_login_success)
+        self.login_form = LoginForm(self.login_frame, login_success_callback=self.login_success, admin_login_callback=self.admin_login_success)
         self.grade_data = self.preload_grade_data()
         
     def start_server(self):
@@ -79,22 +76,14 @@ class Application(ctk.CTk):
     def show_splash_screen(self):
         # Load and set background image first (behind splash)
         bg_image = Image.open("Image/Gradient.jpg")
-        self.splash_bg = ctk.CTkImage(
-            light_image=bg_image,
-            dark_image=bg_image,
-            size=(self.winfo_screenwidth(), self.winfo_screenheight())
-        )
+        self.splash_bg = ctk.CTkImage(light_image=bg_image, dark_image=bg_image, size=(self.winfo_screenwidth(), self.winfo_screenheight()))
         
         # Create background label that covers entire screen
         self.bg_window = ctk.CTkToplevel(self)
         self.bg_window.geometry(f"{self.winfo_screenwidth()}x{self.winfo_screenheight()}+0+0")
         self.bg_window.overrideredirect(True)
         
-        bg_label = ctk.CTkLabel(
-            self.bg_window,
-            image=self.splash_bg,
-            text=""
-        )
+        bg_label = ctk.CTkLabel(self.bg_window, image=self.splash_bg, text="")
         bg_label.place(x=0, y=0, relwidth=1, relheight=1)
         
         # Create splash screen window
@@ -156,8 +145,7 @@ class Application(ctk.CTk):
                     ("Establishing database connection", self.check_database, 25),
                     ("Initializing user interface", self.check_ui_components, 15),
                     ("Performing final system checks", self.check_final_setup, 15),
-                    ("Verifying network connectivity", self.check_network, 10)
-                ]
+                    ("Verifying network connectivity", self.check_network, 10)]
                 
                 # Calculate total weight to ensure 100%
                 total_weight = sum(weight for _, _, weight in components)
@@ -166,10 +154,7 @@ class Application(ctk.CTk):
                 cumulative_progress = 0
                 
                 # Ensure initial message
-                self.splash.after(0, self.loading_label.configure, {
-                    'text': "Starting system initialization...",
-                    'text_color': "blue"
-                })
+                self.splash.after(0, self.loading_label.configure, {'text': "Starting system initialization...", 'text_color': "blue"})
                 
                 # Iterate through components with detailed progress tracking
                 for message, check_function, weight in components:
@@ -177,10 +162,7 @@ class Application(ctk.CTk):
                         # Update loading message
                         def update_loading(msg, color="black"):
                             if hasattr(self, 'loading_label') and self.loading_label:
-                                self.loading_label.configure(
-                                    text=msg, 
-                                    text_color=color
-                                )
+                                self.loading_label.configure(text=msg, text_color=color)
                         
                         # Dispatch message update
                         self.splash.after(0, update_loading, f"{message}...", "blue")
@@ -225,10 +207,7 @@ class Application(ctk.CTk):
                         self.progress.set(1)
                     
                     if hasattr(self, 'loading_label') and self.loading_label:
-                        self.loading_label.configure(
-                            text="System ready!",
-                            text_color='green'
-                        )
+                        self.loading_label.configure(text="System ready!", text_color='green')
                 
                 self.splash.after(0, finalize_startup)
                 
@@ -244,18 +223,10 @@ class Application(ctk.CTk):
                 def handle_error(error_message=None):
                     # Update loading label
                     if hasattr(self, 'loading_label') and self.loading_label:
-                        self.loading_label.configure(
-                            text=error_message if error_message else "An error occurred",
-                            text_color='red'
-                        )
+                        self.loading_label.configure(text=error_message if error_message else "An error occurred", text_color='red')
                     
                     # Show error dialog
-                    CTkMessagebox(
-                        title="System Initialization Error", 
-                        message=error_message if error_message else "An error occurred",
-                        icon="cancel",
-                        option_1="Exit"
-                    )
+                    CTkMessagebox(title="System Initialization Error",  message=error_message if error_message else "An error occurred", icon="cancel", option_1="Exit")
                     
                     # Attempt graceful shutdown
                     self.quit()
@@ -285,14 +256,8 @@ class Application(ctk.CTk):
 
     def check_modules(self):
         """Check if all required modules are available"""
-        required_modules = [
-            'customtkinter',
-            'PIL',
-            'mysql.connector',
-            'pandas',
-            'CTkMessagebox'
-        ]
-        
+        required_modules = ['customtkinter', 'PIL', 'mysql.connector', 'pandas', 'CTkMessagebox']
+
         try:
             for module in required_modules:
                 importlib.import_module(module)
@@ -309,11 +274,7 @@ class Application(ctk.CTk):
                 raise Exception("Database connection failed")
             
             # Check required tables
-            required_tables = [
-                'curriculum_regular',
-                'student_information',
-                'admin_management'
-            ]
+            required_tables = ['curriculum_regular', 'student_information', 'admin_management']
             
             for table in required_tables:
                 db.cursor.execute(f"SHOW TABLES LIKE '{table}'")
@@ -329,12 +290,7 @@ class Application(ctk.CTk):
     def check_ui_components(self):
         """Check if UI components are properly loaded"""
         try:
-            required_attributes = [
-                'dept_logo_image',
-                'splash',
-                'progress',
-                'loading_label'
-            ]
+            required_attributes = ['dept_logo_image','splash', 'progress', 'loading_label']
             
             for attr in required_attributes:
                 if not hasattr(self, attr):
@@ -573,38 +529,20 @@ class Application(ctk.CTk):
             loading_container = ctk.CTkFrame(loading_frame, fg_color="transparent")
             loading_container.grid(row=0, column=0)
             
-            empty_img = ctk.CTkImage(
-                light_image=Image.new("RGB", (300, 40), color="white"),
-                dark_image=Image.new("RGB", (300, 40), color="white"),
-                size=(300, 40)
-            )
+            empty_img = ctk.CTkImage(light_image=Image.new("RGB", (300, 40), color="white"),
+                dark_image=Image.new("RGB", (300, 40), color="white"), size=(300, 40))
 
-            loading_label = ctk.CTkLabel(
-                loading_container,
-                text="Loading Grades Module",
-                font=("Helvetica", 16, "bold"),
-                image=empty_img,
-                compound="center"  # Text will be centered over image
-            )
+            loading_label = ctk.CTkLabel( loading_container, text="Loading Grades Module",
+             font=("Helvetica", 16, "bold"), image=empty_img, compound="center")
             loading_label.pack(pady=10)
             
             # Progress bar
-            progress = ctk.CTkProgressBar(
-                loading_container,
-                width=300,
-                height=15,
-                corner_radius=10,
-                mode="indeterminate"
-            )
+            progress = ctk.CTkProgressBar( loading_container, width=300, height=15, corner_radius=10, mode="indeterminate")
             progress.pack(pady=10)
             progress.start()
             
             # Status message
-            status_label = ctk.CTkLabel(
-                loading_container,
-                text="Initializing...",
-                font=("Helvetica", 12)
-            )
+            status_label = ctk.CTkLabel(loading_container, text="Initializing...", font=("Helvetica", 12))
             status_label.pack(pady=5)
 
             def update_status(message):

@@ -48,10 +48,7 @@ class StudentScreen(ctk.CTkFrame):
 
         ctk.CTkLabel(self,  text="Student", font=("Vivaldi", 40, "bold"), text_color="black", fg_color="transparent",  corner_radius=50, padx=20, pady=10).pack(pady=30)
         # Button style configuration
-        button_style = {
-            "fg_color": "transparent",    
-            "hover_color": "#707070",     
-            "text_color": "black",        
+        button_style = { "fg_color": "transparent","hover_color": "#707070","text_color": "black",        
             "height": 32,                 
             "border_width": 1,            
             "border_color": "black",
@@ -91,7 +88,6 @@ class StudentScreen(ctk.CTkFrame):
         ctk.CTkButton(self, text="Summary", image=self.summary_icon, **button_style, font=('Helvetica',14, 'bold'),command=Monitoring.show_summary).place(x=700, y=147)  # Place the Summary button at the specified coordinates
 
 class Monitoring:
-
     def show_summary(self):
         # Create a summary frame
         summary_frame = ctk.CTkFrame(self, width=950, height=350, fg_color="gainsboro", corner_radius=30)
@@ -214,8 +210,7 @@ class Monitoring:
                 student for student in self.student_data[year]
                 if search_term in student["ID_NO"].lower() or
                 search_term in student["LAST_NAME"].lower() or
-                search_term in student["FIRST_NAME"].lower()
-            ]
+                search_term in student["FIRST_NAME"].lower()]
 
             # Repopulate the treeview with filtered results
             for i, student in enumerate(filtered_students):

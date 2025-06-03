@@ -9,5 +9,8 @@
     ],
     "python.testing.pytestEnabled": false,
     "python.testing.unittestEnabled": true,
-    "CodeGPT.apiKey": "Anthropic"
+    "CodeGPT.apiKey": "Anthropic",
+    "python.analysis.extraPaths": [
+        "./thesis_copy"
+    ]
 }

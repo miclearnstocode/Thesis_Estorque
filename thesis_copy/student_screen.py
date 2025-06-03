@@ -181,8 +181,8 @@ class StudentScreen(ctk.CTkFrame):
             # Add a print button for unenrolled students
             if total_unenrolled > 0:
                 print_button = ctk.CTkButton(
-                    summary_frame, text="Print Unenrolled", text_color="black", font=('Helvetica', 14, 'bold'),
-                    corner_radius=30, command=self.print_unenrolled_students
+                    summary_frame, text="Print All", text_color="black", font=('Helvetica', 14, 'bold'),
+                    corner_radius=30, command=self.print_students
                 )
                 print_button.place(x=20, y=620)
 

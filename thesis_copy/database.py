@@ -1373,9 +1373,10 @@ class DatabaseHandler:
             print(f"Error updating appraised grades: {e}")
             raise
                 
+
     def save_manual_grades(self, grading_data, year_level, school_year):
         try:
-            # Map year levels to table names inug update man ni sa
+            # Map year levels to table names (now each table should have columns: ID_NO, LAST_NAME, FIRST_NAME, MIDDLE_NAME, SCHOOL_YEAR, COURSE_NO, GRADES)
             year_mapping = {
                 "1.1": "first_year_first_semester",
                 "1.2": "first_year_second_semester",
@@ -1384,20 +1385,26 @@ class DatabaseHandler:
                 "3.1": "third_year_first_semester",
                 "3.2": "third_year_second_semester",
                 "4.1": "fourth_year_first_semester",
-                "4.2": "fourth_year_second_semester"
-            }
+                "4.2": "fourth_year_second_semester"}
 
             table_name = year_mapping.get(year_level)
             if not table_name:
                 raise ValueError(f"Invalid year level: {year_level}")
 
-            # Get the table structure to know available course columns
-            self.cursor.execute(f"DESCRIBE {table_name}")
-            table_columns = [row[0] for row in self.cursor.fetchall()]
-            course_columns = [col for col in table_columns if col not in 
-                             ['ID_NO', 'LAST_NAME', 'FIRST_NAME', 'MIDDLE_NAME', 'SCHOOL_YEAR']]
-            
-            print("Available course columns:", course_columns)  # Debug print
+            # Ensure the table has the correct structure
+            create_table_query = f"""
+            CREATE TABLE IF NOT EXISTS `{table_name}` (
+                `ID_NO` VARCHAR(255),
+                `LAST_NAME` VARCHAR(100),
+                `FIRST_NAME` VARCHAR(100),
+                `MIDDLE_NAME` VARCHAR(100),
+                `SCHOOL_YEAR` VARCHAR(20),
+                `COURSE_NO` VARCHAR(30),
+                `GRADES` DECIMAL(5,2),
+                PRIMARY KEY (`ID_NO`, `COURSE_NO`, `SCHOOL_YEAR`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            """
+            self.cursor.execute(create_table_query)
 
             # Define valid grades
             valid_grades = {1.0, 1.25, 1.5, 1.75, 2.0, 2.25, 2.5, 2.75, 3.0, 5.0}
@@ -1406,9 +1413,6 @@ class DatabaseHandler:
             for _, row in grading_data.iterrows():
                 try:
                     course_no = row['Course No.'].strip()
-                    if course_no not in course_columns:
-                        raise ValueError(f"Invalid course: {course_no} for this semester")
-
                     # Convert grade to decimal and validate
                     try:
                         grade = float(row['Grade'])
@@ -1422,56 +1426,42 @@ class DatabaseHandler:
                             raise ValueError(f"Invalid grade format for course {course_no}: {row['Grade']}")
                         raise ve
 
-                    # Check if student record exists
+                    # Check if the record already exists
                     check_query = f"""
-                        SELECT * FROM {table_name} 
-                        WHERE ID_NO = %s AND SCHOOL_YEAR = %s
+                        SELECT COUNT(*) FROM `{table_name}`
+                        WHERE ID_NO = %s AND COURSE_NO = %s AND SCHOOL_YEAR = %s
                     """
-                    self.cursor.execute(check_query, (row['ID_NO'].strip(), school_year))
-                    existing_record = self.cursor.fetchone()
+                    self.cursor.execute(check_query, (
+                        row['ID_NO'].strip(),
+                        course_no,
+                        school_year.strip()
+                    ))
+                    exists = self.cursor.fetchone()[0]
 
-                    if existing_record:
-                        # Update existing record with the new grade for the specific course
-                        update_query = f"""
-                        UPDATE {table_name}
-                        SET `{course_no}` = %s,
-                            LAST_NAME = %s,
-                            FIRST_NAME = %s,
-                            MIDDLE_NAME = %s
-                        WHERE ID_NO = %s AND SCHOOL_YEAR = %s
-                        """
-                        values = (
-                            str(grade),
-                            row['Last Name'].strip(),
-                            row['First Name'].strip(),
-                            row['Middle Name'].strip(),
-                            row['ID_NO'].strip(),
-                            school_year
+                    if exists:
+                        # Do not update, just show message and skip
+                        messagebox.showwarning(
+                            "Duplicate Entry",
+                            f"Grade for student {row['ID_NO']} in course {course_no} for {school_year} already exists. Double entry detected."
                         )
-                        self.cursor.execute(update_query, values)
-                    else:
-                        # Create a new record with NULL for all courses except the current one
-                        columns = ['ID_NO', 'LAST_NAME', 'FIRST_NAME', 'MIDDLE_NAME', 'SCHOOL_YEAR']
-                        values = [
-                            row['ID_NO'].strip(),
-                            row['Last Name'].strip(),
-                            row['First Name'].strip(),
-                            row['Middle Name'].strip(),
-                            school_year
-                        ]
-                        
-                        # Add all course columns
-                        for col in course_columns:
-                            columns.append(f"`{col}`")
-                            values.append(str(grade) if col == course_no else None)
+                        continue
 
-                        placeholders = ', '.join(['%s'] * len(columns))
-                        insert_query = f"""
-                        INSERT INTO {table_name}
-                        ({', '.join(columns)})
-                        VALUES ({placeholders})
-                        """
-                        self.cursor.execute(insert_query, values)
+                    # Insert the grade for this student, course, and school year
+                    insert_query = f"""
+                    INSERT INTO `{table_name}` 
+                        (`ID_NO`, `LAST_NAME`, `FIRST_NAME`, `MIDDLE_NAME`, `SCHOOL_YEAR`, `COURSE_NO`, `GRADES`)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    """
+                    values = (
+                        row['ID_NO'].strip(),
+                        row['Last Name'].strip(),
+                        row['First Name'].strip(),
+                        row['Middle Name'].strip(),
+                        school_year.strip(),
+                        course_no,
+                        grade
+                    )
+                    self.cursor.execute(insert_query, values)
 
                 except ValueError as ve:
                     messagebox.showerror("Validation Error", str(ve))
@@ -1482,13 +1472,13 @@ class DatabaseHandler:
             return True
 
         except mysql.connector.Error as err:
-            print(f"MySQL Error: {err}")
             messagebox.showerror("Database Error", f"Error saving grades: {err}")
             return False
         except Exception as e:
-            print(f"Unexpected Error: {e}")
             messagebox.showerror("Error", f"An unexpected error occurred: {e}")
             return False
+
+            
     def check_student_source(self, id_no):
         """
         Check if a student exists in student_information or appraised curriculum.
@@ -1626,9 +1616,8 @@ class DatabaseHandler:
             
             columns = ['ID_NO', 'STUDENT_NAME', 'COURSE_NO']
             df = pd.DataFrame(results, columns=columns)
-            
             return df
-
+        
         except mysql.connector.Error as err:
             print(f"Database Error: {err}")
             return pd.DataFrame()
@@ -2529,17 +2518,33 @@ class DatabaseHandler:
     def get_unenrolled_students(self, year_level, current_sy):
         """
         Fetch students of a given year level who are not yet enrolled in both first and second semester.
-        
+
         :param year_level: The year level of students (1, 2, 3, or 4).
         :param current_sy: The current school year (e.g., "2024-2025").
         :return: List of dictionaries containing student details.
         """
+        # Map numeric year_level to its word equivalent for table names
+        year_word_map = {
+            "1": "first",
+            "2": "second",
+            "3": "third",
+            "4": "fourth",
+            1: "first",
+            2: "second",
+            3: "third",
+            4: "fourth"
+        }
+        year_word = year_word_map.get(year_level)
+        if not year_word:
+            print(f"Invalid year_level: {year_level}")
+            return []
+
         try:
             query = f"""
                 SELECT s.ID_NO, s.LAST_NAME, s.FIRST_NAME, s.MIDDLE_NAME, s.YR, s.ENROLLED_YEAR
                 FROM student_information s
-                LEFT JOIN {year_level}_year_first_semester fyfs ON s.ID_NO = fyfs.ID_NO AND fyfs.SCHOOL_YEAR = %s
-                LEFT JOIN {year_level}_year_second_semester fyss ON s.ID_NO = fyss.ID_NO AND fyss.SCHOOL_YEAR = %s
+                LEFT JOIN {year_word}_year_first_semester fyfs ON s.ID_NO = fyfs.ID_NO AND fyfs.SCHOOL_YEAR = %s
+                LEFT JOIN {year_word}_year_second_semester fyss ON s.ID_NO = fyss.ID_NO AND fyss.SCHOOL_YEAR = %s
                 WHERE s.YR = %s  
                 AND fyfs.ID_NO IS NULL AND fyss.ID_NO IS NULL;
             """
@@ -2557,14 +2562,13 @@ class DatabaseHandler:
                 print(f"No {year_level}-year students found.")
                 return []
 
-            # 🔹 Now using the format_students function to structure the data
+            #Now using the format_students function to structure the data
             return self.format_students(students)
 
         except mysql.connector.Error as err:
             print(f"{year_level} year Database error: {err}")
             return []
 
-        
     def format_students(self, students):
         """
         Helper function to format student data into a list of dictionaries.

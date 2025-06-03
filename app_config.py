@@ -7,7 +7,7 @@ port=3306,
 allow_local_infile=True
 
 #icon paths
-add_students = "icons/add_students.png"
+add_students = "assets/icons/add_students.png"
 appraisal = "icons/appraisal.png"
 archive = "icons/archives.png"
 back = "icons/back.png"

@@ -1,11 +1,8 @@
 import customtkinter as ctk
 from CTkMessagebox import CTkMessagebox
-import re
-import hashlib
-import tkinter as tk
-import os
+import hashlib, os, re
 from database import DatabaseHandler
-from PIL import Image, ImageTk
+from PIL import Image
 
 class LoginForm(ctk.CTkFrame):
     def __init__(self, master, login_success_callback=None, admin_login_callback=None):
@@ -111,13 +108,7 @@ class LoginForm(ctk.CTkFrame):
         self.show_password_cb.pack(anchor="w", padx=20)
 
         # Error label (add this before the login button)
-        self.error_label = ctk.CTkLabel(
-            self.container,
-            text="",
-            text_color="red",
-            font=ctk.CTkFont("Helvetica", size=14),
-            wraplength=280
-        )
+        self.error_label = ctk.CTkLabel(self.container, text="", text_color="red", font=ctk.CTkFont("Helvetica", size=14), wraplength=280)
         self.error_label.pack(pady=(5, 0))
 
         login_icon = Image.open("icons/logins.png")
@@ -126,12 +117,7 @@ class LoginForm(ctk.CTkFrame):
         login_button.pack(fill='x', padx=20, pady=(1, 20))
 
         # Registration link
-        reg_label = ctk.CTkLabel(
-            self.container, 
-            text="Don't have an account?", 
-            font=ctk.CTkFont(size=12), 
-            text_color="black"
-        )
+        reg_label = ctk.CTkLabel(self.container,  text="Don't have an account?", font=ctk.CTkFont(size=12),text_color="black")
         reg_label.place(x=91, y=431)
 
         register_link = ctk.CTkLabel(self.container, text="Register", font=ctk.CTkFont(size=12, underline=True), text_color="blue", cursor="hand2")
