@@ -1,5 +1,6 @@
 from configparser import Error
 import logging
+from CTkMessagebox import CTkMessagebox
 import pandas as pd
 from tkinter import messagebox
 import mysql.connector
@@ -18,8 +19,7 @@ class DatabaseHandler:
             password='', 
             database='department',
             port=3306,
-            allow_local_infile=True
-        )
+            allow_local_infile=True)
         cursor = conn.cursor()
         return conn, cursor
 
@@ -452,7 +452,7 @@ class DatabaseHandler:
 
     # ini ya hu sa regular student na display 
     def fetch_student_data(self, id_no, year_level):
-        logging.debug(f"Fetching data for ID_NO: {id_no}, Year Level: {year_level}")
+        logging.debug(f"Fetching data for ID_NO: {id_no}, Year Level: {year_level}")        
         curriculum_query = """
             SELECT 
                 si.ID_NO, 
@@ -473,11 +473,11 @@ class DatabaseHandler:
             FROM
                 student_information si
             LEFT JOIN
-                curriculum_regular cr ON cr.Year_Level = %s
+                curriculum_regular cr ON cr.YEAR_LEVEL = si.YR
             WHERE
-                si.ID_NO = %s
+                si.ID_NO = %s AND cr.YEAR_LEVEL = %s
         """
-        curriculum_params = (year_level, id_no)
+        curriculum_params = (id_no, year_level)
 
         try:
             curriculum_results = self.execute_query(curriculum_query, curriculum_params)
@@ -505,8 +505,7 @@ class DatabaseHandler:
             '3.1': 'third_year_first_semester',
             '3.2': 'third_year_second_semester',
             '4.1': 'fourth_year_first_semester',
-            '4.2': 'fourth_year_second_semester'
-        }
+            '4.2': 'fourth_year_second_semester'}
 
         all_grades_data = self.check_all_tables_for_grades(id_no)
         
@@ -535,8 +534,7 @@ class DatabaseHandler:
             "enrollment_status": enrollment_status,
             "table_exists": current_table in all_grades_data,
             "has_grades": bool(all_grades_data.get(current_table)),
-            "grades_data": all_grades_data
-        }
+            "grades_data": all_grades_data}
     
         # pag check ng grade sa regular student
     def check_all_tables_for_grades(self, id_no):
@@ -548,8 +546,7 @@ class DatabaseHandler:
             'third_year_first_semester',
             'third_year_second_semester',
             'fourth_year_first_semester',
-            'fourth_year_second_semester'
-        ]
+            'fourth_year_second_semester']
 
         all_grades_data = {}
 
@@ -654,8 +651,7 @@ class DatabaseHandler:
                 'third_year_first_semester',
                 'third_year_second_semester',
                 'fourth_year_first_semester',
-                'fourth_year_second_semester'
-            ])
+                'fourth_year_second_semester'])
             
             latest_school_year = None
             
@@ -884,27 +880,23 @@ class DatabaseHandler:
                 "1st Year": "first_year",
                 "2nd Year": "second_year",
                 "3rd Year": "third_year",
-                "4th Year": "fourth_year"}
+                "4th Year": "fourth_year"
+            }
 
             semester_mapping = {
                 "1st Semester": "first_semester",
-                "2nd Semester": "second_semester"}
+                "2nd Semester": "second_semester"
+            }
+            
             table_name = f"{year_mapping[year]}_{semester_mapping[semester]}"
 
-            # Get courses from the curriculum
-            existing_courses = self.get_existing_courses()
-            # Identify student info
+            # Identify student info columns and course columns
             student_info_columns = ['ID_NO', 'LAST_NAME', 'FIRST_NAME', 'MIDDLE_NAME']
-            # Identify valid course columns in the uploaded grading data
-            course_columns = [col for col in grading_data.columns if col not in student_info_columns and col.strip().upper() in existing_courses]
-            
-            missing_courses = [col for col in grading_data.columns 
-                            if col not in student_info_columns and col.strip().upper() not in existing_courses]
-            if missing_courses:
-                print("Skipping unknown courses not in curriculum_regular:", missing_courses)
+            course_columns = [col for col in grading_data.columns if col not in student_info_columns]
 
-            # Create table
-            create_table_query = f""" CREATE TABLE IF NOT EXISTS `{table_name}` (
+            # Create table with the correct structure
+            create_table_query = f"""
+            CREATE TABLE IF NOT EXISTS `{table_name}` (
                 `ID_NO` VARCHAR(255),
                 `LAST_NAME` VARCHAR(100),
                 `FIRST_NAME` VARCHAR(100),
@@ -912,47 +904,58 @@ class DatabaseHandler:
                 `SCHOOL_YEAR` VARCHAR(20),
                 `COURSE_NO` VARCHAR(30),
                 `GRADES` DECIMAL(5,2),
-                PRIMARY KEY (`ID_NO`, `COURSE_NO`, `SCHOOL_YEAR`)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci """
+                PRIMARY KEY (`ID_NO`, `COURSE_NO`, `SCHOOL_YEAR`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            """
             self.execute_query_with_retry(create_table_query)
 
-            # Verify if table exists
-            self.cursor.execute(f"SHOW TABLES LIKE '{table_name}'")
-            if not self.cursor.fetchone():
-                raise Exception(f"Failed to create table {table_name}")
-
-            # Insert query for one row per course
+            # Insert query
             insert_query = f"""
-            INSERT INTO `{table_name}` (`ID_NO`, `LAST_NAME`, `FIRST_NAME`, `MIDDLE_NAME`, `SCHOOL_YEAR`, `COURSE_NO`, `GRADES`)
+            INSERT INTO `{table_name}` 
+                (`ID_NO`, `LAST_NAME`, `FIRST_NAME`, `MIDDLE_NAME`, `SCHOOL_YEAR`, `COURSE_NO`, `GRADES`)
             VALUES (%s, %s, %s, %s, %s, %s, %s)
-            ON DUPLICATE KEY UPDATE `GRADES` = VALUES(`GRADES`) """
+            ON DUPLICATE KEY UPDATE `GRADES` = VALUES(`GRADES`)
+            """
 
+            # Process each student's grades
             values_list = []
             for _, row in grading_data.iterrows():
-                student_data = [ str(row['ID_NO']).strip(), str(row['LAST_NAME']).strip(), str(row['FIRST_NAME']).strip(),
-                    str(row.get('MIDDLE_NAME', '')).strip(), school_year.strip()]
+                student_info = [
+                    str(row['ID_NO']).strip(),
+                    str(row['LAST_NAME']).strip(),
+                    str(row['FIRST_NAME']).strip(),
+                    str(row.get('MIDDLE_NAME', '')).strip(),
+                    school_year.strip()
+                ]
                 
+                # For each course column (like GE101, CS101, etc.)
                 for course in course_columns:
                     grade = row[course]
                     if pd.notna(grade) and str(grade).strip() != "":
-                        values = student_data + [course.strip(), float(grade)]
-                        values_list.append(tuple(values))
+                        try:
+                            # Create a record with the course code as COURSE_NO and its value as GRADES
+                            values = student_info + [course, float(grade)]
+                            values_list.append(tuple(values))
+                        except ValueError:
+                            print(f"Invalid grade value for {course}: {grade}")
+                            continue
 
             # Execute batch insert
             if values_list:
                 self.cursor.executemany(insert_query, values_list)
+                self.conn.commit()
+                return True
 
-            self.conn.commit()
-            return True
+            return False
 
         except mysql.connector.Error as err:
-            print(f"Database Error: {err}")
+            CTkMessagebox(title="Database", message=f"Database Error: {err}")
             self.conn.rollback()
             return False
         except Exception as e:
-            print(f"Error saving grades: {e}")
+            CTkMessagebox(title="Database", message=f"Error saving grades: {e}")
             self.conn.rollback()
             return False
-
             
     def save_irregular_grading_data(self, grading_data, year, semester):
         try:

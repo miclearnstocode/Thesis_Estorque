@@ -1,0 +1,68 @@
+Course_No,Descriptive_Title,Year_Level,Units,Lec,Lab,Prerequisite,Grades
+GE101,Understanding the Self/Pag-unawa sa sarili,1.1,3,3,0,N/A,1.75
+GE102,The Contemporary World/Ang Kasalukuyang Daigdig,1.1,3,3,0,N/A,1.5
+GE103,Art Appreciation/Pagpapahalaga sa Sining,1.1,3,3,0,N/A,2.25
+GE104,Mathematics in the Modern World/Matematika sa Makabagong Daigdig,1.1,3,3,0,N/A,2.25
+CMSC 101,Program Logic Formulation,1.1,3,3,0,N/A,2.5
+CMSC 102,Introduction to Computing,1.1,3,2,3,N/A,1.5
+PE 101,Movement Enhancement,1.1,2,2,0,N/A,2
+NSTP 101,ROTC/CWTS/LTS,1.1,3,3,0,N/A,2.75
+GEE 106+,Media and Information Literacy,1.1,2,2,0,N/A,2.5
+GEE 111+,General Biology,1.1,2,2,0,N/A,1
+GE 105,Kontekstwalisadong Komunikasyon sa Filipino,1.2,3,3,0,N/A,1.25
+GE 106,Purposive Communication/ Malayunin Komunikasyon,1.2,3,3,0,N/A,1.5
+GE 107,Ethics/ Etika,1.2,3,3,0,N/A,1.75
+GE 108,"Science, Technology and Society/ Agham Teknolohiya at Lipunan",1.2,3,3,0,N/A,2.5
+GEE 101,Speech and Oral Communication,1.2,3,3,0,N/A,1.5
+CMSC 103,Computer Programming 1,1.2,3,2,3,"CMSC 101, CMSC 102, GE 104",2
+PE 102,Fitness Exercises,1.2,2,2,0,N/A,2.75
+NSTP 102,ROTC/CWTS/LTS,1.2,3,3,0,N/A,1.5
+GEE 101+,General Mathematics,1.2,2,2,0,N/A,2.5
+SPEC 11-1,General Chemistry,1.2,2,2,0,N/A,1
+GE 109,Readings in the Philippine History/ Mga Babasahin Hinggil sa Ksaysayan ng Pilipinas,2.1,3,3,0,N/A,1.25
+GE 110,Filipino sa Ibat ibang Disiplina,2.1,3,3,0,GE 105,2
+GEE 102,Gender and Sciety,2.1,3,3,0,N/A,2.5
+GEE 104,Foreign Language,2.1,3,3,0,N/A,2.5
+CMSC 104,Social Issues and Frofessional Practice,2.1,3,3,0,CMSC 102,1.75
+CMSC 105,Computer Programming 2,2.1,3,2,3,CMSC 103,2.75
+CMSC 106,Data Structures and Algorithms,2.1,3,3,0,CMSC  103,1.25
+PE 103,Physical Activities Towards Health and Fitness 1,2.1,3,2,0,N/A,2
+GEE 102+,Earth and Life Science,2.1,2,2,0,N/A,2.25
+SPEC 11-3,General Physics,2.1,2,2,0,N/A,1
+GEM 101,Life and Works of Rizal/ Ang Buhay at mga Akda ni Rizal,2.2,3,3,0,N/A,1.75
+GEE 107,Reading Visual Art,2.2,3,2,3,N/A,2.25
+CMSC 107,Application Development & Emerging Technologies 1,2.2,3,2,3,"CMSC 102, CMSC 105",1.5
+CMSC 108,Information Management,2.2,3,2,3,"CMSC 103, CMSC 105",1.75
+CMSC 109,Discrete Structures 1,2.2,3,3,0,GE 104,2
+CMSC 110,Software Engineering 1,2.2,3,3,0,CMSC 106,1.5
+CMSC 111,Object Oriented Programming,2.2,3,2,3,CMSC105,1.75
+PE 104,Physical Activities Towards Health and Fitness 2,2.2,2,2,0,N/A,2.75
+GEE109+,Empowerment Technologies (E-Tech) ICT for Professional Tracks,2.2,2,2,0,N/A,1.5
+SPEC 11-4,Basic Calculus,2.2,2,2,0,N/A,2.25
+Basic Stat 311,Basic Statistics with Computer Application,3.1,3,2,3,GE 104,
+CMSC 112,Applications Development & Emerging Technologies 2,3.1,3,2,3,CMSC 107,
+CMSC 113,Algorithms & Complexity,3.1,3,3,0,"CMSC 106, CMSC 108",
+CMSC 114,Software Engineering 2,3.1,3,3,0,CMSC 110,
+CMSC 115,Logic Design and Computer Circuits,3.1,3,3,0,GE 104,
+CMSC 116,Discrete Structures 2,3.1,3,3,0,CMSC 109,
+CMSCSC 101,Network and Communications,3.1,3,2,3,CMSC 102,
+Free Elective 101,Technical Writing (Proposal),3.1,3,3,0,CMSC 110,
+CMSC Elective 101,Mobile Programming,3.1,3,2,3,N/A,
+CMSC 117,Design and Implementation of Programming Languages,3.2,3,2,3,CMSC 105,
+CMSC 118,Computer Architercture & Assembly Programming,3.2,3,2,3,CMSC 115,
+CMSC 119,Thesis 1,3.2,3,3,0,"Eng 314, CMSC 114",
+Seminar 301,Computer Science Seminar,3.2,1,1,0,N/A,
+CMSCSC 102,Distriuted System,3.2,3,3,0,CMSCSC 101,
+Free Elective 102,Microcontroller Programming,3.2,3,2,3,N/A,
+CMSC Elective 102,Game Development/ Animation,3.2,3,2,3,N/A,
+OJT 301,On-The-Job Training (200 hours),Summer,3,,0,N/A,
+CMSC 120,Information Assurance and Security,4.1,3,3,0,CMSC 108,
+CMSC 121,Principles of Operating System,4.1,3,3,0,"CMSC 117, CMSC 1",
+CMSC 122,Thesis 2,4.1,3,3,0,CMSC 119,
+CMSC 123,Automata and Language Theory,4.1,3,3,0,CMSC 116,
+CMSCSC 103,Client-Server,4.1,3,2,3,CMSCSC 102,
+CMSC 124,Principles of Data Communications and Networking,4.2,3,2,3,CMSC 102,
+CMSC 125,Human-Computer Interaction,4.2,3,3,0,"CMSC 102, CMSC 117",
+CMSCSC 104,Network Security,4.2,3,2,3,CMSCSC 103,
+CMSCSC 105,Theory of Computation,4.2,3,3,0,CMSC 123,
+CMSC Elective 103,CSS/ Business Analytics,4.2,3,2,3,N/A,

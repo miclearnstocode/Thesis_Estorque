@@ -12,5 +12,6 @@
     "CodeGPT.apiKey": "Anthropic",
     "python.analysis.extraPaths": [
         "./thesis_copy"
-    ]
+    ],
+    "editor.fontSize": 13
 }
