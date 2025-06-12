@@ -1045,9 +1045,18 @@ class GradeScreen(ctk.CTkFrame):
             duplicate_window.destroy()
 
         def on_update():
-            result["action"] = "Update"
-            result["data"] = grading_data
-            duplicate_window.destroy()
+            """Handle update action with password validation"""
+            # Show password dialog with ttk.messagebox
+            password = simpledialog.askstring("Admin Authentication",  "Enter admin password:", show="*")
+            
+            if password:
+                if password == "BSCS@2024!":  # Replace with your actual admin password
+                    result["action"] = "Update"
+                    result["data"] = grading_data
+                    duplicate_window.destroy()
+                else:
+                    CTkMessagebox(title="Error", message="Invalid password. Update cancelled.")
+                    return
 
         def on_cancel():
             result["action"] = "Cancel"
