@@ -2108,6 +2108,13 @@ class DatabaseHandler:
         return self.cursor.fetchone()
 
     def get_grades(self, student_id):
+        """
+        Get grades for a student across all semesters with the new table structure.
+        Args:
+            student_id (str): The student's ID number
+        Returns:
+            list: List of tuples containing (semester_key, course_no, grade)
+        """
         table_names = {
             'first_year_first_semester': '1.1',
             'first_year_second_semester': '1.2',
@@ -2122,34 +2129,38 @@ class DatabaseHandler:
 
         for table, sem_key in table_names.items():
             try:
-                # Fetch column names for the table
-                cursor = self.conn.cursor()
-                cursor.execute(f"SHOW COLUMNS FROM `{table}`")
-                columns = [col[0] for col in cursor.fetchall() if col[0] not in ('ID_NO', 'LAST_NAME', 'FIRST_NAME', 'MIDDLE_NAME', 'SCHOOL_YEAR')]
-                cursor.close()  # Close the cursor after fetching column names
+                # Query for grades in the new table structure
+                query = f"""
+                    SELECT COURSE_NO, GRADES 
+                    FROM `{table}` 
+                    WHERE ID_NO = %s
+                    ORDER BY COURSE_NO
+                """
+                
+                cursor = self.conn.cursor(dictionary=True)
+                cursor.execute(query, (student_id,))
+                results = cursor.fetchall()
 
-                if columns:
-                    # Fetch grades for the student
-                    cursor = self.conn.cursor()
-                    query = f"SELECT {', '.join([f'`{col}`' for col in columns])} FROM `{table}` WHERE ID_NO = %s"
-                    cursor.execute(query, (student_id,))
-                    result = cursor.fetchone()
-                    cursor.fetchall()  # Consume any remaining results to avoid "Unread result found" error
-                    cursor.close()  # Close the cursor after fetching grades
+                if results:
+                    # Process each course and grade
+                    for row in results:
+                        if row['COURSE_NO'] and row['GRADES']:  # Check if both course and grade exist
+                            grades.append((
+                                sem_key,
+                                row['COURSE_NO'],
+                                row['GRADES']
+                            ))
+                else:
+                    # If no grades found for this semester, log it
+                    print(f"No grades found in {table} for student {student_id}")
 
-                    if result:
-                        for course_no, grade_value in zip(columns, result):
-                            grades.append((sem_key, course_no, grade_value))
-                    else:
-                        # If no grades, append empty grades
-                        for course_no in columns:
-                            grades.append((sem_key, course_no, ""))
+                cursor.close()
+
             except mysql.connector.Error as e:
                 print(f"Error processing table {table}: {e}")
-            finally:
-                # Ensure the cursor is closed explicitly
                 if cursor:
                     cursor.close()
+                continue
 
         return grades
 
