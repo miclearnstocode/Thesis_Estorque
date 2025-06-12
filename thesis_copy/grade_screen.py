@@ -39,18 +39,11 @@ class GradeScreen(ctk.CTkFrame):
         try:
             # Load the background image
             bg_image = Image.open("Image/Gradient.jpg")
-            self.bg_image = ctk.CTkImage(
-                light_image=bg_image,
-                dark_image=bg_image,
-                size=(self.master.winfo_width(), self.master.winfo_height())
-            )
+            self.bg_image = ctk.CTkImage(light_image=bg_image,dark_image=bg_image,
+                size=(self.master.winfo_width(), self.master.winfo_height()))
             
             # Create background label
-            self.bg_label = ctk.CTkLabel(
-                self,
-                image=self.bg_image,
-                text=""
-            )
+            self.bg_label = ctk.CTkLabel(self, image=self.bg_image,text="")
             self.bg_label.place(relx=0, rely=0, relwidth=1, relheight=1)
             
             # Bind resize event
@@ -83,8 +76,7 @@ class GradeScreen(ctk.CTkFrame):
             "width": 120,                 
             "height": 32,                 
             "border_width": 1,            
-            "border_color": "black"       
-        }
+            "border_color": "black"}
 
         # Create a frame to hold the year and semester selectors
         selection_frame = ctk.CTkFrame(self)
@@ -98,18 +90,7 @@ class GradeScreen(ctk.CTkFrame):
         self.school_year_var = ctk.StringVar()
         self.school_year_var.set("Select")  # Empty default value
         ctk.CTkLabel(selection_frame, text="School Year:", font=("Helvetica", 15)).pack(side=tk.LEFT, padx=5)
-        school_year_option = ctk.CTkOptionMenu(
-            selection_frame, 
-            variable=self.school_year_var, 
-            values=school_years,
-            fg_color="white", 
-            button_color="white", 
-            button_hover_color="#707070", 
-            text_color="black", 
-            dropdown_fg_color="white", 
-            dropdown_text_color="black", 
-            dropdown_hover_color="#707070"
-        )
+        school_year_option = ctk.CTkOptionMenu(selection_frame, variable=self.school_year_var, values=school_years, fg_color="white", button_color="white", button_hover_color="#707070", text_color="black",  dropdown_fg_color="white",  dropdown_text_color="black", dropdown_hover_color="#707070")
         school_year_option.pack(side=tk.LEFT, padx=5)
 
         year_var = ctk.StringVar()
@@ -133,17 +114,7 @@ class GradeScreen(ctk.CTkFrame):
 
         # Create the import dropdown
         self.import_var = ctk.StringVar(value="Select")
-        import_dropdown = ctk.CTkOptionMenu(
-            selection_frame,
-            variable=self.import_var,
-            values=["Regular", "Irregular"],
-            fg_color="white",
-            button_color="white",
-            button_hover_color="#707070",
-            text_color="black",
-            dropdown_fg_color="white",
-            dropdown_text_color="black",
-            dropdown_hover_color="#707070",
+        import_dropdown = ctk.CTkOptionMenu(selection_frame, variable=self.import_var, values=["Regular", "Irregular"], fg_color="white", button_color="white", button_hover_color="#707070", text_color="black", dropdown_fg_color="white", dropdown_text_color="black", dropdown_hover_color="#707070",
             command=lambda choice: self.open_file_dialog(year_var.get(), semester_var.get(), choice))
         import_dropdown.pack(side=tk.LEFT, padx=5)
 
@@ -1019,70 +990,223 @@ class GradeScreen(ctk.CTkFrame):
             self.progress_bar.pack_forget()
         self.master.update_idletasks()
 
-    def on_save_button_click(self):
+    def show_duplicate_grades_window(self, duplicates, grading_data):
+        """Show duplicates in a list view window and handle user choice"""
+        # Create a new window for displaying duplicates
+        duplicate_window = ctk.CTkToplevel(self)
+        duplicate_window.title("Duplicate Grades Found")
+        duplicate_window.geometry("600x400")
+        duplicate_window.grab_set()
+
+        # Create main frame
+        main_frame = ctk.CTkFrame(duplicate_window)
+        main_frame.pack(padx=10, pady=10, fill="both", expand=True)
+
+        # Add header label
+        header_label = ctk.CTkLabel(main_frame, text="The following grades already exist in the database:",font=("Helvetica", 12, "bold"))
+        header_label.pack(pady=(10, 5))
+
+        # Create frame for the listview
+        list_frame = ctk.CTkFrame(main_frame)
+        list_frame.pack(padx=10, pady=5, fill="both", expand=True)
+
+        # Create Treeview for duplicates
+        columns = ("Student ID", "Course")
+        tree = ttk.Treeview(list_frame, columns=columns, show="headings", selectmode="none")
+        
+        # Configure columns
+        for col in columns:
+            tree.heading(col, text=col)
+            tree.column(col, width=100, anchor="center")
+
+        # Add scrollbar
+        scrollbar = ttk.Scrollbar(list_frame, orient="vertical", command=tree.yview)
+        tree.configure(yscrollcommand=scrollbar.set)
+        
+        # Pack the treeview and scrollbar
+        tree.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+        # Insert duplicate data
+        for student_id, course in duplicates:
+            tree.insert("", "end", values=(student_id, course))
+
+        # Add instruction label
+        instruction_label = ctk.CTkLabel(main_frame, text="Please choose how to handle these duplicate entries:", font=("Helvetica", 11))
+        instruction_label.pack(pady=5)
+
+        # Variable to store the result
+        result = {"action": None, "data": None}
+
+        # Button functions
+        def on_skip():
+            result["action"] = "Skip"
+            result["data"] = self.filter_out_duplicates(grading_data, duplicates)
+            duplicate_window.destroy()
+
+        def on_update():
+            result["action"] = "Update"
+            result["data"] = grading_data
+            duplicate_window.destroy()
+
+        def on_cancel():
+            result["action"] = "Cancel"
+            result["data"] = None
+            duplicate_window.destroy()
+
+        # Create button frame
+        button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        button_frame.pack(pady=10)
+
+        # Add buttons
+        button_style = {"fg_color": "transparent", "hover_color": "#707070", "text_color": "black", "width": 120, "height": 32, "border_width": 1, "border_color": "black"}
+
+        skip_btn = ctk.CTkButton(button_frame, text="Skip", command=on_skip,**button_style)
+        skip_btn.pack(side="left", padx=5)
+
+        update_btn = ctk.CTkButton(button_frame,  text="Update",  command=on_update, **button_style)
+        update_btn.pack(side="left", padx=5)
+
+        cancel_btn = ctk.CTkButton(button_frame, text="Cancel", command=on_cancel,**button_style)
+        cancel_btn.pack(side="left", padx=5)
+
+        # Wait for the window to be closed
+        duplicate_window.wait_window()
+        
+        return result["action"], result["data"]
+
+    def check_existing_grades(self, grading_data, year, semester, school_year):
+        """Helper function to check for existing grades before saving."""
         try:
-            if not self.school_year_var.get():
-                messagebox.showerror("Error", "Please select a School Year")
-                return
+            duplicates = []
+            student_courses = []
             
-            import_choice = self.import_var.get()  # Get the import choice
+            # For regular format
+            if 'ID_NO' in grading_data.columns:
+                for _, row in grading_data.iterrows():
+                    student_id = str(row['ID_NO']).strip()
+                    course_columns = [col for col in grading_data.columns 
+                                    if col not in ['ID_NO', 'LAST_NAME', 'FIRST_NAME', 'MIDDLE_NAME']]
+                    
+                    for course in course_columns:
+                        if pd.notna(row[course]):
+                            student_courses.append((student_id, course))
+            
+            # For irregular format
+            elif 'id_no' in grading_data.columns and 'course_no' in grading_data.columns:
+                for _, row in grading_data.iterrows():
+                    if pd.notna(row['grades']):
+                        student_courses.append((str(row['id_no']).strip(), row['course_no']))
+
+            # Check each student-course combination for existing grades
+            for student_id, course_no in student_courses:
+                exists = self.db_handler.check_existing_grade(
+                    student_id=student_id,
+                    course_no=course_no,
+                    year=year,
+                    semester=semester,
+                    school_year=school_year)
+                if exists:
+                    duplicates.append((student_id, course_no))
+
+            if duplicates:
+                action, processed_data = self.show_duplicate_grades_window(duplicates, grading_data)
+                
+                if action == "Cancel":
+                    return False, None
+                elif action == "Skip":
+                    return True, processed_data
+                elif action == "Update":
+                    return True, grading_data
+
+            return True, grading_data
+
+        except Exception as e:
+            CTkMessagebox(title="Error", message=f"Error checking for existing grades: {e}")
+            return False, None
+        
+    def filter_out_duplicates(self, grading_data, duplicates):
+        """Helper function to remove duplicate entries from grading data"""
+        try:
+            if 'ID_NO' in grading_data.columns:
+                # For regular format
+                filtered_data = grading_data.copy()
+                for student_id, course in duplicates:
+                    filtered_data.loc[filtered_data['ID_NO'] == student_id, course] = None
+                return filtered_data.dropna(how='all', subset=[col for col in filtered_data.columns 
+                                                            if col not in ['ID_NO', 'LAST_NAME', 'FIRST_NAME', 'MIDDLE_NAME']])
+            else:
+                # For irregular format
+                return grading_data[~grading_data.apply(lambda row: 
+                    (row['id_no'], row['course_no']) in duplicates, axis=1)]
+        except Exception as e:
+            print(f"Error filtering duplicates: {e}")
+            return grading_data
+
+    def on_save_button_click(self):
+        """Handle saving grades with duplicate checking"""
+        try:
+            school_year = self.school_year_var.get()
+            if not school_year or school_year == "Select":
+                CTkMessagebox(title="Error", message="Please select a School Year")
+                return
             
             if not hasattr(self, 'grading_data'):
                 CTkMessagebox(title="Error", message="No grading data loaded")
                 return
 
-            # Clean the DataFrame before saving
-            clean_data = self.grading_data.copy()
-            
-            # Clean column names
-            clean_data.columns = clean_data.columns.str.strip()
-            
-            # Clean data values and trim spaces
-            for col in clean_data.columns:
-                clean_data[col] = clean_data[col].apply(lambda x: str(x).strip().upper() if pd.notna(x) else '')
-                # Trim spaces for grades specifically
-                if col in ['Grade']:
-                    clean_data[col] = clean_data[col].str.replace(r'\s+', '', regex=True)
-            
-            # Determine if the data is for regular or irregular students
             import_choice = self.import_var.get()
             if import_choice == "Select":
                 CTkMessagebox(title="Error", message="Please select an import type (Regular or Irregular)")
                 return
 
+            # Clean the DataFrame before processing
+            clean_data = self.grading_data.copy()
+            clean_data.columns = clean_data.columns.str.strip()
+            
+            for col in clean_data.columns:
+                clean_data[col] = clean_data[col].apply(lambda x: str(x).strip().upper() if pd.notna(x) else '')
+                if col in ['Grade']:
+                    clean_data[col] = clean_data[col].str.replace(r'\s+', '', regex=True)
+
+            # Check for existing grades
+            can_proceed, processed_data = self.check_existing_grades(clean_data, self.year, self.semester, school_year)
+
+            if not can_proceed:
+                return
+
             if import_choice == "Regular":
-                success = self.db_handler.save_grading_data(grading_data=clean_data, year=self.year, semester=self.semester, school_year=self.school_year_var.get().strip())
-
-            elif import_choice == "Irregular":
-                # Prepare grade data for irregular students
-                grade_data = clean_data.copy()
-                
-                # Add school year to the DataFrame
+                success = self.db_handler.save_grading_data(
+                    grading_data=processed_data,
+                    year=self.year,
+                    semester=self.semester,
+                    school_year=school_year)
+            else:  #thi is for Irregular
+                grade_data = processed_data.copy()
                 grade_data['school_year'] = self.school_year_var.get().strip()
-
-                # Identify course columns (exclude ID column and other columns)
+                
                 exclude_columns = ['id_no', 'last_name', 'first_name', 'middle_name']
                 course_columns = [col for col in grade_data.columns if col not in exclude_columns]
-
-                # Melt the DataFrame to create a long format
-                melted_data = grade_data.melt(id_vars=['id_no', 'school_year'],
-                    value_vars=course_columns, 
-                    var_name='course_no', 
+                
+                melted_data = grade_data.melt(
+                    id_vars=['id_no', 'school_year'],
+                    value_vars=course_columns,
+                    var_name='course_no',
                     value_name='grades')
+                
+                melted_data['grades'] = melted_data['grades'].apply(
+                    lambda x: 'INC' if x == '' or pd.isna(x) else x)
+                
+                success = self.db_handler.save_irregular_grading_data(
+                    melted_data,
+                    year=self.year,
+                    semester=self.semester)
 
-                # Replace empty grades with 'INC'
-                melted_data['grades'] = melted_data['grades'].apply(lambda x: 'INC' if x == '' or pd.isna(x) else x)
-
-                # Save or update grades for irregular students
-                success = self.db_handler.save_irregular_grading_data(melted_data,  year=self.year, semester=self.semester)
-            
-            if success:
-                CTkMessagebox(title="Success", message="Grades have been successfully saved to the database.")
-            else:
-                CTkMessagebox(title="Error", message="Failed to save to the database")
+            message = "Grades have been successfully saved to the database." if success else "Failed to save to the database"
+            CTkMessagebox(title="Success" if success else "Error", message=message)
 
         except Exception as e:
-            print(f"Error in on_save_button_click: {e}")  # Debug print
+            print(f"Error in on_save_button_click: {e}")
             CTkMessagebox(title="Error", message=f"Failed to save grades: {e}")
                             
     def display_grading_data(self, grading_data, is_irregular=False):

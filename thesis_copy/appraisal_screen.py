@@ -2,7 +2,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 import customtkinter as ctk
 import pandas as pd
-from fuzzywuzzy import fuzz, process
+from rapidfuzz import fuzz, process
 from database import DatabaseHandler
 from PIL import Image
 import re 

@@ -1234,9 +1234,7 @@ class DatabaseHandler:
             return {'full_data': [], 'names': []}
         
     def get_student_by_id(self, id_no):
-        """
-        Fetch a single student's details by ID number
-        """
+        """Fetch a single student's details by ID number"""
         try:
             query = """
                 SELECT 
@@ -1314,13 +1312,10 @@ class DatabaseHandler:
             return False
         
     def verify_record_exists(self, id_no, course_no):
-        """
-        Verify if a record exists in appraised_curriculum
-        
+        """Verify if a record exists in appraised_curriculum
         Args:
             id_no (str): Student ID number
             course_no (str): Course number
-        
         Returns:
             bool: True if record exists, False otherwise
         """
@@ -1483,17 +1478,13 @@ class DatabaseHandler:
 
             
     def check_student_source(self, id_no):
-        """
-        Check if a student exists in student_information or appraised curriculum.
-
+        """Check if a student exists in student_information or appraised curriculum.
         Args:
             id_no (str): Student ID number to check.
-
         Returns:
             str: 'appraised' if found in appraised curriculum, 
                 'regular' if found in student_information,
-                'not_found' otherwise.
-        """
+                'not_found' otherwise."""
         try:
             # First check appraised curriculum
             query_appraised = """
@@ -1627,7 +1618,48 @@ class DatabaseHandler:
         except Exception as e:
             print(f"Error: {e}")
             return pd.DataFrame()
-        
+
+    def check_existing_grade(self, student_id, course_no, year, semester, school_year):
+        """Check if a grade already exists for a student in a specific course and semester. 
+        Args:
+            student_id (str): Student's ID number
+            course_no (str): Course number/code
+            year (str): Year level (e.g., "1st Year")
+            semester (str): Semester (e.g., "1st Semester")
+            school_year (str): School year (e.g., "2024-2025")
+            
+        Returns:
+            bool: True if grade exists, False otherwise
+        """
+        try:
+            # Map the year and semester to table name
+            year_mapping = {"1st Year": "first_year", "2nd Year": "second_year", "3rd Year": "third_year", "4th Year": "fourth_year"}
+            semester_mapping = {"1st Semester": "first_semester", "2nd Semester": "second_semester"}
+            
+            table_name = f"{year_mapping[year]}_{semester_mapping[semester]}"
+
+            # Check if grade exists
+            query = f"""
+                SELECT COUNT(*) 
+                FROM `{table_name}` 
+                WHERE ID_NO = %s 
+                AND COURSE_NO = %s 
+                AND SCHOOL_YEAR = %s
+                AND GRADES IS NOT NULL
+            """
+            
+            self.cursor.execute(query, (student_id, course_no, school_year))
+            count = self.cursor.fetchone()[0]
+            
+            return count > 0
+
+        except mysql.connector.Error as err:
+            print(f"Database Error in check_existing_grade: {err}")
+            return False
+        except Exception as e:
+            print(f"Error in check_existing_grade: {e}")
+            return False
+            
     def create_users_table(self):
         create_table_query = """
         CREATE TABLE IF NOT EXISTS admin_management (
@@ -2164,9 +2196,7 @@ class DatabaseHandler:
             cursor.close()
 
     def get_students_list(self):
-        """
-        Retrieve list of students for display purposes
-        """
+        """Retrieve list of students for display purposes"""
         try:
             # Ensure connection is active
             if not self.conn or not self.conn.is_connected():
@@ -2193,9 +2223,7 @@ class DatabaseHandler:
             return []
 
     def search_students(self, search_term):
-        """
-        Search students by ID, Name, or Year
-        """
+        """Search students by ID, Name, or Year"""
         try:
             # Ensure connection is active
             if not self.conn or not self.conn.is_connected():
@@ -2235,9 +2263,7 @@ class DatabaseHandler:
             return []
         
     def get_students_list(self):
-        """
-        Retrieve list of students for display purposes, filtered by year value of 4, and include SCHOOL_YEAR.
-        """
+        """Retrieve list of students for display purposes, filtered by year value of 4, and include SCHOOL_YEAR."""
         try:
             # Ensure connection is active
             if not self.conn or not self.conn.is_connected():
@@ -2454,9 +2480,7 @@ class DatabaseHandler:
                 cursor.close()
                         
     def get_course_columns(self, table_name):
-        """
-        Retrieve the column names for the specified course table.
-        """
+        """Retrieve the column names for the specified course table."""
         try:
             # Ensure connection is active
             if not self.conn.is_connected():
@@ -2519,9 +2543,7 @@ class DatabaseHandler:
             return [], []
 
     def get_unenrolled_students(self, year_level, current_sy):
-        """
-        Fetch students of a given year level who are not yet enrolled in both first and second semester.
-
+        """Fetch students of a given year level who are not yet enrolled in both first and second semester.
         :param year_level: The year level of students (1, 2, 3, or 4).
         :param current_sy: The current school year (e.g., "2024-2025").
         :return: List of dictionaries containing student details.
