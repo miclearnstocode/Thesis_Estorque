@@ -1,0 +1,10 @@
+Welcome to the ComputerStudies Application Installer
+
+This application is developed by the Computer Science Department to help manage student records, grades, and administrative functions for academic use.
+
+Before proceeding, please take note of the following:
+- The software requires .NET Framework 4.0 or higher.
+- Make sure all previous versions are uninstalled.
+- This is intended for educational and non-commercial use only.
+
+Click "Next" to continue with the installation.

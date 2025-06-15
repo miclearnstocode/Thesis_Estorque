@@ -1133,7 +1133,7 @@ class GradeScreen(ctk.CTkFrame):
         except Exception as e:
             CTkMessagebox(title="Error", message=f"Error checking for existing grades: {e}")
             return False, None
-        
+    #the error is in the skip
     def filter_out_duplicates(self, grading_data, duplicates):
         """Helper function to remove duplicate entries from grading data"""
         try:

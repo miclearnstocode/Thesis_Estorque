@@ -2,10 +2,10 @@
 
 
 a = Analysis(
-    ['Main.py'],
+    ['thesis_copy\\Main.py'],
     pathex=[],
     binaries=[],
-    datas=[('database.py', '.'), ('grade_screen.py', '.'), ('admin_screen.py', '.'), ('appraisal_screen.py', '.'), ('curriculum_screen.py', '.'), ('loginform.py', '.'), ('archive_screen.py', '.')],
+    datas=[],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
@@ -29,11 +29,10 @@ exe = EXE(
     upx=True,
     upx_exclude=[],
     runtime_tmpdir=None,
-    console=False,
+    console=True,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=['C:\\Users\\Admin\\Documents\\Thesis_Estorque\\icons\\app_logo.ico'],
 )

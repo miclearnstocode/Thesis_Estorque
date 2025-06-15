@@ -9,14 +9,132 @@ import time, os
 import traceback
 import logging
 
+class DatabaseInitializer:
+    """Class responsible for initializing database and tables"""
+
+    def __init__(self, host='localhost', user='comscie', password='BS_Comscie@2025!', port=3306):
+        self.host = host
+        self.user = user
+        self.password = password
+        self.port = port
+
+    def create_database_and_tables(self):
+        """Create department database and required tables if they don't exist"""
+        try:
+            # Create initial connection without database
+            conn = mysql.connector.connect(
+                host=self.host,
+                user=self.user,
+                password=self.password,
+                port=self.port
+            )
+            cursor = conn.cursor()
+
+            # Create and use database
+            cursor.execute("CREATE DATABASE IF NOT EXISTS department CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci")
+            cursor.execute("USE department")
+
+            # Define tables structure
+            tables = {
+                'student_information': """
+                    CREATE TABLE IF NOT EXISTS `student_information` (
+                        `ID_NO` VARCHAR(100) NOT NULL,
+                        `LAST_NAME` VARCHAR(100) NOT NULL,
+                        `FIRST_NAME` VARCHAR(100) NOT NULL,
+                        `MIDDLE_NAME` VARCHAR(100) NOT NULL,
+                        `YR` VARCHAR(100) NOT NULL,
+                        `AGE` VARCHAR(100) NOT NULL,
+                        `SEX` CHAR(25) NOT NULL,
+                        `EMAIL_ADDRESS` VARCHAR(100) NOT NULL,
+                        `SHS` VARCHAR(100) NOT NULL,
+                        `ADDRESS` VARCHAR(100) NOT NULL,
+                        `ENROLLED_YEAR` VARCHAR(255),
+                        PRIMARY KEY (`ID_NO`)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+                """,
+                'curriculum_regular': """
+                    CREATE TABLE IF NOT EXISTS `curriculum_regular` (
+                        `COURSE_NO` VARCHAR(100) NOT NULL,
+                        `DESCRIPTIVE_TITLE` VARCHAR(255) NOT NULL,
+                        `YEAR_LEVEL` DECIMAL(5,1) NOT NULL,
+                        `UNITS` INT(11) NOT NULL,
+                        `LEC` INT(11) NOT NULL,
+                        `LAB` INT(11) NOT NULL,
+                        `PREREQUISITE` VARCHAR(255) NOT NULL,
+                        `GRADES` DECIMAL(10,2) NOT NULL,
+                        `SY_REVISION` VARCHAR(100) NOT NULL,
+                        PRIMARY KEY (`COURSE_NO`)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+                """,
+                'studgrade_pass': """
+                    CREATE TABLE IF NOT EXISTS `studgrade_pass` (
+                        `ID_NO` VARCHAR(20) NOT NULL,
+                        `LAST_NAME` VARCHAR(50) NOT NULL,
+                        `FIRST_NAME` VARCHAR(50) NOT NULL,
+                        `MIDDLE_NAME` VARCHAR(50),
+                        `PASSWORD` VARCHAR(100) NOT NULL,
+                        PRIMARY KEY (`ID_NO`)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+                """
+            }
+
+            # Add semester tables
+            semesters = {
+                'first_year_first_semester': '1.1',
+                'first_year_second_semester': '1.2',
+                'second_year_first_semester': '2.1',
+                'second_year_second_semester': '2.2',
+                'third_year_first_semester': '3.1',
+                'third_year_second_semester': '3.2',
+                'fourth_year_first_semester': '4.1',
+                'fourth_year_second_semester': '4.2'
+            }
+
+            for table_name in semesters.keys():
+                tables[table_name] = f"""
+                    CREATE TABLE IF NOT EXISTS `{table_name}` (
+                        `ID_NO` VARCHAR(20) NOT NULL,
+                        `LAST_NAME` VARCHAR(50) NOT NULL,
+                        `FIRST_NAME` VARCHAR(50) NOT NULL,
+                        `MIDDLE_NAME` VARCHAR(50),
+                        `SCHOOL_YEAR` VARCHAR(20) NOT NULL,
+                        `COURSE_NO` VARCHAR(20) NOT NULL,
+                        `GRADES` DECIMAL(4,2),
+                        PRIMARY KEY (`ID_NO`, `COURSE_NO`, `SCHOOL_YEAR`),
+                        FOREIGN KEY (`ID_NO`) REFERENCES `student_information`(`ID_NO`) ON DELETE CASCADE
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+                """
+
+            # Create all tables
+            for table_name, query in tables.items():
+                try:
+                    cursor.execute(query)
+                    print(f"Table {table_name} created/verified successfully")
+                except mysql.connector.Error as err:
+                    print(f"Error creating table {table_name}: {err}")
+                    return False
+
+            conn.commit()
+            cursor.close()
+            conn.close()
+            return True
+
+        except mysql.connector.Error as err:
+            print(f"Database initialization failed: {err}")
+            return False
+
 class DatabaseHandler:
     def __init__(self):
+        db_init = DatabaseInitializer()
+        db_init.create_database_and_tables()
+
+        # Initialize database connection
         self.conn, self.cursor = self.get_db_connection()
     def get_db_connection(self):
         conn = mysql.connector.connect(
             host='localhost', #192.168.254.125
-            user='root',
-            password='', 
+            user='comscie',
+            password='BS_Comscie@2025!', 
             database='department',
             port=3306,
             allow_local_infile=True)
@@ -165,7 +283,8 @@ class DatabaseHandler:
         try:
             if not school_year:
                 raise ValueError("School year is required")
-            # Create a new table for the student if it doesn't exist
+
+            # Create the appraised_curriculum table if it doesn't exist
             table_name = "appraised_curriculum"
             self.cursor.execute(f"""
                 CREATE TABLE IF NOT EXISTS {table_name} (
@@ -189,27 +308,15 @@ class DatabaseHandler:
                     school_year VARCHAR(20)
                 )
             """)
-
-            # Save basic info
-            self.cursor.execute("""
-                INSERT INTO students (id_no, last_name, first_name, middle_name, year, sex, age, email_address)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-            """, (
-                id_no, 
-                last_name,
-                first_name,
-                middle_name,
-                year if not pd.isna(year) else None, 
-                sex, 
-                age, 
-                email_address
-            ))
-            self.conn.commit()
-
-            # Save matched subjects
+            #i remove the insert to students table since it is not necessart due to extra record only
+            # Save matched subjects only
             for _, row in matched_subjects.iterrows():
                 self.cursor.execute(f"""
-                    INSERT INTO {table_name} (appraised_id, id_no, last_name, first_name, middle_name, year, sex, age, email_address, course_no, descriptive_title, year_level, units, lec, lab, prerequisite, grades, school_year)
+                    INSERT INTO {table_name} (
+                        appraised_id, id_no, last_name, first_name, middle_name,
+                        year, sex, age, email_address,
+                        course_no, descriptive_title, year_level, units, lec, lab, prerequisite, grades, school_year
+                    )
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """, (
                     appraised_id,
@@ -225,18 +332,19 @@ class DatabaseHandler:
                     row['Descriptive_Title'] if not pd.isna(row['Descriptive_Title']) else '', 
                     row['Year_Level'] if not pd.isna(row['Year_Level']) else '', 
                     row['Units'] if not pd.isna(row['Units']) else 0, 
-                    row['Lec'] if not pd.isna(row['Lec']) else '', 
-                    row['Lab'] if not pd.isna(row['Lab']) else '',
+                    row['Lec'] if not pd.isna(row['Lec']) else 0, 
+                    row['Lab'] if not pd.isna(row['Lab']) else 0,
                     row['Prerequisite'] if not pd.isna(row['Prerequisite']) else '',
-                    row['Grades'] if not pd.isna(row['Grades']) else '',
+                    row['Grades'] if not pd.isna(row['Grades']) else 0,
                     school_year
-                )) #fix that the prerequisite is also save
-            self.conn.commit()
+                ))
 
+            self.conn.commit()
             messagebox.showinfo("Success", "Appraised data saved to the database successfully!")
+
         except mysql.connector.Error as e:
             messagebox.showerror("Error", f"Failed to save data to the database: {e}")
-   
+
     def fetch_available_fallback_subjects(self, id_no):
         logging.debug(f"Fetching available fallback subjects for ID_NO: {id_no}")
         query = """
@@ -893,21 +1001,6 @@ class DatabaseHandler:
             # Identify student info columns and course columns
             student_info_columns = ['ID_NO', 'LAST_NAME', 'FIRST_NAME', 'MIDDLE_NAME']
             course_columns = [col for col in grading_data.columns if col not in student_info_columns]
-
-            # Create table with the correct structure
-            create_table_query = f"""
-            CREATE TABLE IF NOT EXISTS `{table_name}` (
-                `ID_NO` VARCHAR(255),
-                `LAST_NAME` VARCHAR(100),
-                `FIRST_NAME` VARCHAR(100),
-                `MIDDLE_NAME` VARCHAR(100),
-                `SCHOOL_YEAR` VARCHAR(20),
-                `COURSE_NO` VARCHAR(30),
-                `GRADES` DECIMAL(5,2),
-                PRIMARY KEY (`ID_NO`, `COURSE_NO`, `SCHOOL_YEAR`)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-            """
-            self.execute_query_with_retry(create_table_query)
 
             # Insert query
             insert_query = f"""

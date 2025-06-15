@@ -2,10 +2,10 @@
 
 
 a = Analysis(
-    ['C:\\Users\\Admin\\Documents\\Thesis_Estorque\\thesis_copy\\student_grades.py'],
+    ['student_grades.py'],
     pathex=[],
     binaries=[],
-    datas=[],
+    datas=[('database.py', '.')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
@@ -29,11 +29,10 @@ exe = EXE(
     upx=True,
     upx_exclude=[],
     runtime_tmpdir=None,
-    console=False,
+    console=True,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=['C:\\Users\\Admin\\Documents\\Thesis_Estorque\\icons\\gradeicon.ico'],
 )
