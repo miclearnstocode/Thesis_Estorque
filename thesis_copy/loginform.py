@@ -3,8 +3,15 @@ from CTkMessagebox import CTkMessagebox
 import hashlib, os, re
 from database import DatabaseHandler
 from PIL import Image
-
+import sys, os
 class LoginForm(ctk.CTkFrame):
+    def resource_path(relative_path):
+        try:
+            base_path = sys._MEIPASS  # PyInstaller temp folder
+        except AttributeError:
+            base_path = os.path.abspath(".")  # Running normally
+        return os.path.join(base_path, relative_path)
+
     def __init__(self, master, login_success_callback=None, admin_login_callback=None):
         super().__init__(master)
         self.master = master
