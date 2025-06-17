@@ -1,0 +1,21 @@
+
+# This file is used to create a standalone executable for the Python application using PyInstaller.
+# Ensure you have PyInstaller installed:
+pyinstaller --noconsole --onefile --add-data "grade_screen.py;." --add-data "loginform.py;." --add-data "curriculum_screen.py;." --add-data "database.py;." --add-data "archive_screen.py;." --add-data "appraisal_screen.py;." --add-data "admin_screen.py;." --add-data "../icons;icons" --add-data "../Image;Image" Main.py
+
+
+def get_db_connection(self):
+    try:
+        conn = mysql.connector.connect(
+            host='192.168.254.125',  # PC A's IP address
+            user='comscie',
+            password='your_password',
+            database='your_database_name',
+            port=3306,
+            allow_local_infile=True
+        )
+        cursor = conn.cursor()
+        return conn, cursor
+    except mysql.connector.Error as err:
+        print(f"Database connection error: {err}")
+        return None, None
