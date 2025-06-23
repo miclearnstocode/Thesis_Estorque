@@ -6,6 +6,7 @@ from tkinter import filedialog, messagebox
 from database import DatabaseHandler
 from PIL import Image
 import customtkinter as ctk
+from loginform import LoginForm
 
 class CurriculumScreen(ctk.CTkFrame):
     def __init__(self, master):
@@ -15,7 +16,7 @@ class CurriculumScreen(ctk.CTkFrame):
         self.db_handler = DatabaseHandler()
 
         try:
-            bg_image = Image.open("Image/student.JPG")
+            bg_image = Image.open(LoginForm.resource_path("Image/student.JPG"))
             self.bg_image = ctk.CTkImage(light_image=bg_image,dark_image=bg_image,size=(self.master.winfo_width(), self.master.winfo_height()))
             
             self.bg_label = ctk.CTkLabel(self,image=self.bg_image,text="")
@@ -68,7 +69,7 @@ class CurriculumScreen(ctk.CTkFrame):
         
         self.school_year_combo = ctk.CTkOptionMenu(import_frame,  values=school_years, width=120, height=32, fg_color="white", button_color="ghost white", button_hover_color="#707070", dropdown_fg_color="white", dropdown_hover_color="#707070", dropdown_text_color="black", text_color="black")
         self.school_year_combo.pack(side=tk.LEFT, padx=10)
-        csv_icon = Image.open("icons/csv_format.png") 
+        csv_icon = Image.open(LoginForm.resource_path("icons/csv_format.png")) 
         self.csv_icon = ctk.CTkImage(light_image=csv_icon, dark_image=csv_icon, size=(30, 30))
                 # Add buttons
         existing_curriculum_button = ctk.CTkButton(
@@ -131,12 +132,12 @@ class CurriculumScreen(ctk.CTkFrame):
         self.back_frame = ctk.CTkFrame(self, fg_color="transparent")
         self.back_frame.place(x=30, y=108)
 
-        save_icon = Image.open("icons/save.png")
+        save_icon = Image.open(LoginForm.resource_path("icons/save.png"))
         self.save_icon = ctk.CTkImage(light_image=save_icon, dark_image=save_icon, size=(30, 30))
         self.save_button = ctk.CTkButton(self.back_frame, text="Save Data", image=self.save_icon, command=self.save_data_to_database,state="disabled",**regular_button_style)
         self.save_button.pack(side=tk.RIGHT, padx=10)
 
-        back_icon = Image.open("icons/back.png")
+        back_icon = Image.open(LoginForm.resource_path("icons/back.png"))
         self.back_icon = ctk.CTkImage(light_image=back_icon, dark_image=back_icon, size=(20, 20))
         ctk.CTkButton(self.back_frame, text="Back", image=self.back_icon, command=self.master.show_main_menu, **back_button_style).pack(side=tk.LEFT, padx=10)
 

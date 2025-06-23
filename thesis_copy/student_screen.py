@@ -23,7 +23,7 @@ from PIL import Image, ImageTk
 import customtkinter as ctk
 from CTkMessagebox import CTkMessagebox
 from datetime import datetime
-
+from loginform import LoginForm
 class StudentScreen(ctk.CTkFrame):
     def __init__(self, master):
         super().__init__(master)
@@ -34,7 +34,7 @@ class StudentScreen(ctk.CTkFrame):
         self.id_no = None
 
         # Load and resize the background image for the main frame
-        self.main_bg_image = Image.open("Image/student.JPG")
+        self.main_bg_image = Image.open(LoginForm.resource_path("Image/student.JPG"))
         # Get the screen dimensions for full coverage
         screen_width = self.master.winfo_screenwidth()
         screen_height = self.master.winfo_screenheight()
@@ -62,9 +62,9 @@ class StudentScreen(ctk.CTkFrame):
         self.back_frame = ctk.CTkFrame(self, fg_color="transparent", corner_radius=30, width=20, height=15)
         self.back_frame.place(x=50,y=110)
         try:
-            irreg_icon = Image.open("icons/irregulars.png")
+            irreg_icon = Image.open(LoginForm.resource_path("icons/irregulars.png"))
             self.irreg_icon =ctk.CTkImage(light_image=irreg_icon, dark_image=irreg_icon, size=(30, 30))
-            regular_icon = Image.open("icons/regulars.png")
+            regular_icon = Image.open(LoginForm.resource_path("icons/regulars.png"))
             self.regular_icon =ctk.CTkImage(light_image=regular_icon, dark_image=regular_icon, size=(30, 30))
 
             ctk.CTkButton(self.regular_frame, text="Regular", image=self.regular_icon,**button_style, font=('Helvetica',14, 'bold'),command=lambda: self.show_search("Regular")).pack(side=tk.RIGHT,padx=10)
@@ -81,11 +81,11 @@ class StudentScreen(ctk.CTkFrame):
         self.print_frame = tk.Frame(self)
         self.print_frame.pack(pady=10)
 
-        back_icon = Image.open("icons/back.png")
+        back_icon = Image.open(LoginForm.resource_path("icons/back.png"))
         self.back_icon = ctk.CTkImage(light_image=back_icon, dark_image=back_icon, size=(20, 20))
         ctk.CTkButton(self.back_frame, text="Back",image=self.back_icon,**button_style, width=32 ,font=('Helvetica',14, 'bold'),command=self.master.show_main_menu).pack(side=tk.LEFT)
         # Add Summary button
-        summary_icon = Image.open("icons/summary.png")  # Load your summary icon
+        summary_icon = Image.open(LoginForm.resource_path("icons/summary.png"))  # Load your summary icon
         self.summary_icon = ctk.CTkImage(light_image=summary_icon, dark_image=summary_icon, size =(30, 30))
         ctk.CTkButton(self, text="Summary", image=self.summary_icon, **button_style, font=('Helvetica',14, 'bold'),command=self.show_summary).place(x=700, y=147)  # Place the Summary button at the specified coordinates
  
@@ -187,7 +187,7 @@ class StudentScreen(ctk.CTkFrame):
                 print_button.place(x=20, y=620)
 
             # Close button
-            close_icon = Image.open("icons/close.png")
+            close_icon = Image.open(LoginForm.resource_path("icons/close.png"))
             self.close_icon = ctk.CTkImage(light_image=close_icon, dark_image=close_icon, size=(30, 30))
             ctk.CTkButton(summary_frame, text="Close", text_color="black", font=('Helvetica', 14, 'bold'),
                         corner_radius=30, image=self.close_icon, command=summary_frame.destroy).pack(pady=30, padx=30, side="right")
@@ -242,7 +242,7 @@ class StudentScreen(ctk.CTkFrame):
         self.search_entry = ctk.CTkEntry(self.search_frame, corner_radius=20 ,textvariable=self.search_var,  width=200,  height=32,  placeholder_text="e.g, 2021-322048", validate="key", validatecommand=(self.register(self.validate_input), '%P'))
         self.search_entry.pack(side="left", padx=5)
         try:
-            search_icon = Image.open("icons/searchs.png")
+            search_icon = Image.open(LoginForm.resource_path("icons/searchs.png"))
             self.search_icon = ctk.CTkImage(light_image=search_icon, dark_image=search_icon,size=(30,30))
             # Search button
             search_button = ctk.CTkButton( self.search_frame, text="Search",image=self.search_icon, text_color="black", fg_color="transparent", border_width=1,command=self.search_student, width=100, height=32)
@@ -256,7 +256,7 @@ class StudentScreen(ctk.CTkFrame):
         year_semester_combobox.set("Select")  
 
         try:
-            print_icon = Image.open("icons/prints.png")
+            print_icon = Image.open(LoginForm.resource_path("icons/prints.png"))
             self.print_icon =ctk.CTkImage(light_image=print_icon, dark_image=print_icon, size=(30, 30)) 
 
             self.print_button = ctk.CTkButton( self.search_frame, text="Print", image=self.print_icon, text_color="black", fg_color="transparent", border_width=1,hover_color="grey70" ,command=self.print_students, width=100, height=32)
@@ -274,7 +274,7 @@ class StudentScreen(ctk.CTkFrame):
         self.enroll_label.place(x=719, y=6)
 
         try:
-            add_student = Image.open("icons/add_students.png")
+            add_student = Image.open(LoginForm.resource_path("icons/add_students.png"))
             self.add_student=ctk.CTkImage(light_image=add_student, dark_image=add_student,size=(30,30))
             import_button = ctk.CTkButton( self.search_frame, text="Add Student", image=self.add_student, text_color="black", fg_color="transparent", border_width=1 ,hover_color="grey70",command=self.import_students, width=120, height=32)
             import_button.pack(side="left", padx=(0,5))
@@ -1151,7 +1151,7 @@ class StudentScreen(ctk.CTkFrame):
         self.search_entry = ctk.CTkEntry( self.search_frame, corner_radius=20 ,textvariable=self.search_var,  width=200,  height=32,  placeholder_text="Enter ID", validate="key", validatecommand=(self.register(validate_input), '%P'))
         self.search_entry.pack(side="left", padx=5)
 
-        search_icon = Image.open("icons/searchs.png")
+        search_icon = Image.open(LoginForm.resource_path("icons/searchs.png"))
         self.search_icons = ctk.CTkImage(light_image=search_icon, dark_image=search_icon,size=(30,30))
         search_button = ctk.CTkButton( self.search_frame, text="Search",image=self.search_icons, command=self.search_student_irregular, text_color="black", fg_color="transparent", hover_color="grey70", border_width=1, width=100, height=32)
         search_button.pack(side="left", padx=(0, 5))
@@ -1162,7 +1162,7 @@ class StudentScreen(ctk.CTkFrame):
         self.year_semester_combobox.pack(side="left", padx=5)
         self.year_semester_combobox.set("Select")  # Set default text
 
-        print_icon = Image.open("icons/prints.png")
+        print_icon = Image.open(LoginForm.resource_path("icons/prints.png"))
         self.print_icons =ctk.CTkImage(light_image=print_icon, dark_image=print_icon, size=(30, 30))
         self.print_button = ctk.CTkButton( self.search_frame, text="Print", image=self.print_icons ,command=self.print_students_irregular, fg_color="transparent", hover_color="grey70", border_width=1, text_color="black", width=100,height=32)
         self.print_button.pack(side="left", padx=(0, 5))
@@ -2176,11 +2176,11 @@ class StudentScreen(ctk.CTkFrame):
         self.file_entry = ctk.CTkEntry(file_frame,width=400,height=32,placeholder_text="Select CSV file...")
         self.file_entry.pack(side="left", padx=(0, 10))
 
-        browse_icon = Image.open("icons/browse.png")
+        browse_icon = Image.open(LoginForm.resource_path("icons/browse.png"))
         self.browse_icon =ctk.CTkImage(light_image=browse_icon, dark_image=browse_icon, size=(20, 20))
         ctk.CTkButton(file_frame,text="Browse", image=self.browse_icon,command=self.browse_file, width=100, height=32).pack(side="left", padx=5)
 
-        import_icon = Image.open("icons/import.png")
+        import_icon = Image.open(LoginForm.resource_path("icons/import.png"))
         self.import_icon =ctk.CTkImage(light_image=import_icon, dark_image=import_icon, size=(20, 20))
         ctk.CTkButton(file_frame, text="Import", image=self.import_icon ,command=self.import_students_callback, width=100, height=32).pack(side="left", padx=5)
 
@@ -2188,25 +2188,14 @@ class StudentScreen(ctk.CTkFrame):
         year_frame = ctk.CTkFrame(file_frame, fg_color="transparent")
         year_frame.pack(side="left", padx=5)
         
-        ctk.CTkLabel(
-            year_frame,
-            text="Enroll for Year:",
-            font=ctk.CTkFont(size=12)
-        ).pack(side="left", padx=5)
+        ctk.CTkLabel(year_frame,text="Enroll for Year:",font=ctk.CTkFont(size=12)).pack(side="left", padx=5)
 
         # Create list of years from 2020 to 2099
         years = [str(year) for year in range(2020, 2100)]
         self.enrolled_year_var = ctk.StringVar()
         self.enrolled_year_var.set("Select Year")  # Set default text
         
-        year_dropdown = ctk.CTkComboBox(
-            year_frame,
-            values=years,
-            variable=self.enrolled_year_var,
-            width=100,
-            height=32,
-            state="readonly"
-        )
+        year_dropdown = ctk.CTkComboBox(year_frame,values=years,variable=self.enrolled_year_var,width=100,height=32,state="readonly")
         year_dropdown.pack(side="left", padx=5)
 
         # Treeview frame

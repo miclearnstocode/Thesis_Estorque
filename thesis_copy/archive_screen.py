@@ -1,10 +1,9 @@
-import csv
-from io import BytesIO
+
 import os, subprocess, tempfile
-import threading
 import tkinter as tk
 from tkinter import filedialog
 from tkinter import messagebox
+import CTkMessagebox
 import customtkinter as ctk
 from PIL import Image
 from database import DatabaseHandler
@@ -12,16 +11,13 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import Table, TableStyle, Spacer
-from reportlab.platypus import Image as RLImage
-from reportlab.pdfgen import canvas
-from reportlab.lib.units import mm
+from reportlab.platypus import Image
 from reportlab.platypus import BaseDocTemplate, Frame, PageTemplate, Paragraph
-from reportlab.lib.units import inch 
-from fuzzywuzzy import process
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.lib.utils import ImageReader
+from loginform import LoginForm
 
 class ArchiveScreen(ctk.CTkFrame):
     def __init__(self, master):
@@ -31,7 +27,7 @@ class ArchiveScreen(ctk.CTkFrame):
         self.create_widgets()
         # Load and set up the background
         try:
-            bg_image = Image.open("Image/Gradient.jpg")
+            bg_image = Image.open(LoginForm.resource_path("Image/Gradient.jpg"))
             self.bg_image = ctk.CTkImage(light_image=bg_image,dark_image=bg_image,size=(self.master.winfo_width(), self.master.winfo_height()))
             
             self.bg_label = ctk.CTkLabel(self,image=self.bg_image,text="")
@@ -86,7 +82,7 @@ class ArchiveScreen(ctk.CTkFrame):
         back_frame = ctk.CTkFrame(self, fg_color="transparent")
         back_frame.place(x=30, y=108)
 
-        back_icon = Image.open("icons/back.png")
+        back_icon = Image.open(LoginForm.resource_path("icons/back.png"))
         self.back_icon = ctk.CTkImage(light_image=back_icon, dark_image=back_icon, size=(20, 20))
         ctk.CTkButton(back_frame, text="Back", image=self.back_icon,command=self.master.show_main_menu,**back_button_style).pack(side=tk.LEFT)
 
@@ -95,7 +91,7 @@ class ArchiveScreen(ctk.CTkFrame):
         self.search_entry.pack(side="left", padx=(0, 10))
 
         # Search button
-        search_icons = Image.open("icons/searchs.png")
+        search_icons = Image.open(LoginForm.resource_path("icons/searchs.png"))
         self.search_icons = ctk.CTkImage(light_image=search_icons, dark_image=search_icons,size=(30,30))
         search_button = ctk.CTkButton(search_frame, text="Search", image=self.search_icons, command=self.perform_search,width=120, **button_style, corner_radius=20)
         search_button.pack(side="left")
@@ -240,8 +236,7 @@ class ArchiveScreen(ctk.CTkFrame):
                 width=scaled_width, 
                 height=scaled_height, 
                 mask='auto',  # Preserves transparency
-                preserveAspectRatio=True
-            )
+                preserveAspectRatio=True)
             canvas.restoreState()
 
         try:
@@ -427,8 +422,7 @@ class ArchiveScreen(ctk.CTkFrame):
             "3.1": "Third Year First Semester",
             "3.2": "Third Year Second Semester",
             "4.1": "Fourth Year First Semester",
-            "4.2": "Fourth Year Second Semester"
-        }.get(str(year_level), year_level)
+            "4.2": "Fourth Year Second Semester"}.get(str(year_level), year_level)
 
     def perform_search(self):
         search_term = self.search_entry.get()
@@ -447,21 +441,9 @@ class ArchiveScreen(ctk.CTkFrame):
         import_window.geometry("600x400")
 
         # Base style for labels and buttons
-        label_style = {
-            "fg_color": "white",
-            "text_color": "black",
-            "corner_radius": 10,
-            "width": 300,
-            "height": 40
-        }
+        label_style = {"fg_color": "white","text_color": "black","corner_radius": 10,"width": 300,"height": 40}
 
-        button_style = {
-            "fg_color": "#4CAF50",
-            "hover_color": "#45a049",
-            "text_color": "white",
-            "width": 100,
-            "height": 30
-        }
+        button_style = {"fg_color": "#4CAF50","hover_color": "#45a049","text_color": "white","width": 100,"height": 30}
 
         # Frame to hold archive import components
         import_frame = ctk.CTkFrame(import_window, fg_color="transparent")
@@ -471,24 +453,14 @@ class ArchiveScreen(ctk.CTkFrame):
         graduates_label = ctk.CTkLabel(import_frame, text="Graduates", **label_style)
         graduates_label.pack(pady=10)
 
-        graduates_import_btn = ctk.CTkButton(
-            import_frame, 
-            text="Import", 
-            command=self.import_graduates,
-            **button_style
-        )
+        graduates_import_btn = ctk.CTkButton(import_frame, text="Import", command=self.import_graduates,**button_style)
         graduates_import_btn.pack(pady=5)
 
         # Curriculum Label with Import Button
         curriculum_label = ctk.CTkLabel(import_frame, text="Curriculum", **label_style)
         curriculum_label.pack(pady=10)
 
-        curriculum_import_btn = ctk.CTkButton(
-            import_frame, 
-            text="Import", 
-            command=self.import_curriculum,
-            **button_style
-        )
+        curriculum_import_btn = ctk.CTkButton(import_frame, text="Import", command=self.import_curriculum,**button_style)
         curriculum_import_btn.pack(pady=5)
 
     def import_graduates(self):
@@ -499,12 +471,7 @@ class ArchiveScreen(ctk.CTkFrame):
             # Open file dialog to select graduates file
             file_path = filedialog.askopenfilename(
                 title="Select Graduates File",
-                filetypes=[
-                    ("CSV files", "*.csv"),
-                    ("Excel files", "*.xlsx"),
-                    ("All files", "*.*")
-                ]
-            )
+                filetypes=[("CSV files", "*.csv"), ("Excel files", "*.xlsx"), ("All files", "*.*")])
 
             if not file_path:
                 return  # User cancelled file selection
@@ -520,28 +487,16 @@ class ArchiveScreen(ctk.CTkFrame):
             progress_frame.pack(expand=True, fill="both", padx=20, pady=20)
 
             # Status label
-            status_label = ctk.CTkLabel(
-                progress_frame, 
-                text="Importing Graduates...", 
-                font=("Arial", 16)
-            )
+            status_label = ctk.CTkLabel(progress_frame, text="Importing Graduates...",  font=("Arial", 16))
             status_label.pack(pady=(0, 10))
 
             # Progress bar
-            progress_bar = ctk.CTkProgressBar(
-                progress_frame, 
-                width=300, 
-                height=20
-            )
+            progress_bar = ctk.CTkProgressBar(progress_frame,width=300, height=20)
             progress_bar.pack(pady=(0, 10))
             progress_bar.set(0)
 
             # Detailed status label
-            detail_label = ctk.CTkLabel(
-                progress_frame, 
-                text="", 
-                font=("Arial", 12)
-            )
+            detail_label = ctk.CTkLabel(progress_frame, text="", font=("Arial", 12))
             detail_label.pack(pady=(0, 10))
 
             # Determine file type and import accordingly
@@ -570,20 +525,10 @@ class ArchiveScreen(ctk.CTkFrame):
                     success_dialog.geometry("300x150")
                     success_dialog.resizable(False, False)
 
-                    success_label = ctk.CTkLabel(
-                        success_dialog, 
-                        text="Graduates data\nimported successfully!", 
-                        font=("Arial", 14),
-                        text_color="green"
-                    )
+                    success_label = ctk.CTkLabel(success_dialog, text="Graduates data\nimported successfully!",  font=("Arial", 14), text_color="green")
                     success_label.pack(expand=True, pady=10)
 
-                    close_btn = ctk.CTkButton(
-                        success_dialog, 
-                        text="Close", 
-                        command=success_dialog.destroy,
-                        width=100
-                    )
+                    close_btn = ctk.CTkButton(success_dialog, text="Close",  command=success_dialog.destroy,width=100)
                     close_btn.pack(pady=10)
 
                     # Close progress window
@@ -596,22 +541,10 @@ class ArchiveScreen(ctk.CTkFrame):
                     error_dialog.geometry("300x150")
                     error_dialog.resizable(False, False)
 
-                    error_label = ctk.CTkLabel(
-                        error_dialog, 
-                        text=f"Import failed:\n{str(e)}", 
-                        font=("Arial", 12),
-                        text_color="red"
-                    )
+                    error_label = ctk.CTkLabel(error_dialog, text=f"Import failed:\n{str(e)}", font=("Arial", 12), text_color="red")
                     error_label.pack(expand=True, pady=10)
 
-                    close_btn = ctk.CTkButton(
-                        error_dialog, 
-                        text="Close", 
-                        command=error_dialog.destroy,
-                        width=100,
-                        fg_color="red",
-                        hover_color="darkred"
-                    )
+                    close_btn = ctk.CTkButton(error_dialog,text="Close", command=error_dialog.destroy,width=100,fg_color="red",hover_color="darkred")
                     close_btn.pack(pady=10)
 
                     # Close progress window
@@ -622,11 +555,7 @@ class ArchiveScreen(ctk.CTkFrame):
 
         except Exception as e:
             # Fallback error handling
-            ctk.CTkMessagebox(
-                title="Critical Error", 
-                message=str(e),
-                icon="cancel"
-            )
+            CTkMessagebox(title="Critical Error", message=str(e), icon="cancel")
 
     def import_curriculum(self):
         """
@@ -637,12 +566,7 @@ class ArchiveScreen(ctk.CTkFrame):
             # Open file dialog to select curriculum file
             file_path = filedialog.askopenfilename(
                 title="Select Curriculum File",
-                filetypes=[
-                    ("CSV files", "*.csv"),
-                    ("Excel files", "*.xlsx"),
-                    ("All files", "*.*")
-                ]
-            )
+                filetypes=[("CSV files", "*.csv"),("Excel files", "*.xlsx"),("All files", "*.*")])
 
             if not file_path:
                 return  # User cancelled file selection
@@ -658,28 +582,16 @@ class ArchiveScreen(ctk.CTkFrame):
             progress_frame.pack(expand=True, fill="both", padx=20, pady=20)
 
             # Status label
-            status_label = ctk.CTkLabel(
-                progress_frame, 
-                text="Importing Curriculum...", 
-                font=("Arial", 16)
-            )
+            status_label = ctk.CTkLabel(progress_frame, text="Importing Curriculum...", font=("Arial", 16))
             status_label.pack(pady=(0, 10))
 
             # Progress bar
-            progress_bar = ctk.CTkProgressBar(
-                progress_frame, 
-                width=300, 
-                height=20
-            )
+            progress_bar = ctk.CTkProgressBar(progress_frame, width=300, height=20)
             progress_bar.pack(pady=(0, 10))
             progress_bar.set(0)
 
             # Detailed status label
-            detail_label = ctk.CTkLabel(
-                progress_frame, 
-                text="", 
-                font=("Arial", 12)
-            )
+            detail_label = ctk.CTkLabel(progress_frame, text="", font=("Arial", 12))
             detail_label.pack(pady=(0, 10))
 
             # Determine file type and import accordingly
@@ -708,20 +620,10 @@ class ArchiveScreen(ctk.CTkFrame):
                     success_dialog.geometry("300x150")
                     success_dialog.resizable(False, False)
 
-                    success_label = ctk.CTkLabel(
-                        success_dialog, 
-                        text="Curriculum data\nimported successfully!", 
-                        font=("Arial", 14),
-                        text_color="green"
-                    )
+                    success_label = ctk.CTkLabel(success_dialog,text="Curriculum data\nimported successfully!", font=("Arial", 14),text_color="green")
                     success_label.pack(expand=True, pady=10)
 
-                    close_btn = ctk.CTkButton(
-                        success_dialog, 
-                        text="Close", 
-                        command=success_dialog.destroy,
-                        width=100
-                    )
+                    close_btn = ctk.CTkButton(success_dialog, text="Close", command=success_dialog.destroy, width=100)
                     close_btn.pack(pady=10)
 
                     # Close progress window
@@ -734,22 +636,10 @@ class ArchiveScreen(ctk.CTkFrame):
                     error_dialog.geometry("300x150")
                     error_dialog.resizable(False, False)
 
-                    error_label = ctk.CTkLabel(
-                        error_dialog, 
-                        text=f"Import failed:\n{str(e)}", 
-                        font=("Arial", 12),
-                        text_color="red"
-                    )
+                    error_label = ctk.CTkLabel(error_dialog, text=f"Import failed:\n{str(e)}", font=("Arial", 12), text_color="red")
                     error_label.pack(expand=True, pady=10)
 
-                    close_btn = ctk.CTkButton(
-                        error_dialog, 
-                        text="Close", 
-                        command=error_dialog.destroy,
-                        width=100,
-                        fg_color="red",
-                        hover_color="darkred"
-                    )
+                    close_btn = ctk.CTkButton(error_dialog, text="Close", command=error_dialog.destroy, width=100, fg_color="red", hover_color="darkred")
                     close_btn.pack(pady=10)
 
                     # Close progress window
@@ -760,8 +650,4 @@ class ArchiveScreen(ctk.CTkFrame):
 
         except Exception as e:
             # Fallback error handling
-            ctk.CTkMessagebox(
-                title="Critical Error", 
-                message=str(e),
-                icon="cancel"
-            )
+            CTkMessagebox(title="Critical Error", message=str(e), icon="cancel")

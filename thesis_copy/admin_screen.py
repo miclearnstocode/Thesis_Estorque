@@ -10,7 +10,7 @@ import threading
 import time
 import queue, os
 from PIL import Image
-
+from loginform import LoginForm
 
 class LoadingScreen(ctk.CTkToplevel):
     def __init__(self, parent, message="Refreshing..."):
@@ -45,25 +45,16 @@ class LoadingScreen(ctk.CTkToplevel):
         loading_frame.pack(expand=True, fill="both", padx=20, pady=20)
         
         # Spinning loading indicator
-        self.loading_label = ctk.CTkLabel(
-            loading_frame, 
-            text="", 
-            font=ctk.CTkFont(size=16, weight="bold")
-        )
+        self.loading_label = ctk.CTkLabel(loading_frame, text="", font=ctk.CTkFont(size=16, weight="bold"))
         self.loading_label.pack(expand=True, fill="both")
         
         # Spinner animation
         self.spinner_frames = [
-            "🕐", "🕑", "🕒", "🕓", "🕔", "🕕", "🕖", "🕗", "🕘", "🕙", "🕚", "🕛"
-        ]
+            "🕐", "🕑", "🕒", "🕓", "🕔", "🕕", "🕖", "🕗", "🕘", "🕙", "🕚", "🕛"]
         self.current_frame = 0
         
         # Message label
-        self.message_label = ctk.CTkLabel(
-            loading_frame, 
-            text=message, 
-            font=ctk.CTkFont(size=14)
-        )
+        self.message_label = ctk.CTkLabel(loading_frame, text=message, font=ctk.CTkFont(size=14))
         self.message_label.pack(pady=(10, 0))
         
         # Start spinning animation
@@ -71,9 +62,7 @@ class LoadingScreen(ctk.CTkToplevel):
     
     def animate_spinner(self):
         """Create spinning animation"""
-        self.loading_label.configure(
-            text=self.spinner_frames[self.current_frame]
-        )
+        self.loading_label.configure(text=self.spinner_frames[self.current_frame])
         self.current_frame = (self.current_frame + 1) % len(self.spinner_frames)
         self.after(100, self.animate_spinner)
 
@@ -132,17 +121,10 @@ class AdminScreen(ctk.CTkFrame):
         result_queue = queue.Queue()
         
         # Create loading screen
-        self.loading_screen = LoadingScreen(
-            self, 
-            message="Refreshing data..."
-        )
+        self.loading_screen = LoadingScreen(self, message="Refreshing data...")
         
         # Start refresh thread
-        threading.Thread(
-            target=refresh_task, 
-            args=(result_queue,),
-            daemon=True
-        ).start()
+        threading.Thread(target=refresh_task, args=(result_queue,),daemon=True).start()
         
         # Start processing results
         self.after(100, process_refresh_results)
@@ -164,10 +146,7 @@ class AdminScreen(ctk.CTkFrame):
         # Implement your statistics data retrieval logic
         try:
             db = DatabaseHandler()
-            stats_data = {
-                'year_counts': db.get_students_per_year(),
-                'level_counts': db.get_students_per_level()
-            }
+            stats_data = {'year_counts': db.get_students_per_year(),'level_counts': db.get_students_per_level()}
             db.close_db_connection()
             return stats_data
         except Exception as e:
@@ -257,7 +236,7 @@ class AdminScreen(ctk.CTkFrame):
         button_title = ctk.CTkLabel(button_container,text="Controls",font=ctk.CTkFont(size=16, weight="bold"))
         button_title.pack(pady=(0, 10))
         
-        home_icon =Image.open("icons/Home.png")
+        home_icon =Image.open(LoginForm.resource_path("icons/Home.png"))
         self.home_icon =ctk.CTkImage(light_image=home_icon, dark_image=home_icon, size=(20, 20))
         self.home_btn = ctk.CTkButton(button_container,text="Home",image=self.home_icon,command=self.return_to_home,width=150,**button_style)
         self.home_btn.pack(pady=5)
@@ -289,22 +268,12 @@ class AdminScreen(ctk.CTkFrame):
             icon_path = os.path.join(BASE_DIR, "..", "icons", "user.png")
             user_icon = Image.open(icon_path)
             self.user_icon = ctk.CTkImage(light_image=user_icon, dark_image=user_icon, size=(30, 30))
-            title_label = ctk.CTkLabel(
-                self.center_frame,
-                text="User Account Management",
-                image=self.user_icon,
-                font=ctk.CTkFont("Helvetica", size=20, weight="bold"),
-                text_color='grey50'
-            )
+            title_label = ctk.CTkLabel(self.center_frame, text="User Account Management",image=self.user_icon,
+                font=ctk.CTkFont("Helvetica", size=20, weight="bold"), text_color='grey50')
         except Exception as e:
             print(f"Failed to load user icon: {e}")
             # Create label without icon if image loading fails
-            title_label = ctk.CTkLabel(
-                self.center_frame,
-                text="User Account Management",
-                font=ctk.CTkFont("Helvetica", size=20, weight="bold"),
-                text_color='grey50'
-            )
+            title_label = ctk.CTkLabel(self.center_frame, text="User Account Management",font=ctk.CTkFont("Helvetica", size=20, weight="bold"), text_color='grey50')
         title_label.pack(pady=10)
         
         # Create Treeview frame with reduced height
@@ -329,7 +298,6 @@ class AdminScreen(ctk.CTkFrame):
         self.bottom_frame.grid_propagate(False)
         self.setup_bottom_frame()
         
-        
         # Scrollbars
         y_scroll = ttk.Scrollbar(tree_frame, orient="vertical")
         y_scroll.grid(row=0, column=1, sticky="ns")
@@ -343,9 +311,8 @@ class AdminScreen(ctk.CTkFrame):
         style.configure("Treeview.Heading", font=('Helvetica', 12, 'bold'))
         
         # Configure alternating colors
-        style.map('Treeview', 
-            background=[('selected', '#0078D7')],  # Selection color
-        )
+        style.map('Treeview', background=[('selected', '#0078D7')],)  # Selection color
+
         style.configure('Treeview', 
             background='white',  # Default background
             fieldbackground='white',  # Color of empty space
@@ -353,15 +320,8 @@ class AdminScreen(ctk.CTkFrame):
         )
 
         # Create Treeview
-        self.user_tree = ttk.Treeview(
-            tree_frame,
-            columns=('ID', 'Name', 'Email', 'Status', 'Pause'),
-            show='headings',
-            yscrollcommand=y_scroll.set,
-            xscrollcommand=x_scroll.set,
-            height=20,
-            style="Treeview"
-        )
+        self.user_tree = ttk.Treeview(tree_frame,columns=('ID', 'Name', 'Email', 'Status', 'Pause'),
+            show='headings', yscrollcommand=y_scroll.set, xscrollcommand=x_scroll.set, height=20,style="Treeview")
         self.user_tree.grid(row=0, column=0, sticky="nsew")
         
         # Add tag configuration for alternating rows
