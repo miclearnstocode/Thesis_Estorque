@@ -1,9 +1,9 @@
 
 # This file is used to create a standalone executable for the Python application using PyInstaller.
 # Ensure you have PyInstaller installed:
-pyinstaller --noconsole --onefile --add-data "grade_screen.py;." --add-data "loginform.py;." --add-data "curriculum_screen.py;." --add-data "database.py;." --add-data "archive_screen.py;." --add-data "appraisal_screen.py;." --add-data "admin_screen.py;." --add-data "../icons;icons" --add-data "../Image;Image" Main.py
-
-
+pyinstaller --noconsole --onedir --add-data "grade_screen.py;." --add-data "loginform.py;." --add-data "curriculum_screen.py;." --add-data "database.py;." --add-data "archive_screen.py;." --add-data "appraisal_screen.py;." --add-data "admin_screen.py;." --add-data "../icons;icons" --add-data "../Image;Image" Main.py
+with console for debugging
+pyinstaller --onedir --add-data "grade_screen.py;." --add-data "loginform.py;." --add-data "curriculum_screen.py;." --add-data "database.py;." --add-data "archive_screen.py;." --add-data "appraisal_screen.py;." --add-data "admin_screen.py;." --add-data "../icons;icons" --add-data "../Image;Image" Main.py
 def get_db_connection(self):
     try:
         conn = mysql.connector.connect(
@@ -19,3 +19,43 @@ def get_db_connection(self):
     except mysql.connector.Error as err:
         print(f"Database connection error: {err}")
         return None, None
+
+[Setup]
+AppName=ComputerStudies
+AppVersion=1.1
+DefaultDirName={pf}\ComputerStudies
+DefaultGroupName=ComputerStudies
+OutputDir=.
+OutputBaseFilename=ComputerStudiesInstaller
+Compression=lzma
+SolidCompression=yes
+DisableDirPage=no
+LicenseFile="license_agreement.txt"
+InfoBeforeFile="info_before.txt"
+UninstallDisplayIcon={app}\Main.exe
+UninstallDisplayName=ComputerStudies
+SetupIconFile="Image\CSD.ico"
+WizardImageFile="Image\Capiz_State_University 2.bmp"
+VersionInfoVersion=1.2.2
+VersionInfoCompany=Computer Science Department
+VersionInfoDescription=ComputerStudies Application
+
+[Files]
+Source: "Image\CSD.ico"; DestDir: "{app}"; Flags: ignoreversion
+Source: "thesis_copy\dist\Main\Main.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "thesis_copy*"; DestDir: "{app}\thesis_copy"; Flags: ignoreversion recursesubdirs createallsubdirs
+
+[Tasks]
+Name: "desktopicon"; Description: "Create a &desktop icon"; GroupDescription: "Additional icons:"; Flags: unchecked
+
+[Icons]
+Name: "{group}\ComputerStudies"; Filename: "{app}\Main.exe"; IconFilename: "{app}\CSD.ico"
+Name: "{commondesktop}\ComputerStudies"; Filename: "{app}\Main.exe"; IconFilename: "{app}\CSD.ico"; Tasks: desktopicon
+
+[Run]
+Filename: "{app}\Main.exe"; Description: "Launch ComputerStudies"; Flags: nowait postinstall skipifsilent
+
+[Messages]
+WelcomeLabel1=Welcome to the ComputerStudies Setup Wizard
+WelcomeLabel2=This will install [name/ver] on your computer.%n%nIt is recommended that you close all other applications before continuing.
+FinishedLabel=Setup has finished installing [name/ver] on your computer.

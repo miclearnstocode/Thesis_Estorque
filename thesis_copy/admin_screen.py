@@ -255,18 +255,11 @@ class AdminScreen(ctk.CTkFrame):
         self.right_frame = ctk.CTkFrame(self.main_container, fg_color="#F0F0F0")
         self.right_frame.grid(row=0, column=2, sticky="nsew", padx=10, pady=10)
         
-        # Get the directory where your script is located
-        BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
-        # Create path to icons directory relative to your script
-        icon_path = os.path.join(BASE_DIR, "..", "icons", "user.png")
-
-        user_icon = Image.open(icon_path)
+        user_icon = Image.open(LoginForm.resource_path("icons/user.png"))
         self.user_icon = ctk.CTkImage(light_image=user_icon, dark_image=user_icon, size=(30, 30))
 
         try:
-            icon_path = os.path.join(BASE_DIR, "..", "icons", "user.png")
-            user_icon = Image.open(icon_path)
+            user_icon = Image.open(LoginForm.resource_path("icons/user.png"))
             self.user_icon = ctk.CTkImage(light_image=user_icon, dark_image=user_icon, size=(30, 30))
             title_label = ctk.CTkLabel(self.center_frame, text="User Account Management",image=self.user_icon,
                 font=ctk.CTkFont("Helvetica", size=20, weight="bold"), text_color='grey50')

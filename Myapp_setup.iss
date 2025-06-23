@@ -20,9 +20,7 @@ VersionInfoDescription=ComputerStudies Application
 
 [Files]
 Source: "Image\CSD.ico"; DestDir: "{app}"; Flags: ignoreversion
-Source: "thesis_copy\dist\Main.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "thesis_copy\*"; DestDir: "{app}\thesis_copy"; Flags: ignoreversion recursesubdirs createallsubdirs
-
+Source: "thesis_copy\dist\Main\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 [Tasks]
 Name: "desktopicon"; Description: "Create a &desktop icon"; GroupDescription: "Additional icons:"; Flags: unchecked
 

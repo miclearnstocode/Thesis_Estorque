@@ -118,7 +118,7 @@ class LoginForm(ctk.CTkFrame):
         self.error_label = ctk.CTkLabel(self.container, text="", text_color="red", font=ctk.CTkFont("Helvetica", size=14), wraplength=280)
         self.error_label.pack(pady=(5, 0))
 
-        login_icon = Image.open("icons/logins.png")
+        login_icon = Image.open(self.resource_path("icons/logins.png"))
         self.login_icon = ctk.CTkImage(light_image=login_icon, dark_image=login_icon, size=(30, 30))
         login_button = ctk.CTkButton(self.container, text="Login", image=self.login_icon, command=self.validate_login, width=80, height=40, text_color="black", fg_color="transparent", hover_color="#707070", border_color="grey", border_width=1, corner_radius=30, font=ctk.CTkFont(size=15, weight="bold"))
         login_button.pack(fill='x', padx=20, pady=(1, 20))
