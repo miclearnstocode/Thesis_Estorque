@@ -75,7 +75,7 @@ class Application(ctk.CTk):
 
     def show_splash_screen(self):
         # Load and set background image first (behind splash)
-        bg_image = Image.open("Image/Gradient.jpg")
+        bg_image = Image.open(LoginForm.resource_path("Image/Gradient.jpg"))
         self.splash_bg = ctk.CTkImage(light_image=bg_image, dark_image=bg_image, size=(self.winfo_screenwidth(), self.winfo_screenheight()))
         
         # Create background label that covers entire screen
@@ -104,7 +104,7 @@ class Application(ctk.CTk):
         
         # Load CSU logo
         try:
-            csu_logo = Image.open("Image/Capiz_State_University 2.png")
+            csu_logo = Image.open(LoginForm.resource_path("Image/Capiz_State_University 2.png"))
             self.csu_logo_image = ctk.CTkImage(light_image=csu_logo,dark_image=csu_logo,size=(300, 300))
             
             # Create and pack logo label
@@ -357,7 +357,7 @@ class Application(ctk.CTk):
         """Load and store all images used in the application"""
         try:
             # Department logo
-            dept_logo = Image.open("thesis_copy/pictures/department_logo.jpg")
+            dept_logo = Image.open(LoginForm.resource_path("thesis_copy/pictures/department_logo.jpg"))
             self.dept_logo_image = ctk.CTkImage(light_image=dept_logo, dark_image=dept_logo, size=(300, 300))
 
         except Exception as e:
@@ -417,7 +417,7 @@ class Application(ctk.CTk):
     def setup_background(self):
         """Load and set up background image"""
         try:
-            self.dept_bg = Image.open("Image/background.jpg")
+            self.dept_bg = Image.open(LoginForm.resource_path("Image/background.jpg"))
             self.bg_image_pil = self.dept_bg
             
             initial_width = self.right_frame.winfo_width() or 736
@@ -578,11 +578,7 @@ class Application(ctk.CTk):
                 except Exception as e:
                     error_msg = f"Error loading grade screen: {str(e)}"
                     print(error_msg)
-                    CTkMessagebox(
-                        title="Loading Error",
-                        message=error_msg,
-                        icon="cancel"
-                    )
+                    CTkMessagebox(title="Loading Error",message=error_msg,icon="cancel")
                     # Remove loading screen and show main menu
                     loading_frame.destroy()
                     self.show_main_menu()
@@ -625,7 +621,7 @@ class Application(ctk.CTk):
         self.fullscreen_button = ctk.CTkButton(control_frame,text="⤡", width=30,height=30,font=("Times New Roman", 19),command=self.toggle_fullscreen,fg_color="transparent",text_color="black",hover_color=("gray70", "gray30"))
         self.fullscreen_button.pack(side="right", padx=5)
 
-        logout_icon = Image.open("icons/logout.png")
+        logout_icon = Image.open(LoginForm.resource_path("icons/logout.png"))
         self.logout_icon=ctk.CTkImage(light_image=logout_icon, dark_image=logout_icon, size=(30,30))
         self.close_button = ctk.CTkButton(control_frame,text="Logout", image=self.logout_icon,width=60,height=30,font=("Times New Roman", 19),command=self.logout, corner_radius=30,fg_color="transparent",text_color="black",hover_color=("gray70", "gray30"))
         self.close_button.pack(side="right", padx=5)
@@ -644,20 +640,10 @@ class Application(ctk.CTk):
             # Recreate login frame and form with all necessary callbacks
             self.login_frame = ctk.CTkFrame(self)
             self.login_frame.pack(expand=True, fill="both")
-            self.login_form = LoginForm(
-                self.login_frame, 
-                login_success_callback=self.login_success,
-                admin_login_callback=self.admin_login_success
-            )
+            self.login_form = LoginForm(self.login_frame, login_success_callback=self.login_success, admin_login_callback=self.admin_login_success)
 
         def on_button_click():
-            msg = CTkMessagebox(
-                title="Logout",
-                message="Are you sure you want to logout?",
-                icon="question",
-                option_1="Yes",
-                option_2="No"
-            )
+            msg = CTkMessagebox(title="Logout",message="Are you sure you want to logout?",icon="question",option_1="Yes",option_2="No")
             
             def handle_enter(event):
                 msg.destroy()
