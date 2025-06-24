@@ -13,6 +13,7 @@ from reportlab.lib.units import inch
 from reportlab.lib import colors
 from reportlab.pdfbase.ttfonts import TTFont
 import re
+# from CTkMessageBox import CTkMessageBox  # Removed: incorrect import, use CTkMessagebox instead
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 from database import DatabaseHandler
@@ -87,7 +88,7 @@ class StudentScreen(ctk.CTkFrame):
         # Add Summary button
         summary_icon = Image.open(LoginForm.resource_path("icons/summary.png"))  # Load your summary icon
         self.summary_icon = ctk.CTkImage(light_image=summary_icon, dark_image=summary_icon, size =(30, 30))
-        ctk.CTkButton(self, text="Summary", image=self.summary_icon, **button_style, font=('Helvetica',14, 'bold'),command=self.show_summary).place(x=700, y=147)  # Place the Summary button at the specified coordinates
+        ctk.CTkButton(self, text="Summary", image=self.summary_icon, **button_style, font=('Helvetica',14, 'bold'),command=self.show_summary).place(x=730, y=147)  # Place the Summary button at the specified coordinates
  
     def show_summary(self):
         # Create a summary frame
@@ -502,8 +503,7 @@ class StudentScreen(ctk.CTkFrame):
                     print("No next semester found")
 
         except Exception as e:
-            ctk.CTkMessageBox(title="Database Error", 
-                            message=f"An error occurred while fetching student data: {str(e)}")
+            CTkMessagebox(title="Database Error", message=f"An error occurred while fetching student data: {str(e)}")
             return
         
         # Create a frame to hold the student data and curriculum data
@@ -796,6 +796,10 @@ class StudentScreen(ctk.CTkFrame):
         name_frame.pack(fill= "x", pady=(0,10))
 
         curriculum_data = self.curriculum_data.get("curriculum_data",[])
+        if not curriculum_data:
+            messagebox.showerror("Error", "No student data found to print.")
+            print_window.destroy()
+            return
         # Fetch student details for display (assuming only one student is fetched)
         student_details = curriculum_data[0]  # Assuming at least one record exists
         student_name = student_details.get("STUDENT_NAME", "")
@@ -965,7 +969,7 @@ class StudentScreen(ctk.CTkFrame):
         pdfmetrics.registerFont(TTFont('TimesNewRoman-Bold', 'timesbd.ttf'))
         c.setFont('TimesNewRoman', 12)
 
-        image_path = "Image/Header.jpg"  # Update this path to your image
+        image_path = LoginForm.resource_path("Image/Header.jpg")  # Update this path to your image
         header_height = 80  
         c.drawImage(image_path, 0, height - header_height, width=width, height=header_height)
 
@@ -1105,7 +1109,7 @@ class StudentScreen(ctk.CTkFrame):
         c.drawRightString(462, y, "College Registrar")        
         
         # Draw footer image
-        footer_image_path = "Image/Footer.jpg"  # Update this path to your footer image
+        footer_image_path = LoginForm.resource_path("Image/Footer.jpg")  # Update this path to your footer image
         footer_height = 50  # Adjust height as needed
         c.drawImage(footer_image_path, 0, 0, width=width, height=footer_height)
         # Save the PDF
@@ -2020,7 +2024,7 @@ class StudentScreen(ctk.CTkFrame):
         pdfmetrics.registerFont(TTFont('TimesNewRoman-Bold', 'timesbd.ttf'))
         c.setFont('TimesNewRoman', 12)
 
-        image_path = "Image/Header.jpg"  # Update this path to your image
+        image_path = LoginForm.resource_path("Image/Header.jpg")  # Update this path to your image
         header_height = 80  
         c.drawImage(image_path, 0, height - header_height, width=width, height=header_height)
 
@@ -2137,7 +2141,7 @@ class StudentScreen(ctk.CTkFrame):
         c.drawRightString(462, y, "College Registrar")        
 
         # Draw footer image
-        footer_image_path = "Image/Footer.jpg"  # Update this path to your footer image
+        footer_image_path = LoginForm.resource_path("Image/Footer.jpg")  # Update this path to your footer image
         footer_height = 50  # Adjust height as needed
         c.drawImage(footer_image_path, 0, 0, width=width, height=footer_height)
         c.save()
@@ -2165,7 +2169,7 @@ class StudentScreen(ctk.CTkFrame):
         for widget in self.student_list_frame.winfo_children():
             widget.destroy()
 
-        select_icon = Image.open("icons/select.png")
+        select_icon = Image.open(LoginForm.resource_path("icons/select.png"))
         self.select_icon =ctk.CTkImage(light_image=select_icon, dark_image=select_icon, size=(20, 20))
         ctk.CTkLabel(self.student_list_frame, text="Select a file to import:", image=self.select_icon,compound="left",font=ctk.CTkFont(size=14)).pack(pady=10)
 

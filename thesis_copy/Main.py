@@ -245,10 +245,9 @@ class Application(ctk.CTk):
             if sys.version_info < (3, 7):
                 raise Exception("Python 3.7 or higher is required")
             
-            # Check available memory
-            if psutil.virtual_memory().available < 500 * 1024 * 1024:  # 500MB
-                raise Exception("Insufficient memory available")
-            
+            if psutil.virtual_memory().available < 500 * 1024 * 1024:
+                print("Warning: Low available memory. The application may run slowly.")
+                        
             return True
         except Exception as e:
             print(f"System requirements check failed: {e}")
@@ -289,17 +288,15 @@ class Application(ctk.CTk):
 
     def check_ui_components(self):
         """Check if UI components are properly loaded"""
-        try:
-            required_attributes = ['dept_logo_image','splash', 'progress', 'loading_label']
-            
-            for attr in required_attributes:
-                if not hasattr(self, attr):
-                    raise Exception(f"Missing UI component: {attr}")
-            
-            return True
-        except Exception as e:
-            print(f"UI component check failed: {e}")
-            return False
+        required_attributes = ['dept_logo_image','splash','progress','loading_label']
+        missing = []
+        for attr in required_attributes:
+            if not hasattr(self, attr):
+                print(f"Warning: Missing UI component: {attr}")
+                missing.append(attr)
+        if missing:
+            print(f"Warning: The following UI components are missing: {', '.join(missing)}")
+        return True  # Only warn, do not fail
 
     def check_final_setup(self):
         """Perform final checks before system launch"""
@@ -474,19 +471,19 @@ class Application(ctk.CTk):
     def create_navigation_buttons(self):
         try:
             # Load icons with correct path
-            student_icon = Image.open("icons/student.png")
+            student_icon = Image.open(LoginForm.resource_path("icons/student.png"))
             self.student_icon = ctk.CTkImage(light_image=student_icon, dark_image=student_icon, size=(30, 30))
             
-            grade_icon = Image.open("icons/grade.png")
+            grade_icon = Image.open(LoginForm.resource_path("icons/grade.png"))
             self.grade_icon = ctk.CTkImage(light_image=grade_icon, dark_image=grade_icon, size=(30, 30))
             
-            curriculum_icon = Image.open("icons/curriculum2.png")
+            curriculum_icon = Image.open(LoginForm.resource_path("icons/curriculum2.png"))
             self.curriculum_icon = ctk.CTkImage(light_image=curriculum_icon, dark_image=curriculum_icon, size=(30, 30))
             
-            appraisal_icon = Image.open("icons/appraisal.png")
+            appraisal_icon = Image.open(LoginForm.resource_path("icons/appraisal.png"))
             self.appraisal_icon = ctk.CTkImage(light_image=appraisal_icon, dark_image=appraisal_icon, size=(30, 30))
             
-            archive_icon = Image.open("icons/archives.png")
+            archive_icon = Image.open(LoginForm.resource_path("icons/archives.png"))
             self.archive_icon = ctk.CTkImage(light_image=archive_icon, dark_image=archive_icon, size=(30, 30))
         except Exception as e:
             print(f"Error loading icons: {e}")

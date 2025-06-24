@@ -5,7 +5,7 @@ a = Analysis(
     ['Main.py'],
     pathex=[],
     binaries=[],
-    datas=[('grade_screen.py', '.'), ('loginform.py', '.'), ('curriculum_screen.py', '.'), ('database.py', '.'), ('archive_screen.py', '.'), ('appraisal_screen.py', '.'), ('admin_screen.py', '.'), ('../icons', 'icons'), ('../Image', 'Image')],
+    datas=[('grade_screen.py', '.'), ('loginform.py', '.'), ('curriculum_screen.py', '.'), ('database.py', '.'), ('archive_screen.py', '.'), ('appraisal_screen.py', '.'), ('admin_screen.py', '.'), ('../icons', 'icons'), ('../Image', 'Image'), ('pictures', 'thesis_copy/pictures')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
