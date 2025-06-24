@@ -5,20 +5,10 @@ import pandas as pd
 from tkinter import messagebox
 import mysql.connector
 from datetime import datetime
-import time, os, logging, traceback, configparser
+import time, os, logging
+import traceback
 
-def get_db_config():
-    config = configparser.ConfigParser()
-    config.read('thesis_copy/config.ini')
-    db_cfg = config['database']
-    return {
-        'host': db_cfg.get('host', 'localhost'),
-        'user': db_cfg.get('user', ''),
-        'password': db_cfg.get('password', ''),
-        'database': db_cfg.get('database', ''),
-        'port': db_cfg.getint('port', 3306),
-        'allow_local_infile': True
-    }
+
 class DatabaseHandler:
     def __init__(self):
         db_init = DatabaseInitializer()
@@ -27,8 +17,13 @@ class DatabaseHandler:
         # Initialize database connection
         self.conn, self.cursor = self.get_db_connection()
     def get_db_connection(self):
-        db_params = get_db_config()
-        conn = mysql.connector.connect(**db_params)
+        conn = mysql.connector.connect(
+            host='localhost', #192.168.254.125
+            user='comscie',
+            password='BS_Comscie@2025!', 
+            database='department',
+            port=3306,
+            allow_local_infile=True)
         cursor = conn.cursor()
         return conn, cursor
 
@@ -474,7 +469,7 @@ class DatabaseHandler:
             LEFT JOIN
                 curriculum_regular cr ON cr.YEAR_LEVEL = si.YR
             WHERE
-                si.ID_NO = %s AND cr.YEAR_LEVEL = %s
+                si.ID_NO = %s OR cr.YEAR_LEVEL = %s
         """
         curriculum_params = (id_no, year_level)
 
@@ -551,41 +546,23 @@ class DatabaseHandler:
 
         for table in table_names:
             try:
-                # First check if table exists
-                table_check_query = """
-                    SELECT COLUMN_NAME 
-                    FROM INFORMATION_SCHEMA.COLUMNS 
-                    WHERE TABLE_NAME = %s 
-                    AND COLUMN_NAME NOT IN ('ID_NO', 'LAST_NAME', 'FIRST_NAME', 'MIDDLE_NAME', 'SCHOOL_YEAR')
+                # Fetch all grades for this student in this semester table
+                query = f"""
+                    SELECT COURSE_NO, GRADES
+                    FROM `{table}`
+                    WHERE ID_NO = %s
                 """
-                course_columns = self.execute_query(table_check_query, (table,))
-                
-                if course_columns:
-                    # Build dynamic SELECT query using the course columns
-                    course_cols = [col['COLUMN_NAME'] for col in course_columns]
-                    select_query = f"""
-                        SELECT 
-                            {', '.join(f'`{col}`' for col in course_cols)}
-                        FROM {table}
-                        WHERE ID_NO = %s
-                    """
-                    
-                    grades_result = self.execute_query(select_query, (id_no,))
-                    
-                    if grades_result:
-                        grades_data = {}
-                        # First row contains all the grades
-                        grade_row = grades_result[0]
-                        
-                        # Add each non-empty grade to the dictionary
-                        for course_col in course_cols:
-                            if grade_row[course_col] and str(grade_row[course_col]).strip():
-                                grades_data[course_col] = grade_row[course_col]
-                        
-                        if grades_data:  # Only add if there are actual grades
-                            all_grades_data[table] = grades_data
-                            logging.debug(f"Found grades in {table}: {grades_data}")
-                
+                results = self.execute_query(query, (id_no,))
+                if results:
+                    grades_data = {}
+                    for row in results:
+                        course_no = row['COURSE_NO']
+                        grade = row['GRADES']
+                        if course_no and grade is not None and str(grade).strip() != '':
+                            grades_data[course_no] = grade
+                    if grades_data:
+                        all_grades_data[table] = grades_data
+                        logging.debug(f"Found grades in {table}: {grades_data}")
             except mysql.connector.Error as err:
                 logging.error(f"Error checking {table}: {err}")
                 continue
@@ -2591,20 +2568,60 @@ class DatabaseHandler:
 
     def format_students(self, students):
         """
-        Helper function to format student data into a list of dictionaries.
+        Helper function to format student data into a list of dictionaries,
+        fetching the latest enrollment STATUS from the enrollment table.
         """
         student_list = []
         for row in students:
+            id_no = row[0]
+            # Fetch the latest enrollment status for this student
+            self.cursor.execute("""
+                SELECT STATUS 
+                FROM enrollment 
+                WHERE ID_NO = %s 
+                ORDER BY ENROLLMENT_DATE DESC, enrollment_id DESC 
+                LIMIT 1
+            """, (id_no,))
+            status_result = self.cursor.fetchone()
+            status = status_result[0] if status_result else "Not Enrolled"
+
             student_list.append({
-                "ID_NO": row[0],
+                "ID_NO": id_no,
                 "LAST_NAME": row[1],
                 "FIRST_NAME": row[2],
                 "MIDDLE_NAME": row[3] if row[3] else "",
                 "YEAR_LEVEL": row[4],
-                "ENROLLMENT_STATUS": "Not Enrolled"
+                "ENROLLMENT_STATUS": status
             })
         return student_list
+    def create_enrollment_table(self):
+        create_table_query = """
+            CREATE TABLE IF NOT EXISTS `enrollment` (
+                `enrollment_id` INT AUTO_INCREMENT PRIMARY KEY,
+                `ID_NO` VARCHAR(100) NOT NULL,
+                `ENROLLED_YEAR` INT NOT NULL,
+                `SCHOOL_YEAR` VARCHAR(20) NOT NULL,
+                `ENROLLMENT_DATE` DATETIME DEFAULT CURRENT_TIMESTAMP,
+                `STATUS` VARCHAR(20) DEFAULT 'Enrolled',
+                FOREIGN KEY (`ID_NO`) REFERENCES `student_information`(`ID_NO`)
+                    ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+        """
+        self.cursor.execute(create_table_query)
+        self.conn.commit()
 
+    def save_enrollment(self, id_no, enrolled_year, school_year, status="Enrolled"):
+        insert_query = """
+            INSERT INTO `enrollment` 
+                (`ID_NO`, `ENROLLED_YEAR`, `SCHOOL_YEAR`, `ENROLLMENT_DATE`, `STATUS`)
+            VALUES (%s, %s, %s, NOW(), %s)
+        """
+        try:
+            self.cursor.execute(insert_query, (id_no, enrolled_year, school_year, status))
+            self.conn.commit()
+        except Exception as err:
+            self.conn.rollback()
+            raise
 
 class DatabaseInitializer:
     """Class responsible for initializing database and tables"""
