@@ -5,10 +5,20 @@ import pandas as pd
 from tkinter import messagebox
 import mysql.connector
 from datetime import datetime
-import time, os
-import traceback
-import logging
+import time, os, logging, traceback, configparser
 
+def get_db_config():
+    config = configparser.ConfigParser()
+    config.read('thesis_copy/config.ini')
+    db_cfg = config['database']
+    return {
+        'host': db_cfg.get('host', 'localhost'),
+        'user': db_cfg.get('user', ''),
+        'password': db_cfg.get('password', ''),
+        'database': db_cfg.get('database', ''),
+        'port': db_cfg.getint('port', 3306),
+        'allow_local_infile': True
+    }
 class DatabaseHandler:
     def __init__(self):
         db_init = DatabaseInitializer()
@@ -17,13 +27,8 @@ class DatabaseHandler:
         # Initialize database connection
         self.conn, self.cursor = self.get_db_connection()
     def get_db_connection(self):
-        conn = mysql.connector.connect(
-            host='localhost', #192.168.254.125
-            user='comscie',
-            password='BS_Comscie@2025!', 
-            database='department',
-            port=3306,
-            allow_local_infile=True)
+        db_params = get_db_config()
+        conn = mysql.connector.connect(**db_params)
         cursor = conn.cursor()
         return conn, cursor
 
