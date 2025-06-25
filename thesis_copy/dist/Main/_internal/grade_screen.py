@@ -173,6 +173,7 @@ class GradeScreen(ctk.CTkFrame):
             self.progress_bar['value'] = i
             self.update_idletasks()
             time.sleep(0.07)
+        self.progress_bar.stop()
         self.progress_bar.pack_forget()
         back_button_style = {**button_style}
         

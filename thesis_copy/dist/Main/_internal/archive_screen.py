@@ -9,9 +9,9 @@ from PIL import Image
 from database import DatabaseHandler
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
+from reportlab.platypus import Image as RLImage
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import Table, TableStyle, Spacer
-from reportlab.platypus import Image
 from reportlab.platypus import BaseDocTemplate, Frame, PageTemplate, Paragraph
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.pdfbase import pdfmetrics
@@ -145,10 +145,10 @@ class ArchiveScreen(ctk.CTkFrame):
 
             # If the student is in their fourth year, second semester, they are graduating this year
             if current_year == 4:  # Fourth year
-                student_data['YEAR_GRADUATED'] = enrolled_year + 4  # Graduation year
+                student_data['YEAR_GRADUATED'] = int(enrolled_year) + 4  # Graduation year
             else:
                 # If not in fourth year, set to "N/A" or calculate expected graduation year
-                student_data['YEAR_GRADUATED'] = enrolled_year + 4  # Expected graduation year
+                student_data['YEAR_GRADUATED'] = int(enrolled_year) + 4  # Expected graduation year
 
             # Map 'SCHOOL_YEAR' to 'YEAR_GRADUATED' (if needed)
             if 'SCHOOL_YEAR' in student_data:
@@ -180,7 +180,7 @@ class ArchiveScreen(ctk.CTkFrame):
             page_height = doc.pagesize[1]
 
             # Header image on every page
-            header_image_path = "Image/Header.jpg"
+            header_image_path = LoginForm.resource_path("Image/Header.jpg")
             canvas.drawImage(header_image_path, x=0, y=page_height - 70, width=595.27, height=70)
 
             # Header text only on first page
@@ -192,11 +192,11 @@ class ArchiveScreen(ctk.CTkFrame):
                 canvas.drawString(x_centered, page_height - 120, text)
 
             # Footer image on every page
-            footer_image_path = "Image/Footer.jpg"
+            footer_image_path = LoginForm.resource_path("Image/Footer.jpg")
             canvas.drawImage(footer_image_path, x=0, y=0, width=595.27, height=70)
             
             # Non-official logo (watermark effect)
-            logo_path = "icons/non_official.jpg"
+            logo_path = LoginForm.resource_path("icons/non_official.jpg")
             
             # Load logo with transparency
             logo = ImageReader(logo_path)

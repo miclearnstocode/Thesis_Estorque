@@ -145,10 +145,10 @@ class ArchiveScreen(ctk.CTkFrame):
 
             # If the student is in their fourth year, second semester, they are graduating this year
             if current_year == 4:  # Fourth year
-                student_data['YEAR_GRADUATED'] = enrolled_year + 4  # Graduation year
+                student_data['YEAR_GRADUATED'] = int(enrolled_year) + 4  # Graduation year
             else:
                 # If not in fourth year, set to "N/A" or calculate expected graduation year
-                student_data['YEAR_GRADUATED'] = enrolled_year + 4  # Expected graduation year
+                student_data['YEAR_GRADUATED'] = int(enrolled_year) + 4  # Expected graduation year
 
             # Map 'SCHOOL_YEAR' to 'YEAR_GRADUATED' (if needed)
             if 'SCHOOL_YEAR' in student_data:

@@ -13,7 +13,6 @@ from reportlab.lib.units import inch
 from reportlab.lib import colors
 from reportlab.pdfbase.ttfonts import TTFont
 import re
-# from CTkMessageBox import CTkMessageBox  # Removed: incorrect import, use CTkMessagebox instead
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 from database import DatabaseHandler
@@ -55,7 +54,7 @@ class StudentScreen(ctk.CTkFrame):
             "height": 32,                 
             "border_width": 1,            
             "border_color": "black",
-            "corner_radius": 20}
+            "corner_radius": 6}
         
         self.regular_frame = ctk.CTkFrame(self, fg_color="transparent")
         self.regular_frame.pack(pady=20)
@@ -88,7 +87,7 @@ class StudentScreen(ctk.CTkFrame):
         # Add Summary button
         summary_icon = Image.open(LoginForm.resource_path("icons/summary.png"))  # Load your summary icon
         self.summary_icon = ctk.CTkImage(light_image=summary_icon, dark_image=summary_icon, size =(30, 30))
-        ctk.CTkButton(self, text="Summary", image=self.summary_icon, **button_style, font=('Helvetica',14, 'bold'),command=self.show_summary).place(x=730, y=147)  # Place the Summary button at the specified coordinates
+        ctk.CTkButton(self.regular_frame, text="Summary", image=self.summary_icon, **button_style, font=('Helvetica',14, 'bold'),command=self.show_summary).pack(side=tk.RIGHT, padx=10) # Place the Summary button at the specified coordinates
  
     def show_summary(self):
         # Create a summary frame
@@ -111,7 +110,7 @@ class StudentScreen(ctk.CTkFrame):
         search_button.pack(side="left", padx=10)
 
         # Create a Notebook for year levels
-        self.notebook = ttk.Notebook(summary_frame, width=950, height=297)
+        self.notebook = ttk.Notebook(summary_frame, width=1000, height=297)
         self.notebook.pack(pady=10, expand=True, fill='both')
 
         # Get current school year
@@ -144,7 +143,9 @@ class StudentScreen(ctk.CTkFrame):
 
                 tree_frame = ctk.CTkFrame(tab)
                 tree_frame.pack(pady=10, padx=10, fill="both", expand=True)
-
+                style = ttk.Style()
+                style.configure("Treeview", font=('Helvetica', 13),  rowheight=35)
+                style.configure("Treeview.Heading",  font=('Helvetica', 13, 'bold'))
                 # Create Treeview for student data
                 columns = ("ID", "Name", "Year Level", "Status")
                 tree = ttk.Treeview(tree_frame, columns=columns, show="headings", height=10)
@@ -178,20 +179,18 @@ class StudentScreen(ctk.CTkFrame):
                     tree.insert("", "end", values=(student["ID_NO"], full_name, student["YEAR_LEVEL"], student["ENROLLMENT_STATUS"]), tags=(tag,))
 
                 self.treeviews[year] = tree  # Store treeview reference for filtering
-
+            not_enrolled_count = sum(1 for student in self.unenrolled_students if student.get("ENROLLMENT_STATUS") == "Not Enrolled")
             # Add a print button for unenrolled students
-            if total_unenrolled > 0:
-                print_button = ctk.CTkButton(
-                    summary_frame, text="Print All", text_color="black", font=('Helvetica', 14, 'bold'),
-                    corner_radius=30, command=self.print_students
-                )
-                print_button.place(x=20, y=620)
+            
+            print_button = ctk.CTkButton(summary_frame, text=f"Print All ({not_enrolled_count})", text_color="black", font=('Helvetica', 14, 'bold'),
+                corner_radius=30, command=self.print_students)
+            print_button.pack(pady=5, padx=30, side="right")
 
             # Close button
             close_icon = Image.open(LoginForm.resource_path("icons/close.png"))
             self.close_icon = ctk.CTkImage(light_image=close_icon, dark_image=close_icon, size=(30, 30))
             ctk.CTkButton(summary_frame, text="Close", text_color="black", font=('Helvetica', 14, 'bold'),
-                        corner_radius=30, image=self.close_icon, command=summary_frame.destroy).pack(pady=30, padx=30, side="right")
+                        corner_radius=30, image=self.close_icon, command=summary_frame.destroy).pack(pady=5, padx=30, side="right")
 
         except Exception as e:
             messagebox.showerror("Database Error", f"Failed to fetch student data: {str(e)}")
@@ -718,21 +717,26 @@ class StudentScreen(ctk.CTkFrame):
             student_data = db_handler.fetch_student_data(id_no, self.selected_year_semester.get())
 
             if student_data and student_data["curriculum_data"]:
-                student_info = student_data["curriculum_data"][0]  # Assuming we use the first entry
-                last_name = student_info.get("LAST_NAME", "")
-                first_name = student_info.get("FIRST_NAME", "")
-                middle_name = student_info.get("MIDDLE_NAME", "")
-                bday = student_info.get("BDAY", "")
-
                 # Save to the database
-                self.saving_student(last_name, first_name, middle_name, [student_info], enrolled_year, bday, to_be_enrolled_years)
+                self.saving_student(id_no, enrolled_year, to_be_enrolled_years)
                 messagebox.showinfo("Success", "Student enrollment status updated.")
             else:
                 messagebox.showerror("Error", "No student data found.")
 
         except Exception as e:
             messagebox.showerror("Database Error", f"Failed to update enrollment status: {str(e)}")
-
+    def saving_student(self, id_no, enrolled_year, school_year):
+        """Save the student's enrollment record.
+        :param id_no: Student ID number
+        :param enrolled_year: Numeric year (e.g., 2025)
+        :param school_year: School year string (e.g., '2025-2026')"""
+        db_handler = DatabaseHandler()
+        try:
+            db_handler.create_enrollment_table()
+            db_handler.save_enrollment(id_no, enrolled_year, school_year)
+        except Exception as e:
+            messagebox.showerror("Database Error", f"Failed to save enrollment: {str(e)}")
+            
     def print_students(self):
         self.enroll_var.set(True)
         self.update_enroll_label()
@@ -828,7 +832,7 @@ class StudentScreen(ctk.CTkFrame):
         # Create Treeview for course information
         table_columns = ("Course No", "Descriptive Title", "Units", "Faculty")
         self.treeview = ttk.Treeview(table_frame, columns=table_columns, show="headings")
-        
+
         # Set font
         style = ttk.Style()
         style.configure("Treeview.Heading", font=("Times New Roman", 12), background="#4a7a8c")
@@ -894,11 +898,13 @@ class StudentScreen(ctk.CTkFrame):
         cert_label = ttk.Label(cert_frame, text="This is to certify that the student indicated above is qualified to enroll this_______________", font=("Times New Roman", 12))
         cert_label.pack(anchor="w")
 
-        underscore_label = ttk.Label(cert_frame, text="_"*30, font=("Times New Roman", 12))
-        underscore_label.pack(side=tk.RIGHT, pady=(6, 7), anchor="w")
+        # Create a frame for the signature area
+        signature_frame = tk.Frame(cert_frame, padx=20)
+        signature_frame.pack(side=tk.RIGHT, pady=(30, 10), anchor="se")
 
-        signature_frame = tk.Frame(print_frame, padx=10)
-        signature_frame.pack(side=tk.RIGHT, pady=(1, 30), anchor="w")
+        # Add the underscore label
+        underscore_label = ttk.Label(signature_frame, text="_______________________", font=("Times New Roman", 11))
+        underscore_label.pack(anchor="e")  # Align to the end (right side)
 
         ttk.Label(signature_frame, text="Name and Signature of Student", font=("Times New Roman", 11)).pack(anchor="se")
 
@@ -906,8 +912,8 @@ class StudentScreen(ctk.CTkFrame):
         noted_frame = tk.Frame(print_frame, padx=10)
         noted_frame.pack(side=tk.LEFT, pady=(10, 0), anchor="sw")
 
-        ttk.Label(noted_frame, text="Noted:", font=("Times New Roman", 12)).pack(anchor="w", pady=(10, 0))
-        ttk.Label(noted_frame, text="MAREVIC P. NAVA, MSCS", font=("Times New Roman", 11)).pack(anchor="w", pady=(0,0))
+        ttk.Label(noted_frame, text="Noted:", font=("Times New Roman", 11)).pack(anchor="w", pady=(10, 0))
+        ttk.Label(noted_frame, text="MAREVIC P. NAVA, MSCS", font=("Times New Roman", 11)).pack(anchor="w", pady=(0, 0))
         ttk.Label(noted_frame, text="Program Chair, BSCS", font=("Times New Roman", 11)).pack(anchor="w", pady=(0, 10))
 
         # Right side (east)
@@ -2318,4 +2324,4 @@ class StudentScreen(ctk.CTkFrame):
                 messagebox.showerror("Error", "Error reading CSV file: " + str(err))
         else:
             messagebox.showerror("Error", "Please select a file to import.")
-  
+            messagebox.showerror("Error", "Please select a file to import.")
