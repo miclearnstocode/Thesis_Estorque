@@ -122,7 +122,7 @@ class StudentScreen(ctk.CTkFrame):
         # Connect to the database
         db_handler = DatabaseHandler()
         try:
-            # 🔹 Fetch unenrolled students dynamically for each year level
+            #Fetch unenrolled students dynamically for each year level
             self.student_data = {}
             self.unenrolled_students = []
 
@@ -149,7 +149,7 @@ class StudentScreen(ctk.CTkFrame):
                 style.configure("Treeview", font=('Helvetica', 13),  rowheight=35)
                 style.configure("Treeview.Heading",  font=('Helvetica', 13, 'bold'))
                 # Create Treeview for student data
-                columns = ("ID", "Name", "Year Level", "Status")
+                columns = ("ID", "Name", "Year Level", "Semester","Status")
                 tree = ttk.Treeview(tree_frame, columns=columns, show="headings", height=10)
                 tree.pack(side="left", fill="both", expand=True)
 
@@ -162,12 +162,14 @@ class StudentScreen(ctk.CTkFrame):
                 tree.heading("ID", text="Student ID", anchor="center")
                 tree.heading("Name", text="Student Name", anchor="center")
                 tree.heading("Year Level", text="Year", anchor="center")
+                tree.heading("Semester", text="Semester", anchor="center")
                 tree.heading("Status", text="Enroll Status", anchor="center")
 
                 # Set column widths
                 tree.column("ID", width=120, anchor="center")
                 tree.column("Name", width=250, anchor="w")
                 tree.column("Year Level", width=100, anchor="center")
+                tree.column("Semester", width=100, anchor="center") 
                 tree.column("Status", width=150, anchor="center")
 
                 # Add row styles
@@ -178,16 +180,17 @@ class StudentScreen(ctk.CTkFrame):
                 for i, student in enumerate(students):
                     full_name = f"{student['LAST_NAME']}, {student['FIRST_NAME']} {student['MIDDLE_NAME']}".strip()
                     tag = "evenrow" if i % 2 == 0 else "oddrow"
-                    tree.insert("", "end", values=(student["ID_NO"], full_name, student["YEAR_LEVEL"], student["ENROLLMENT_STATUS"]), tags=(tag,))
+                    semester = student.get("SEMESTER", "")
+                    tree.insert("", "end", values=(student["ID_NO"], full_name, student["YEAR_LEVEL"], semester,student["ENROLLMENT_STATUS"]), tags=(tag,))
 
                 self.treeviews[year] = tree  # Store treeview reference for filtering
             not_enrolled_count = sum(1 for student in self.unenrolled_students if student.get("ENROLLMENT_STATUS") == "Not Enrolled")
-            not_enrolled_ids = [student["ID_NO"] for student in self.unenrolled_students if student.get("ENROLLMENT_STATUS") == "Not Enrolled"]
             # Add a print button for unenrolled students
             
             print_icon = Image.open(LoginForm.resource_path("icons/prints.png"))
             self.print_icon =ctk.CTkImage(light_image=print_icon, dark_image=print_icon, size=(30, 30)) 
-
+            #fix nga ma update ang status once ma click na ang print all
+        
             print_button = ctk.CTkButton(summary_frame, text=f"Print All ({not_enrolled_count})",image=self.print_icon,border_width=1, fg_color="transparent",text_color="black", font=('Helvetica', 14, 'bold'),corner_radius=30, command=self.print_all_not_enrolled)
             print_button.pack(pady=5, padx=30, side="right")
 
@@ -199,15 +202,22 @@ class StudentScreen(ctk.CTkFrame):
         except Exception as e:
             messagebox.showerror("Database Error", f"Failed to fetch student data: {str(e)}")
     def print_all_not_enrolled(self):
-        # Get all not enrolled student IDs
         not_enrolled_ids = [student["ID_NO"] for student in self.unenrolled_students if student.get("ENROLLMENT_STATUS") == "Not Enrolled"]
         if not not_enrolled_ids:
             messagebox.showinfo("No Students", "No not enrolled students to print.")
             return
-        # You may want to ask for year_level, or use a default/selected one
         year_level = "1.1"  # Or get from user selection
         printer = BulkStudentPrinter(self.master, not_enrolled_ids, year_level)
         printer.print_all()
+
+        # After printing, update all to enrolled
+        db_handler = DatabaseHandler()
+        current_year = datetime.now().year
+        school_year = f"{current_year}-{current_year+1}"
+        db_handler.update_enrollment_status_bulk(not_enrolled_ids, year_level, school_year)
+
+        # Optionally, refresh the summary or UI
+        self.show_summary()
 
     def filter_students(self):
         #Filters the student Treeview lists based on the search input.
@@ -803,6 +813,7 @@ class StudentScreen(ctk.CTkFrame):
         year = student_details.get("YR", "")
         sex = student_details.get("SEX", "")
         age = student_details.get("AGE", "") 
+        address = student_details.get("ADDRESS", "")
 
         # Configure the grid columns
         name_frame.columnconfigure(0, weight=1)
@@ -814,7 +825,7 @@ class StudentScreen(ctk.CTkFrame):
         ttk.Label(name_frame, text=f"Sex: {sex}", font=("Times New Roman", 12)).grid(row=0, column=1, sticky="we")
         ttk.Label(name_frame, text=f"Age: {age}", font=("Times New Roman", 12)).grid(row=0, column=2, sticky="we")
         ttk.Label(left_frame, text=f"Course/Year Level: {year}", font=("Times New Roman", 12)).pack(anchor="w")
-        ttk.Label(left_frame, text="Address:_____________________________", font=("Times New Roman", 12)).pack(anchor="w")
+        ttk.Label(left_frame, text=f"Address: {address}", font=("Times New Roman", 12)).pack(anchor="w")
         ttk.Label(left_frame, text="Parent/Guardian:______________________", font=("Times New Roman", 12)).pack(anchor="w")
         ttk.Label(left_frame, text="Contact No:__________________________", font=("Times New Roman", 12)).pack(anchor="w")
 
@@ -947,14 +958,7 @@ class StudentScreen(ctk.CTkFrame):
         pdf_path = os.path.join(temp_dir, pdf_filename)
 
         # Year level mapping
-        year_mapping = {
-            '1': '1st Year',
-            '2': '2nd Year',
-            '3': '3rd Year',
-            '4': '4th Year'
-        }
-        
-        # Convert year level to proper format
+        year_mapping = {'1': '1st Year', '2': '2nd Year', '3': '3rd Year', '4': '4th Year'}
         formatted_year = year_mapping.get(str(self.year_level), self.year_level)
         # Get current school year
         db_handler = DatabaseHandler()
@@ -1983,7 +1987,6 @@ class StudentScreen(ctk.CTkFrame):
         # Add the updated total units row
         self.treeview.insert("", "end", values=("Total", "", total_units, ""))
 
-
     def print_content_irregular(self, print_window):
         def sanitize_filename(name):
             # Remove invalid filename characters and replace spaces with underscores
@@ -2153,7 +2156,6 @@ class StudentScreen(ctk.CTkFrame):
             messagebox.showerror("Printing Error", f"An error occurred while printing: {str(e)}")
         finally:
             print_window.destroy()
-
 
     def import_students(self):
         # Clear student list frame
