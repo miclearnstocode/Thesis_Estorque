@@ -24,6 +24,7 @@ import customtkinter as ctk
 from CTkMessagebox import CTkMessagebox
 from datetime import datetime
 from loginform import LoginForm
+from print_all import BulkStudentPrinter
 class StudentScreen(ctk.CTkFrame):
     def __init__(self, master):
         super().__init__(master)
@@ -105,8 +106,9 @@ class StudentScreen(ctk.CTkFrame):
 
         search_entry = ctk.CTkEntry(search_frame, textvariable=self.search_var, width=250, height=30, placeholder_text="Enter ID, Last Name, or First Name")
         search_entry.pack(side="left", padx=10)
-        
-        search_button = ctk.CTkButton(search_frame, text="Search", fg_color="blue", text_color="white", corner_radius=10, command=self.filter_students)
+        search_icon = Image.open(LoginForm.resource_path("icons/searchs.png"))
+        self.search_icon = ctk.CTkImage(light_image=search_icon, dark_image=search_icon,size=(30,30))
+        search_button = ctk.CTkButton(search_frame, text="Search",image=self.search_icon, fg_color="transparent", text_color="black", border_width=1, corner_radius=10, command=self.filter_students)
         search_button.pack(side="left", padx=10)
 
         # Create a Notebook for year levels
@@ -180,25 +182,35 @@ class StudentScreen(ctk.CTkFrame):
 
                 self.treeviews[year] = tree  # Store treeview reference for filtering
             not_enrolled_count = sum(1 for student in self.unenrolled_students if student.get("ENROLLMENT_STATUS") == "Not Enrolled")
+            not_enrolled_ids = [student["ID_NO"] for student in self.unenrolled_students if student.get("ENROLLMENT_STATUS") == "Not Enrolled"]
             # Add a print button for unenrolled students
             
-            print_button = ctk.CTkButton(summary_frame, text=f"Print All ({not_enrolled_count})", text_color="black", font=('Helvetica', 14, 'bold'),
-                corner_radius=30, command=self.print_students)
+            print_icon = Image.open(LoginForm.resource_path("icons/prints.png"))
+            self.print_icon =ctk.CTkImage(light_image=print_icon, dark_image=print_icon, size=(30, 30)) 
+
+            print_button = ctk.CTkButton(summary_frame, text=f"Print All ({not_enrolled_count})",image=self.print_icon,border_width=1, fg_color="transparent",text_color="black", font=('Helvetica', 14, 'bold'),corner_radius=30, command=self.print_all_not_enrolled)
             print_button.pack(pady=5, padx=30, side="right")
 
             # Close button
             close_icon = Image.open(LoginForm.resource_path("icons/close.png"))
             self.close_icon = ctk.CTkImage(light_image=close_icon, dark_image=close_icon, size=(30, 30))
-            ctk.CTkButton(summary_frame, text="Close", text_color="black", font=('Helvetica', 14, 'bold'),
-                        corner_radius=30, image=self.close_icon, command=summary_frame.destroy).pack(pady=5, padx=30, side="right")
+            ctk.CTkButton(summary_frame, text="Close", text_color="black", font=('Helvetica', 14, 'bold'),corner_radius=30,border_width=1,fg_color="transparent", image=self.close_icon, command=summary_frame.destroy).pack(pady=5, padx=30, side="right")
 
         except Exception as e:
             messagebox.showerror("Database Error", f"Failed to fetch student data: {str(e)}")
+    def print_all_not_enrolled(self):
+        # Get all not enrolled student IDs
+        not_enrolled_ids = [student["ID_NO"] for student in self.unenrolled_students if student.get("ENROLLMENT_STATUS") == "Not Enrolled"]
+        if not not_enrolled_ids:
+            messagebox.showinfo("No Students", "No not enrolled students to print.")
+            return
+        # You may want to ask for year_level, or use a default/selected one
+        year_level = "1.1"  # Or get from user selection
+        printer = BulkStudentPrinter(self.master, not_enrolled_ids, year_level)
+        printer.print_all()
 
     def filter_students(self):
-        """
-        Filters the student Treeview lists based on the search input.
-        """
+        #Filters the student Treeview lists based on the search input.
         search_term = self.search_var.get().strip().lower()
 
         if not search_term:
@@ -255,14 +267,11 @@ class StudentScreen(ctk.CTkFrame):
         year_semester_combobox.pack(side="left", padx=5)
         year_semester_combobox.set("Select")  
 
-        try:
-            print_icon = Image.open(LoginForm.resource_path("icons/prints.png"))
-            self.print_icon =ctk.CTkImage(light_image=print_icon, dark_image=print_icon, size=(30, 30)) 
+        print_icon = Image.open(LoginForm.resource_path("icons/prints.png"))
+        self.print_icon =ctk.CTkImage(light_image=print_icon, dark_image=print_icon, size=(30, 30)) 
 
-            self.print_button = ctk.CTkButton( self.search_frame, text="Print", image=self.print_icon, text_color="black", fg_color="transparent", border_width=1,hover_color="grey70" ,command=self.print_students, width=100, height=32)
-            self.print_button.pack(side="left", padx=(0, 5))
-        except Exception as e:
-            print(f"Error loading print icon: {e}")
+        self.print_button = ctk.CTkButton( self.search_frame, text="Print", image=self.print_icon, text_color="black", fg_color="transparent", border_width=1,hover_color="grey70" ,command=self.print_students, width=100, height=32)
+        self.print_button.pack(side="left", padx=(0, 5))
 
         # Checkbox for enrollment status
         self.enroll_var = ctk.BooleanVar()
@@ -395,9 +404,7 @@ class StudentScreen(ctk.CTkFrame):
                     # Find the prerequisite subject in curriculum data
                     prereq_subject = next(
                         (s for s in curriculum_data if s and 
-                        fuzz.ratio(s.get('COURSE_NO', '').strip().lower(), prereq.lower()) >= 100),
-                        None
-                    )
+                        fuzz.ratio(s.get('COURSE_NO', '').strip().lower(), prereq.lower()) >= 100),None)
                     
                     if prereq_subject:
                         # Only append if the prerequisite has no grade
@@ -572,25 +579,12 @@ class StudentScreen(ctk.CTkFrame):
         vsb.pack(side="right", fill="y")
 
         # Adjust column widths for curriculum tree
-        curriculum_column_widths = {
-            "Course No.": 130,
-            "Descriptive Title": 300,
-            "Year Level": 90,
-            "Units": 80,
-            "Lec": 80,
-            "Lab": 80,
-            "Pre-requisite": 150,
-            "Grade": 90
-        }
+        curriculum_column_widths = {"Course No.": 130, "Descriptive Title": 300,
+            "Year Level": 90, "Units": 80, "Lec": 80, "Lab": 80, "Pre-requisite": 150, "Grade": 90}
 
         for column in table_curriculum:
             self.curriculum_tree.heading(column, text=column)
-            self.curriculum_tree.column(
-                column, 
-                width=curriculum_column_widths.get(column, 150), 
-                anchor='center',
-                stretch=True
-            )
+            self.curriculum_tree.column(column, width=curriculum_column_widths.get(column, 150), anchor='center',stretch=True)
         # Clear existing data
         for item in self.curriculum_tree.get_children():
             self.curriculum_tree.delete(item)
@@ -699,13 +693,12 @@ class StudentScreen(ctk.CTkFrame):
         return ""
     
     def enable_enrollment_and_save(self, id_no):
-        """
-        Enables the enrollment checkbox and updates the database with the enrolled year.
-        """
+        #Enables the enrollment checkbox and updates the database with the enrolled year.
         # Enable the checkbox
-        self.enroll_var.set(True)
-        self.enroll_checkbox.configure(state="normal")
-        self.update_enroll_label()
+        if hasattr(self, 'enroll_var'):
+            self.enroll_var.set(True)
+            self.enroll_checkbox.configure(state="normal")
+            self.update_enroll_label()
 
         # Get current year and the next academic year
         enrolled_year = datetime.now().year
@@ -969,6 +962,7 @@ class StudentScreen(ctk.CTkFrame):
 
         # Create the PDF
         c = canvas.Canvas(pdf_path, pagesize=A4)
+        c.setTitle(pdf_filename)
         width, height = A4
 
         pdfmetrics.registerFont(TTFont('TimesNewRoman', 'C://Windows//Fonts//times.ttf'))
@@ -2006,24 +2000,15 @@ class StudentScreen(ctk.CTkFrame):
         # Create the PDF in temp directory with custom filename
         temp_dir = tempfile.gettempdir()
         pdf_path = os.path.join(temp_dir, pdf_filename)
-        
-        # Year level mapping
-        year_mapping = {
-            '1': '1st Year',
-            '2': '2nd Year',
-            '3': '3rd Year',
-            '4': '4th Year'
-        }
-        
-        # Convert year level to proper format
+        year_mapping = {'1': '1st Year','2': '2nd Year','3': '3rd Year','4': '4th Year'}# Convert year level to proper format
         formatted_year = year_mapping.get(str(self.year), self.year)
         # Get current school year
         db_handler = DatabaseHandler()
         current_school_year = db_handler.get_latest_school_year_irregular(self.selected_id_no)
-        
 
         # Create the PDF
         c = canvas.Canvas(pdf_path, pagesize=A4)
+        c.setTitle(pdf_filename)
         width, height = A4
 
         pdfmetrics.registerFont(TTFont('TimesNewRoman', 'C://Windows//Fonts//times.ttf'))
