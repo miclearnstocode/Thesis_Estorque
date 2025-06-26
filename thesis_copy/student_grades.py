@@ -1,13 +1,11 @@
 import socket
 import json
-import threading
 import customtkinter as ctk
 from tkinter import messagebox
 from tkinter import ttk
 from database import DatabaseHandler
 from PIL import Image
-from tkinter import TclError
-import re
+import re, os, sys
 
 ctk.set_default_color_theme("green")    
 class StudentApp(ctk.CTk):
@@ -52,11 +50,11 @@ class StudentApp(ctk.CTk):
         self.clear_frame()
         
         # Add a title label outside the login frame
-        title_label = ctk.CTkLabel(self, text="COMPUTER STUDIES GRADES KIOSK", text_color="white",font=("Courier New", 40, "bold"))
+        title_label = ctk.CTkLabel(self, text="COMPUTER STUDIES GRADES KIOSK", text_color="grey",font=("Courier New", 40, "bold"))
         title_label.pack(padx=20,pady=20)
 
         # Add a label with the text ComScie@2025
-        comscie_label = ctk.CTkLabel(self, text="ComScie@2025", text_color="white", font=("Helvetica", 16))
+        comscie_label = ctk.CTkLabel(self, text="ComScie@2025", text_color="grey", font=("Helvetica", 16))
         comscie_label.place(x=10, y=90)
 
         # Create a frame for the login form
@@ -64,7 +62,7 @@ class StudentApp(ctk.CTk):
         login_frame.pack(fill="both", expand=True, padx=10, pady=40)
         
         # Load and display the logo
-        logo_image = Image.open("Image/Capiz_State_University 2.png")
+        logo_image = Image.open(self.resource_path("Image/Capiz_State_University 2.png"))
         logo_image = logo_image.resize((150, 150), Image.LANCZOS)
         logo_photo = ctk.CTkImage(light_image=logo_image, dark_image=logo_image, size=(150, 150))
         logo_label = ctk.CTkLabel(login_frame, image=logo_photo, text="")
@@ -104,8 +102,8 @@ class StudentApp(ctk.CTk):
                 show_password_button.configure(image=show_icon)
 
         # Load the show/hide icons
-        show_icon = ctk.CTkImage(Image.open("icons/show_icon.png").resize((15, 15), Image.LANCZOS))
-        hide_icon = ctk.CTkImage(Image.open("icons/hide_icon.png").resize((15, 15), Image.LANCZOS))
+        show_icon = ctk.CTkImage(Image.open(self.resource_path("icons/show_icon.png")).resize((15, 15), Image.LANCZOS))
+        hide_icon = ctk.CTkImage(Image.open(self.resource_path("icons/hide_icon.png")).resize((15, 15), Image.LANCZOS))
 
         # Add a "Show Password" button with an icon
         show_password_button = ctk.CTkButton(login_frame, image=show_icon, text="", width=15, height=15, bg_color="white", fg_color="white",command=toggle_password)
@@ -124,12 +122,19 @@ class StudentApp(ctk.CTk):
         register_link = ctk.CTkLabel(login_frame, text="Register", fg_color="gainsboro", text_color="blue", font=("Helvetica", 12, "underline"))
         register_link.place(x=720, y=389)
         register_link.bind("<Button-1>", lambda e: self.show_register())
+    @staticmethod  
+    def resource_path(relative_path):
+        try:
+            base_path = sys._MEIPASS  # PyInstaller temp folder
+        except AttributeError:
+            base_path = os.path.abspath(".")  # Running normally
+        return os.path.join(base_path, relative_path)
     
     def show_register(self):
         self.clear_frame()
 
         # Add a title label outside the login frame
-        title_label = ctk.CTkLabel(self, text="COMPUTER STUDIES GRADES KIOSK", text_color="white",font=("Courier New", 40, "bold"))
+        title_label = ctk.CTkLabel(self, text="COMPUTER STUDIES GRADES KIOSK", text_color="grey",font=("Courier New", 40, "bold"))
         title_label.pack(padx=20,pady=20)
 
         # Create a frame for the registration form
@@ -137,7 +142,7 @@ class StudentApp(ctk.CTk):
         register_frame.pack(fill="both", expand=True, padx=10, pady=10)
 
         # Load and display the logo
-        logo_image = Image.open("Image/Capiz_State_University 2.png")
+        logo_image = Image.open(self.resource_path("Image/Capiz_State_University 2.png"))
         logo_image = logo_image.resize((150, 150), Image.LANCZOS)
         logo_photo = ctk.CTkImage(light_image=logo_image, dark_image=logo_image, size=(150, 150))
         logo_label = ctk.CTkLabel(register_frame, image=logo_photo, text="")
@@ -204,8 +209,8 @@ class StudentApp(ctk.CTk):
                 password_button.configure(image=show_icon)
 
         # Load the show/hide icons
-        show_icon = ctk.CTkImage(Image.open("icons/show_icon.png").resize((15, 15), Image.LANCZOS))
-        hide_icon = ctk.CTkImage(Image.open("icons/hide_icon.png").resize((15, 15), Image.LANCZOS))
+        show_icon = ctk.CTkImage(Image.open(self.resource_path("icons/show_icon.png")).resize((15, 15), Image.LANCZOS))
+        hide_icon = ctk.CTkImage(Image.open(self.resource_path("icons/hide_icon.png")).resize((15, 15), Image.LANCZOS))
 
         # Add a "Show Password" button with an icon
         password_button = ctk.CTkButton(register_frame, image=show_icon, text="", width=15, height=15, bg_color="white", fg_color="white",command=toggle_password)
@@ -221,8 +226,8 @@ class StudentApp(ctk.CTk):
                 show_password_button.configure(image=show_icon)
 
         # Load the show/hide icons
-        show_icon = ctk.CTkImage(Image.open("icons/show_icon.png").resize((15, 15), Image.LANCZOS))
-        hide_icon = ctk.CTkImage(Image.open("icons/hide_icon.png").resize((15, 15), Image.LANCZOS))
+        show_icon = ctk.CTkImage(Image.open(self.resource_path("icons/show_icon.png")).resize((15, 15), Image.LANCZOS))
+        hide_icon = ctk.CTkImage(Image.open(self.resource_path("icons/hide_icon.png")).resize((15, 15), Image.LANCZOS))
 
         # Add a "Show Password" button with an icon
         show_password_button = ctk.CTkButton(register_frame, image=show_icon, text="", width=15, height=15, bg_color="white", fg_color="white",command=toggle_password2)
@@ -286,13 +291,13 @@ class StudentApp(ctk.CTk):
         first_name = student[3]
 
         # Display student name and ID
-        name_label = ctk.CTkLabel(self, text=f"{last_name}, {middle_name} {first_name}", font=("Helvetica", 20, "bold"), text_color="white")
+        name_label = ctk.CTkLabel(self, text=f"{last_name}, {middle_name} {first_name}", font=("Helvetica", 20, "bold"), text_color="grey")
         name_label.pack(anchor='w', pady=10)
-        id_label = ctk.CTkLabel(self, text=f"Student ID: {student_id}", font=("Helvetica", 16), text_color="white")
+        id_label = ctk.CTkLabel(self, text=f"Student ID: {student_id}", font=("Helvetica", 16), text_color="grey")
         id_label.pack(anchor='w', pady=10)
 
         # Create a label for the school year
-        self.school_year_label = ctk.CTkLabel(self, text="", font=("Helvetica", 16), text_color="white")
+        self.school_year_label = ctk.CTkLabel(self, text="", font=("Helvetica", 16), text_color="grey")
         self.school_year_label.pack(anchor='w', pady=10)
 
         # Add a logout button

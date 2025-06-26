@@ -4,6 +4,9 @@
 pyinstaller --noconsole --onedir --add-data "grade_screen.py;." --add-data "loginform.py;." --add-data "curriculum_screen.py;." --add-data "database.py;." --add-data "archive_screen.py;." --add-data "appraisal_screen.py;." --add-data "admin_screen.py;." --add-data "../icons;icons" --add-data "../Image;Image" Main.py
 with console for debugging
 pyinstaller --noconsole --onedir --add-data "grade_screen.py;." --add-data "loginform.py;." --add-data "curriculum_screen.py;." --add-data "database.py;." --add-data "archive_screen.py;." --add-data "appraisal_screen.py;." --add-data "admin_screen.py;." --add-data "../icons;icons" --add-data "../Image;Image" --add-data "pictures;thesis_copy/pictures" Main.py
+
+for grades
+pyinstaller --noconsole --onedir --add-data "database.py;." --add-data "../icons;icons" --add-data "../Image;Image" student_grades.py
 def get_db_connection(self):
     try:
         conn = mysql.connector.connect(
