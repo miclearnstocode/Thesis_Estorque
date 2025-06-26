@@ -428,18 +428,28 @@ class DatabaseHandler:
         
     def insert_students(self, table_name, data):
         try:
-            # Insert data
+            # --- Add phone number validation here ---
+            for row in data:
+                phone = str(row.get('PHONE_NUMBER', '')).strip()
+                phone_digits = ''.join(filter(str.isdigit, phone))
+                if len(phone_digits) > 10:
+                    messagebox.showerror("Validation Error", f"Phone number '{phone}' exceeds 10 digits.")
+                    return  # Stop the insert if any phone number is invalid
+                row['PHONE_NUMBER'] = phone_digits  # Save only digits
+
             insert_query = """
                 INSERT INTO student_information (
                     ID_NO, LAST_NAME, FIRST_NAME, MIDDLE_NAME,
-                    YR, AGE, SEX, EMAIL_ADDRESS, SHS, ADDRESS, ENROLLED_YEAR
-                ) VALUES (%(ID_NO)s, %(LAST_NAME)s, %(FIRST_NAME)s, %(MIDDLE_NAME)s,
-                        %(YR)s, %(AGE)s, %(SEX)s, %(EMAIL_ADDRESS)s, %(SHS)s, 
-                        %(ADDRESS)s, %(ENROLLED_YEAR)s)
+                    YR, AGE, BIRTHDAY, SEX, PARENT_GUARDIAN, PHONE_NUMBER,
+                    EMAIL_ADDRESS, SHS, ADDRESS, ENROLLED_YEAR
+                ) VALUES (
+                    %(ID_NO)s, %(LAST_NAME)s, %(FIRST_NAME)s, %(MIDDLE_NAME)s,
+                    %(YR)s, %(AGE)s, %(BIRTHDAY)s, %(SEX)s, %(PARENT_GUARDIAN)s, %(PHONE_NUMBER)s,
+                    %(EMAIL_ADDRESS)s, %(SHS)s, %(ADDRESS)s, %(ENROLLED_YEAR)s
+                )
             """
             self.cursor.executemany(insert_query, data)
             self.conn.commit()
-            
         except mysql.connector.Error as err:
             messagebox.showerror("Database Error", f"Failed to insert data: {err}")
             self.conn.rollback()
@@ -454,8 +464,11 @@ class DatabaseHandler:
                 si.FIRST_NAME,
                 si.MIDDLE_NAME,
                 si.YR, 
-                si.AGE, 
+                si.AGE,
+                si.BIRTHDAY, 
                 si.SEX, 
+                si.PARENT_GUARDIAN,
+                si.PHONE_NUMBER,
                 si.EMAIL_ADDRESS,
                 si.ADDRESS,
                 cr.Course_No, 
@@ -481,7 +494,9 @@ class DatabaseHandler:
             else:
                 # Update student name format in results
                 for result in curriculum_results:
-                    result['STUDENT_NAME'] = f"{result['LAST_NAME']}, {result['FIRST_NAME']} {result['MIDDLE_NAME']}".strip()
+                    middle = result['MIDDLE_NAME']
+                    middle_initial = f"{middle[0]}." if middle and len(middle) > 0 else ""
+                    result['STUDENT_NAME'] = f"{result['LAST_NAME']}, {result['FIRST_NAME']} {middle_initial}".strip()
                     # Remove individual name fields if not needed
                     del result['LAST_NAME']
                     del result['FIRST_NAME']
@@ -2588,12 +2603,22 @@ class DatabaseHandler:
                 return "Graduate"
         else:
             return semester_order[0]  # If none completed, start at 1.1
-
     def format_students(self, students):
         """
         Helper function to format student data into a list of dictionaries,
         fetching the latest enrollment STATUS from the enrollment table.
         """
+        def semester_number_to_word(semester_key):
+            """
+            Convert semester part of a key like '1.1' or '2.2' to '1st' or '2nd'.
+            """
+            if '.' in semester_key:
+                sem_part = semester_key.split('.')[1]
+                if sem_part == '1':
+                    return "1st"
+                elif sem_part == '2':
+                    return "2nd"
+            return semester_key  # fallback
         student_list = []
         for row in students:
             id_no = row[0]
@@ -2617,7 +2642,7 @@ class DatabaseHandler:
                 "MIDDLE_NAME": row[3] if row[3] else "",
                 "YEAR_LEVEL": row[4],
                 "ENROLLMENT_STATUS": status,
-                "SEMESTER": next_semester
+                "SEMESTER": semester_number_to_word(next_semester)
             })
         return student_list
     
@@ -2667,19 +2692,23 @@ class DatabaseHandler:
             self.conn.rollback()
             raise
 
-    def update_enrollment_status_bulk(self, id_list, year_level, school_year):
+    def update_enrollment_status_bulk(self, id_list, year_level, school_year, batch_size=100):
         """
         Set ENROLLMENT_STATUS to 'Enrolled' for all students in id_list for the given year_level and school_year.
         """
         if not id_list:
             return
-        placeholders = ','.join(['%s'] * len(id_list))
-        query = f"""
-            UPDATE enrollment
-            SET STATUS = 'Enrolled'
-            WHERE ID_NO IN ({placeholders})
-        """
-        self.cursor.execute(query, id_list)
+        if not self.conn.is_connected():
+            self.conn.reconnect()
+        for i in range(0, len(id_list), batch_size):
+            batch = id_list[i:i+batch_size]
+            placeholders = ','.join(['%s'] * len(batch))
+            query = f"""
+                UPDATE enrollment
+                SET STATUS = 'Enrolled'
+                WHERE ID_NO IN ({placeholders})
+            """
+            self.cursor.execute(query, batch)
         self.conn.commit()
 
 class DatabaseInitializer:
@@ -2717,7 +2746,10 @@ class DatabaseInitializer:
                         `MIDDLE_NAME` VARCHAR(100) NOT NULL,
                         `YR` VARCHAR(100) NOT NULL,
                         `AGE` VARCHAR(100) NOT NULL,
+                        `BIRTHDAY` DATE,
                         `SEX` CHAR(25) NOT NULL,
+                        `PARENT_GUARDIAN` VARCHAR(150),
+                        `PHONE_NUMBER` VARCHAR(10),
                         `EMAIL_ADDRESS` VARCHAR(100) NOT NULL,
                         `SHS` VARCHAR(100) NOT NULL,
                         `ADDRESS` VARCHAR(100) NOT NULL,

@@ -477,12 +477,7 @@ class StudentScreen(ctk.CTkFrame):
                 completed_semesters = set(db_handler.check_all_tables_for_grades(id_no).keys())
                 
                 # Use dictionary for O(1) lookup time
-                year_semester_mapping = {
-                    '1': ['1.1', '1.2'],
-                    '2': ['2.1', '2.2'],
-                    '3': ['3.1', '3.2'],
-                    '4': ['4.1', '4.2']
-                }
+                year_semester_mapping = {'1': ['1.1', '1.2'],'2': ['2.1', '2.2'],'3': ['3.1', '3.2'],'4': ['4.1', '4.2']}
                 
                 # Use dictionary for O(1) lookup time
                 semester_conversion = {
@@ -493,8 +488,7 @@ class StudentScreen(ctk.CTkFrame):
                     'third_year_first_semester': '3.1',
                     'third_year_second_semester': '3.2',
                     'fourth_year_first_semester': '4.1',
-                    'fourth_year_second_semester': '4.2'
-                }
+                    'fourth_year_second_semester': '4.2'}
                 
                 # Convert to set for O(1) lookup time
                 completed_yr_sem = {semester_conversion[sem] for sem in completed_semesters 
@@ -813,6 +807,8 @@ class StudentScreen(ctk.CTkFrame):
         year = student_details.get("YR", "")
         sex = student_details.get("SEX", "")
         age = student_details.get("AGE", "") 
+        parent_mo = student_details.get("PARENT_GUARDIAN", "")
+        cellphone_number = student_details.get("PHONE_NUMBER", "")
         address = student_details.get("ADDRESS", "")
 
         # Configure the grid columns
@@ -821,13 +817,13 @@ class StudentScreen(ctk.CTkFrame):
         name_frame.columnconfigure(2, weight=1)
 
         # Add labels to the grid
-        ttk.Label(name_frame, text=f"Name: {student_name}", font=("Times New Roman", 12)).grid(row=0, column=0, sticky="w")
-        ttk.Label(name_frame, text=f"Sex: {sex}", font=("Times New Roman", 12)).grid(row=0, column=1, sticky="we")
-        ttk.Label(name_frame, text=f"Age: {age}", font=("Times New Roman", 12)).grid(row=0, column=2, sticky="we")
-        ttk.Label(left_frame, text=f"Course/Year Level: {year}", font=("Times New Roman", 12)).pack(anchor="w")
-        ttk.Label(left_frame, text=f"Address: {address}", font=("Times New Roman", 12)).pack(anchor="w")
-        ttk.Label(left_frame, text="Parent/Guardian:______________________", font=("Times New Roman", 12)).pack(anchor="w")
-        ttk.Label(left_frame, text="Contact No:__________________________", font=("Times New Roman", 12)).pack(anchor="w")
+        ttk.Label(name_frame, text=f"Name:  {student_name}", font=("Times New Roman", 12)).grid(row=0, column=0, sticky="w")
+        ttk.Label(name_frame, text=f"Sex:  {sex}", font=("Times New Roman", 12)).grid(row=0, column=1, sticky="we")
+        ttk.Label(name_frame, text=f"Age:  {age}", font=("Times New Roman", 12)).grid(row=0, column=2, sticky="we")
+        ttk.Label(left_frame, text=f"Course/Year Level:  {year}", font=("Times New Roman", 12)).pack(anchor="w")
+        ttk.Label(left_frame, text=f"Address:  {address}", font=("Times New Roman", 12)).pack(anchor="w")
+        ttk.Label(left_frame, text=f"Parent/Guardian:  {parent_mo}", font=("Times New Roman", 12)).pack(anchor="w")
+        ttk.Label(left_frame, text=f"Contact No:  +63{cellphone_number}", font=("Times New Roman", 12)).pack(anchor="w")
 
         # Table to display course information
         table_frame = tk.Frame(print_frame, padx=10, pady=10)
@@ -972,7 +968,19 @@ class StudentScreen(ctk.CTkFrame):
         pdfmetrics.registerFont(TTFont('TimesNewRoman', 'C://Windows//Fonts//times.ttf'))
         pdfmetrics.registerFont(TTFont('TimesNewRoman-Bold', 'timesbd.ttf'))
         c.setFont('TimesNewRoman', 12)
-
+        curriculum_data = self.curriculum_data.get("curriculum_data",[])
+        if not curriculum_data:
+            messagebox.showerror("Error", "No student data found to print.")
+            print_window.destroy()
+            return
+        student_details = curriculum_data[0]
+        student_name = student_details.get("STUDENT_NAME", "")
+        year = student_details.get("YR", "")
+        sex = student_details.get("SEX", "")
+        age = student_details.get("AGE", "") 
+        parent_mo = student_details.get("PARENT_GUARDIAN", "")
+        cellphone_number = student_details.get("PHONE_NUMBER", "")
+        address = student_details.get("ADDRESS", "")
         image_path = LoginForm.resource_path("Image/Header.jpg")  # Update this path to your image
         header_height = 80  
         c.drawImage(image_path, 0, height - header_height, width=width, height=header_height)
@@ -993,17 +1001,17 @@ class StudentScreen(ctk.CTkFrame):
         # Reset the font to normal
         c.setFont("TimesNewRoman", 14)
 
-        c.drawString(40, y, f"Name: {self.student_name}")
-        c.drawString(285, y, f"Sex: {self.sex}")
-        c.drawString(450, y,f"Age: {self.age}")
+        c.drawString(40, y, f"Name: {student_name}")
+        c.drawString(285, y, f"Sex: {sex}")
+        c.drawString(450, y,f"Age: {age}")
         y -= 20
         c.drawString(40, y, f"Course/Year Level: {self.year_level}")
         y -= 20
-        c.drawString(40, y, "Address:____________________________")
+        c.drawString(40, y, f"Address: {address}")
         y -= 20
-        c.drawString(40, y, "Parent/Guardian:______________________")
+        c.drawString(40, y, f"Parent/Guardian: {parent_mo}")
         y -= 20
-        c.drawString(40, y, "Contact No:__________________________")
+        c.drawString(40, y, f"Contact No: +63{cellphone_number}")
         y -= 20
 
 
@@ -1113,8 +1121,8 @@ class StudentScreen(ctk.CTkFrame):
         c.drawRightString(462, y, "College Registrar")        
         
         # Draw footer image
-        footer_image_path = LoginForm.resource_path("Image/Footer.jpg")  # Update this path to your footer image
-        footer_height = 50  # Adjust height as needed
+        footer_image_path = LoginForm.resource_path("Image/Foota.jpg")  # Update this path to your footer image
+        footer_height = 80  # Adjust height as needed
         c.drawImage(footer_image_path, 0, 0, width=width, height=footer_height)
         # Save the PDF
         c.save()
@@ -2135,7 +2143,7 @@ class StudentScreen(ctk.CTkFrame):
         c.drawRightString(462, y, "College Registrar")        
 
         # Draw footer image
-        footer_image_path = LoginForm.resource_path("Image/Footer.jpg")  # Update this path to your footer image
+        footer_image_path = LoginForm.resource_path("Image/Foota.jpg")  # Update this path to your footer image
         footer_height = 50  # Adjust height as needed
         c.drawImage(footer_image_path, 0, 0, width=width, height=footer_height)
         c.save()
@@ -2220,21 +2228,15 @@ class StudentScreen(ctk.CTkFrame):
         treeview_scrollbar_x.config(command=self.treeview.xview)
 
         # Configure columns (remove ENROLLED_YEAR from display)
-        self.columns = ('ID_NO', 'STUDENT_NAME', 'YR', 'AGE', 'SEX', 'EMAIL_ADDRESS', 'SHS', 'ADDRESS')
+        self.columns = ('ID_NO', 'STUDENT_NAME', 'YR', 'AGE', 'BIRTHDAY', 'SEX', 'PARENT_GUARDIAN', 'PHONE_NUMBER','EMAIL_ADDRESS', 'SHS', 'ADDRESS')
         self.treeview['columns'] = self.columns
         self.treeview['show'] = 'headings'  
 
         # Configure headings and columns (remove ENROLLED_YEAR)
-        column_widths = {
-            'ID_NO': (80, tk.NO),
-            'STUDENT_NAME': (200, tk.YES),
-            'YR': (50, tk.NO),
-            'AGE': (50, tk.NO),
-            'SEX': (50, tk.NO),
-            'EMAIL_ADDRESS': (200, tk.YES),
-            'SHS': (100, tk.YES),
-            'ADDRESS': (200, tk.YES)
-        }
+        column_widths = {'ID_NO': (80, tk.NO),'STUDENT_NAME': (200, tk.YES),
+            'YR': (50, tk.NO),'AGE': (50, tk.NO),'BIRTHDAY': (100, tk.NO),
+            'SEX': (50, tk.NO),'PARENT_GUARDIAN': (150, tk.YES),'PHONE_NUMBER': (120, tk.NO),
+            'EMAIL_ADDRESS': (200, tk.YES),'SHS': (100, tk.YES),'ADDRESS': (200, tk.YES)}
 
         for col in self.columns:
             self.treeview.heading(col, text=col)
@@ -2287,14 +2289,16 @@ class StudentScreen(ctk.CTkFrame):
                     # Clear existing data
                     self.treeview.delete(*self.treeview.get_children())
 
-                    # Insert display data into treeview (without ENROLLED_YEAR)
                     for i, row in enumerate(display_data):
                         values = [
                             row.get('ID_NO', ''),
-                            row.get('STUDENT_NAME', ''),  # Combined name for display only
+                            row.get('STUDENT_NAME', ''),
                             row.get('YR', ''),
                             row.get('AGE', ''),
+                            row.get('BIRTHDAY', ''),
                             row.get('SEX', ''),
+                            row.get('PARENT_GUARDIAN', ''),
+                            row.get('PHONE_NUMBER', ''),
                             row.get('EMAIL_ADDRESS', ''),
                             row.get('SHS', ''),
                             row.get('ADDRESS', '')

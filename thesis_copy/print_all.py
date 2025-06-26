@@ -1,4 +1,4 @@
-import os
+import os, math, random
 import tempfile
 import subprocess
 from datetime import datetime
@@ -37,14 +37,24 @@ class SplashScreen(tk.Toplevel):
         self.progress.pack(fill="x", padx=20, pady=5)
         self.progress.start(10)
         self.protocol("WM_DELETE_WINDOW", lambda: None)  # Disable close button
-
+        self.flame_id = None  # Store flame ID for animation
+        self._running = True
         # Draw rocket parts
         self.rocket_y = 200
         self.rocket_parts = self.draw_rocket(90, self.rocket_y)
-        self._running = True
+        # Draw clouds (as ovals for simplicity)
+        self.clouds = [
+            self.draw_cloud(30, 220, scale=1.0),
+            self.draw_cloud(120, 240, scale=0.7),
+            self.draw_cloud(60, 180, scale=0.8)]
+        self.cloud_anim_phase = [0, math.pi/2, math.pi]  # Different phase for each cloud for variety
+        self.animate_clouds()
         self._dot_count = 0
         self.animate_message()
         self.animate_rocket()
+        self.animate_flame()
+        self.animate_clouds()
+        self.update_idletasks()  # Ensure everything is drawn before showing
         self.update()
 
     def draw_rocket(self, x, y):
@@ -54,8 +64,26 @@ class SplashScreen(tk.Toplevel):
         left_fin = self.canvas.create_polygon(x, y+50, x-10, y+60, x, y+40, fill="orange", outline="")
         right_fin = self.canvas.create_polygon(x+20, y+50, x+30, y+60, x+20, y+40, fill="orange", outline="")
         flame = self.canvas.create_polygon(x+5, y+50, x+15, y+50, x+10, y+70, fill="yellow", outline="")
+        self.flame_id = flame
         return [body, nose, left_fin, right_fin, flame]
 
+    def draw_cloud(self, x, y, scale=1.0):
+        # Draw an irregular, cartoon-style cloud using several overlapping ovals
+        parts = []
+        # Main body
+        parts.append(self.canvas.create_oval(x, y, x+30*scale, y+18*scale, fill="#e0e0e0", outline="#cccccc"))
+        # Top left puff
+        parts.append(self.canvas.create_oval(x-10*scale, y+5*scale, x+10*scale, y+20*scale, fill="#e0e0e0", outline="#cccccc"))
+        # Top right puff
+        parts.append(self.canvas.create_oval(x+20*scale, y-8*scale, x+45*scale, y+12*scale, fill="#e0e0e0", outline="#cccccc"))
+        # Bottom left puff
+        parts.append(self.canvas.create_oval(x-5*scale, y+15*scale, x+15*scale, y+28*scale, fill="#e0e0e0", outline="#cccccc"))
+        # Bottom right puff
+        parts.append(self.canvas.create_oval(x+25*scale, y+12*scale, x+50*scale, y+28*scale, fill="#e0e0e0", outline="#cccccc"))
+        # Center puff (for more irregularity)
+        parts.append(self.canvas.create_oval(x+10*scale, y+8*scale, x+28*scale, y+25*scale, fill="#e0e0e0", outline="#cccccc"))
+        return parts
+    
     def animate_rocket(self):
         if not self._running:
             return
@@ -67,6 +95,51 @@ class SplashScreen(tk.Toplevel):
         else:
             # Optional: show "Launched!" when done
             self.label.config(text="Rocket Launched! Generating PDF...")
+    def animate_flame(self):
+        if not self._running:
+            return
+        # Flicker the flame by changing its points and color
+        base_x, base_y = 90, self.rocket_y + 50
+        # Randomize the flame tip for flicker
+        tip_offset = random.randint(15, 25)
+        left_offset = random.randint(4, 7)
+        right_offset = random.randint(13, 16)
+        flame_points = [
+            base_x + left_offset, base_y,
+            base_x + right_offset, base_y,
+            base_x + 10, base_y + tip_offset
+        ]
+        # Randomly choose a color between yellow and orange
+        flame_color = random.choice(["#FFD700", "#FFA500", "#FFFF00"])
+        self.canvas.coords(self.flame_id, *flame_points)
+        self.canvas.itemconfig(self.flame_id, fill=flame_color)
+        self.after(80, self.animate_flame)
+
+    def animate_clouds(self):
+        if not self._running:
+            return
+        # Animate each cloud with a wavy and bouncy effect
+        for idx, cloud in enumerate(self.clouds):
+            phase = self.cloud_anim_phase[idx]
+            for part in cloud:
+                # Move right
+                self.canvas.move(part, 1, 0)
+                # Get current coords
+                coords = self.canvas.coords(part)
+                # Wavy vertical movement using sine wave
+                if coords:
+                    base_y = coords[1]
+                    amplitude = 4 + 2 * idx  # Different amplitude for each cloud
+                    offset = amplitude * math.sin(phase)
+                    # Move vertically to create wave/bounce
+                    self.canvas.move(part, 0, offset)
+                    # If cloud is off the right edge, wrap to left
+                    if coords[0] > 200:
+                        dx = -200 - (coords[2] - coords[0])
+                        self.canvas.move(part, dx, 0)
+            # Advance phase for next frame
+            self.cloud_anim_phase[idx] += 0.15 + 0.05 * idx  # Different speed for each cloud
+        self.after(80, self.animate_clouds)
 
     def animate_message(self):
         if not self._running:
@@ -79,6 +152,7 @@ class SplashScreen(tk.Toplevel):
     def destroy(self):
         self._running = False
         super().destroy()
+#kalay uhon ang year level
 
 class BulkStudentPrinter:
     def __init__(self, parent, not_enrolled_ids, year_level):
@@ -122,6 +196,8 @@ class BulkStudentPrinter:
                         year = student_details.get("YR", "")
                         sex = student_details.get("SEX", "")
                         age = student_details.get("AGE", "")
+                        parent_name = student_details.get("PARENT_GUARDIAN", "")
+                        phone = student_details.get("PHONE_NUMBER", "")
                         address = student_details.get("ADDRESS", "")
                     except Exception as e:
                         print(f"Error fetching data for {student_id}: {e}")
@@ -153,16 +229,16 @@ class BulkStudentPrinter:
                     y -= 30
                     c.setFont("TimesNewRoman", 14)
                     c.drawString(40, y, f"Name: {student_name}")
-                    c.drawString(285, y, f"Sex: {sex}")
-                    c.drawString(450, y, f"Age: {age}")
+                    c.drawString(285, y, f"Sex:  {sex}")
+                    c.drawString(450, y, f"Age:  {age}")
                     y -= 20
-                    c.drawString(40, y, f"Course/Year Level: {year}")
+                    c.drawString(40, y, f"Course/Year Level:  {year}")
                     y -= 20
-                    c.drawString(40, y, f"Address: {address}")
+                    c.drawString(40, y, f"Address:  {address}")
                     y -= 20
-                    c.drawString(40, y, "Parent/Guardian:______________________")
+                    c.drawString(40, y, f"Parent/Guardian:  {parent_name}")
                     y -= 20
-                    c.drawString(40, y, "Contact No:__________________________")
+                    c.drawString(40, y, f"Contact No:  {phone}")
                     y -= 20
 
                     # Table
@@ -245,8 +321,8 @@ class BulkStudentPrinter:
                     y -= 20
                     c.drawRightString(462, y, "College Registrar")
                     # Footer image
-                    footer_image_path = LoginForm.resource_path("Image/Footer.jpg")
-                    footer_height = 50
+                    footer_image_path = LoginForm.resource_path("Image/Foota.jpg")
+                    footer_height = 80
                     c.drawImage(footer_image_path, 0, 0, width=width, height=footer_height)
 
                     # Add new page if not last student
@@ -268,7 +344,7 @@ class BulkStudentPrinter:
                     messagebox.showerror("Printing Error", f"An error occurred while opening PDF: {str(e)}")
             finally:
                 # Hide splash screen when done
-                splash.destroy()
+                splash.after(2200, splash.destroy)
         threading.Thread(target=generate_and_open_pdf, daemon=True).start()
 
     def check_prerequisites(self, student_data, selected_year_semester):
