@@ -16,7 +16,7 @@ import re
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 from database import DatabaseHandler
-from fuzzywuzzy import fuzz
+from rapidfuzz import fuzz
 from sklearn.cluster import AgglomerativeClustering
 import numpy as np
 from PIL import Image, ImageTk
@@ -48,14 +48,9 @@ class StudentScreen(ctk.CTkFrame):
 
         ctk.CTkLabel(self,  text="Student", font=("Vivaldi", 40, "bold"), text_color="black", fg_color="transparent",  corner_radius=50, padx=20, pady=10).pack(pady=30)
         # Button style configuration
-        button_style = {
-            "fg_color": "transparent",    
-            "hover_color": "#707070",     
-            "text_color": "black",        
-            "height": 32,                 
-            "border_width": 1,            
-            "border_color": "black",
-            "corner_radius": 6}
+        button_style = {"fg_color": "transparent","hover_color": "#707070",     
+            "text_color": "black", "height": 32,                 
+            "border_width": 1, "border_color": "black", "corner_radius": 6}
         
         self.regular_frame = ctk.CTkFrame(self, fg_color="transparent")
         self.regular_frame.pack(pady=20)
@@ -305,7 +300,6 @@ class StudentScreen(ctk.CTkFrame):
     def update_enroll_label(self):
         self.enroll_label.configure(text="Enrolled" if self.enroll_var.get() else "Enroll")
     
-
     def clear_all_displays(self):
         # Clear search frame
         for widget in self.search_frame.winfo_children():
@@ -432,7 +426,6 @@ class StudentScreen(ctk.CTkFrame):
             'prerequisite_subjects': prerequisite_subjects
         }
     
-
     def search_student(self):
         id_no = self.search_var.get().strip()
         if not id_no:
@@ -480,14 +473,10 @@ class StudentScreen(ctk.CTkFrame):
                 year_semester_mapping = {'1': ['1.1', '1.2'],'2': ['2.1', '2.2'],'3': ['3.1', '3.2'],'4': ['4.1', '4.2']}
                 
                 # Use dictionary for O(1) lookup time
-                semester_conversion = {
-                    'first_year_first_semester': '1.1',
-                    'first_year_second_semester': '1.2',
-                    'second_year_first_semester': '2.1',
-                    'second_year_second_semester': '2.2',
-                    'third_year_first_semester': '3.1',
-                    'third_year_second_semester': '3.2',
-                    'fourth_year_first_semester': '4.1',
+                semester_conversion = {'first_year_first_semester': '1.1',
+                    'first_year_second_semester': '1.2','second_year_first_semester': '2.1',
+                    'second_year_second_semester': '2.2','third_year_first_semester': '3.1',
+                    'third_year_second_semester': '3.2','fourth_year_first_semester': '4.1',
                     'fourth_year_second_semester': '4.2'}
                 
                 # Convert to set for O(1) lookup time
@@ -529,19 +518,12 @@ class StudentScreen(ctk.CTkFrame):
         self.tree = ttk.Treeview(student_frame, columns=table_student, show='headings', height=2)
         self.tree.pack(fill="both", expand=True)
 
-        column_widths = {
-            "ID NO": 130,
-            "STUDENT NAME": 300,
-            "YEAR": 80,
-            "AGE": 80,
-            "SEX": 80,
-            "EMAIL_ADDRESS": 300
-        }
+        column_widths = {"ID NO": 130,"STUDENT NAME": 300,"YEAR": 80,
+            "AGE": 80,"SEX": 80,"EMAIL_ADDRESS": 300}
 
         for column in table_student:
             self.tree.heading(column, text=column)
             self.tree.column(column, width=column_widths.get(column, 150), anchor='center', stretch=True)
-
 
         # Maintain a set of inserted ID_NO to avoid duplicates
         inserted_ids = set()
@@ -549,14 +531,9 @@ class StudentScreen(ctk.CTkFrame):
         for row in student_data["curriculum_data"]:
             student_id = row.get("ID_NO", "")
             if student_id not in inserted_ids:
-                self.tree.insert("", "end", values=(
-                    student_id,
-                    row.get("STUDENT_NAME", ""),
-                    row.get("YR", ""),
-                    row.get("AGE", ""),
-                    row.get("SEX", ""),
-                    row.get("EMAIL_ADDRESS", "")
-                ))
+                self.tree.insert("", "end", values=(student_id,
+                    row.get("STUDENT_NAME", ""),row.get("YR", ""),
+                    row.get("AGE", ""), row.get("SEX", ""), row.get("EMAIL_ADDRESS", "")))
                 self.student_name = row.get("STUDENT_NAME", "")  
                 self.year_level = row.get("YR", "")
                 self.sex = row.get("SEX","")
@@ -1226,10 +1203,7 @@ class StudentScreen(ctk.CTkFrame):
                 year, semester = map(int, year_level.split('.'))
                 return year + (semester / 10)  # e.g., 3.1 becomes 3.1, 3.2 becomes 3.2
 
-            year_levels = np.array([
-                convert_year_level_to_numeric(record['year_level']) 
-                for record in appraised_data
-            ]).reshape(-1, 1)
+            year_levels = np.array([convert_year_level_to_numeric(record['year_level']) for record in appraised_data]).reshape(-1, 1)
             
             # Apply Agglomerative Clustering
             clustering_model = AgglomerativeClustering(n_clusters=1, metric='euclidean', linkage='ward')
@@ -1239,12 +1213,9 @@ class StudentScreen(ctk.CTkFrame):
             # Determine the next semester based on completed courses
             def suggest_next_semester(data, labels):
                 # Semester progression mapping
-                semester_progression = {
-                    '1.1': '1.2', '1.2': '2.1', 
-                    '2.1': '2.2', '2.2': '3.1', 
-                    '3.1': '3.2', '3.2': '4.1', 
-                    '4.1': '4.2', '4.2': 'Graduate'
-                }
+                semester_progression = {'1.1': '1.2', '1.2': '2.1', 
+                    '2.1': '2.2', '2.2': '3.1', '3.1': '3.2', '3.2': '4.1', 
+                    '4.1': '4.2', '4.2': 'Graduate'}
 
                 # Track semester completion and labels
                 semester_info = {}
@@ -1252,23 +1223,14 @@ class StudentScreen(ctk.CTkFrame):
                     year_level = str(record['year_level'])
                     
                     # Check if grades indicate course completion
-                    is_completed = (
-                        record['grades'] not in ['', '0.00'] and 
-                        (isinstance(record['grades'], (int, float, Decimal)) and float(record['grades']) >= 1.0) or
-                        (isinstance(record['grades'], str) and record['grades'] != '' and float(record['grades']) >= 1.0)
-                    )
+                    is_completed = (record['grades'] not in ['0.00'] and (isinstance(record['grades'], (int, float, Decimal)) and float(record['grades']) >= 1.00) or
+                        (isinstance(record['grades'], str) and record['grades'] != '' and float(record['grades']) >= 1.00))
                     
                     # Store semester information with its cluster label
-                    semester_info[year_level] = {
-                        'completed': is_completed,
-                        'label': labels[i]
-                    }
+                    semester_info[year_level] = {'completed': is_completed,'label': labels[i]}
 
                 # Sort semesters by year and semester
-                sorted_semesters = sorted(
-                    semester_info.keys(), 
-                    key=lambda x: (int(x.split('.')[0]), int(x.split('.')[1]))
-                )
+                sorted_semesters = sorted(semester_info.keys(), key=lambda x: (int(x.split('.')[0]), int(x.split('.')[1])))
 
                 # Find the most recent completed semester in the same cluster
                 current_cluster = labels[0]  # Use the first label as reference
@@ -1283,15 +1245,14 @@ class StudentScreen(ctk.CTkFrame):
                         # Validate next semester
                         while next_semester:
                             # Check if next semester exists in original data and is not completed
-                            if (next_semester in semester_info and 
-                                not semester_info[next_semester]['completed']):
+                            if (next_semester in semester_info and not semester_info[next_semester]['completed']):
                                 return next_semester
                             
                             # Move to the next semester in progression
                             next_semester = semester_progression.get(next_semester)
 
                 # Fallback: return the first semester if no progression found
-                return sorted_semesters[0] if sorted_semesters else '1.1'
+                return sorted_semesters[0]
 
             # Get suggested semester
             suggested_semester = suggest_next_semester(appraised_data, labels)
@@ -1304,10 +1265,7 @@ class StudentScreen(ctk.CTkFrame):
 
                 # Provide feedback if selected semester differs from suggested
                 if selected_year_level != suggested_semester:
-                    CTkMessagebox(
-                        title="Semester Suggestion", 
-                        message=f"Recommended semester is {suggested_semester}. Please verify."
-                    )
+                    CTkMessagebox(title="Semester Suggestion", message=f"Recommended semester is {suggested_semester}. Please verify.")
 
             # Enable print button
             self.print_button.configure(state="normal")
@@ -1316,10 +1274,7 @@ class StudentScreen(ctk.CTkFrame):
 
         except Exception as e:
             logging.error(f"Enrollment check error: {str(e)}")
-            CTkMessagebox(
-                title="Database Error", 
-                message=f"An error occurred while checking enrollment status: {str(e)}"
-            )
+            CTkMessagebox(title="Database Error", message=f"An error occurred while checking enrollment status: {str(e)}")
             self.print_button.configure(state="disabled")
             return None
                                                 
@@ -1329,13 +1284,9 @@ class StudentScreen(ctk.CTkFrame):
         corequisite_subjects = []
         failed_subjects = []
         no_grade_courses = []
-
-        # Define year level order and mappings
-        year_levels = ['1.1', '1.2', '2.1', '2.2', '3.1', '3.2', '4.1', '4.2']
         
         # Get current year and semester
         current_year = selected_year_semester.split('.')[0]
-        current_semester = selected_year_semester.split('.')[1]
 
         def is_current_or_previous_year(year_level):
             """Check if the year level is current or previous"""
@@ -1382,15 +1333,10 @@ class StudentScreen(ctk.CTkFrame):
             
             try:
                 grade_decimal = Decimal(grade)
-                requirement_status[course_no] = {
-                    'grade': grade_decimal,
-                    'completed': grade_decimal > Decimal('0.00') and grade_decimal != Decimal('5.00')
-                }
+                requirement_status[course_no] = {'grade': grade_decimal,
+                    'completed': grade_decimal > Decimal('0.00') and grade_decimal != Decimal('5.00')}
             except (InvalidOperation, TypeError):
-                requirement_status[course_no] = {
-                    'grade': Decimal('0.00'),
-                    'completed': False
-                }
+                requirement_status[course_no] = {'grade': Decimal('0.00'),'completed': False}
 
         # Main processing loop
         for subject in appraised_data:
@@ -1405,12 +1351,8 @@ class StudentScreen(ctk.CTkFrame):
 
             # Check requirements
             if course_no in course_requirements:
-                missing_reqs = []
                 for req in course_requirements[course_no]:
-                    req_subject = next(
-                        (s for s in appraised_data if s.get('course_no', '').strip() == req), 
-                        None
-                    )
+                    req_subject = next((s for s in appraised_data if s.get('course_no', '').strip() == req), None)
                     if req_subject and should_include_subject(req_subject):
                         if requirement_type[course_no] == 'prerequisite':
                             if req_subject not in prerequisite_subjects:
@@ -1449,8 +1391,7 @@ class StudentScreen(ctk.CTkFrame):
             'prerequisite_subject': prerequisite_subjects,
             'corequisite_subject': corequisite_subjects,
             'failed_subject': failed_subjects,
-            'no_grade_course': no_grade_courses
-        }
+            'no_grade_course': no_grade_courses}
 
     def search_student_irregular(self):
         identifier = self.search_var.get().strip().capitalize()
@@ -1478,17 +1419,6 @@ class StudentScreen(ctk.CTkFrame):
                 current_yr = self.appraised_data[0].get('year')  # This gets the 'year' column value
                 print(f"Student's current year from appraised curriculum: {current_yr}")
                 
-                # Set available semesters based on current year
-                if current_yr:
-                    # For the current year level, show both semesters
-                    current_year_sems = [f"{current_yr}.1", f"{current_yr}.2"]
-                    self.selected_year_semester.set(current_year_sems[0])  # Default to first semester
-                    print(f"Setting semester to: {current_year_sems[0]}")
-                else:
-                    self.selected_year_semester.set("Select")
-                    print("No year level found in appraised curriculum")
-
-
             # Create a frame to hold the student data and curriculum data
             student_frame = tk.Frame(self.student_list_frame)
             student_frame.pack(fill="both", expand=True)
@@ -1501,20 +1431,11 @@ class StudentScreen(ctk.CTkFrame):
             self.tree = ttk.Treeview(student_frame, columns=table_student, show='headings', height=2)
             self.tree.pack(fill="both", expand=True)
 
-            column_widths = {
-                "ID NO": 130,
-                "STUDENT NAME": 300,
-                "YEAR": 80,
-                "AGE": 80,
-                "SEX": 80,
-                "EMAIL_ADDRESS": 300
-            }
+            column_widths = {"ID NO": 130, "STUDENT NAME": 300, "YEAR": 80, "AGE": 80, "SEX": 80, "EMAIL_ADDRESS": 300}
 
             for column in table_student:
                 self.tree.heading(column, text=column)
                 self.tree.column(column, width=column_widths.get(column, 150), anchor='center', stretch=True)
-
-
 
             self.student_record = {}
             # Insert student data
@@ -1525,14 +1446,9 @@ class StudentScreen(ctk.CTkFrame):
                 first_name = student_info.get("first_name", "").strip()
                 middle_name = student_info.get("middle_name", "").strip()
                 student_name = f"{last_name} {first_name} {middle_name}".strip()
-                self.tree.insert("", "end", values=(
-                    student_info.get("id_no", ""),
-                    student_name, 
-                    student_info.get("year", ""),
-                    student_info.get("age", ""),
-                    student_info.get("sex", ""),
-                    student_info.get("email_address", "")
-                ))
+                self.tree.insert("", "end", values=(student_info.get("id_no", ""),
+                    student_name, student_info.get("year", ""),
+                    student_info.get("age", ""), student_info.get("sex", ""), student_info.get("email_address", "")))
                 self.student_name_irreg = student_name            
                 self.year = student_info.get("year", "")
                 self.sex_irreg = student_info.get("sex", "")
@@ -1553,25 +1469,13 @@ class StudentScreen(ctk.CTkFrame):
             self.curriculum_tree.configure(yscrollcommand=vsb.set)
             vsb.pack(side="right", fill="y")
 
-            curriculum_column_widths = {
-                "Course No.": 130,
-                "Descriptive Title": 300,
-                "Year Level": 90,
-                "Units": 80,
-                "Lec": 80,
-                "Lab": 80,
-                "Pre-requisite": 150,
-                "Grade": 90
-            }
+            curriculum_column_widths = {"Course No.": 130,"Descriptive Title": 300,
+                "Year Level": 90,"Units": 80,"Lec": 80,
+                "Lab": 80,"Pre-requisite": 150,"Grade": 90}
 
             for column in table_curriculum:
                 self.curriculum_tree.heading(column, text=column)
-                self.curriculum_tree.column(
-                    column, 
-                    width=curriculum_column_widths.get(column, 150), 
-                    anchor='center',
-                    stretch=True
-                )
+                self.curriculum_tree.column(column, width=curriculum_column_widths.get(column, 150), anchor='center',stretch=True)
             # Clear existing data
             for item in self.curriculum_tree.get_children():
                 self.curriculum_tree.delete(item)
@@ -1635,7 +1539,7 @@ class StudentScreen(ctk.CTkFrame):
 
             # Store the retrieved student ID for later use in printing
             self.selected_id_no = identifier
-
+            self.check_enrollment_irregular()
         except Exception as e:
             messagebox.showerror("Database Error", str(e))
 
@@ -1733,12 +1637,7 @@ class StudentScreen(ctk.CTkFrame):
         self.treeview.pack(expand=True, fill="both")
 
         # Create dictionaries to store subjects by their type
-        subject_groups = {
-            'enrollable': [],
-            'no_grade': [],
-            'prerequisite': [],
-            'failed': []
-        }
+        subject_groups = {'enrollable': [],'no_grade': [],'prerequisite': [],'failed': []}
 
         # Check prerequisites
         prereq_analysis = self.check_prerequisites_irregular(self.curri_data_irreg, self.selected_year_semester.get())
@@ -1750,16 +1649,10 @@ class StudentScreen(ctk.CTkFrame):
             if isinstance(subject, dict):
                 course_no = subject.get('course_no', '')
                 if course_no not in seen_courses:
-                    subject_groups['enrollable'].append({
-                        'data': (
-                            course_no,
+                    subject_groups['enrollable'].append({'data': (course_no,
                             subject.get('descriptive_title', ''),
-                            subject.get('units', ''),
-                            ''
-                        ),
-                        'tag': '',
-                        'units': subject.get('units', 0)
-                    })
+                            subject.get('units', ''),''),'tag': '',
+                        'units': subject.get('units', 0)})
                     seen_courses.add(course_no)
 
         # Define a comprehensive mapping of year levels to allowed no-grade course semesters
@@ -1773,12 +1666,7 @@ class StudentScreen(ctk.CTkFrame):
         }
 
         # Collect no grade courses with semester-based limitation
-        semester_no_grade_courses = {
-            '1.1': [], '1.2': [], 
-            '2.1': [], '2.2': [], 
-            '3.1': [], '3.2': [], 
-            '4.1': [], '4.2': []
-        }
+        semester_no_grade_courses = {'1.1': [], '1.2': [], '2.1': [], '2.2': [], '3.1': [], '3.2': [], '4.1': [], '4.2': []}
 
         # Get the selected year semester
         selected_year_semester = str(self.selected_year_semester.get())
@@ -1797,15 +1685,9 @@ class StudentScreen(ctk.CTkFrame):
                     # Ensure only one no-grade course is added for the allowed semester
                     if not semester_no_grade_courses[subject_year_level]:
                         subject_groups['no_grade'].append({
-                            'data': (
-                                course_no,
-                                subject.get('descriptive_title', ''),
+                            'data': (course_no,subject.get('descriptive_title', ''),
                                 subject.get('units', 0),
-                                ''
-                            ),
-                            'tag': 'no_grade',
-                            'units': subject.get('units', 0)
-                        })
+                                ''),'tag': 'no_grade', 'units': subject.get('units', 0)})
                         semester_no_grade_courses[subject_year_level].append(course_no)
                         seen_courses.add(course_no)
             
@@ -1814,15 +1696,9 @@ class StudentScreen(ctk.CTkFrame):
                 # For 1.1 and 1.2, allow all no-grade courses
                 if subject_year_level in semester_no_grade_courses and not semester_no_grade_courses[subject_year_level]:
                     subject_groups['no_grade'].append({
-                        'data': (
-                            course_no,
-                            subject.get('descriptive_title', ''),
+                        'data': (course_no, subject.get('descriptive_title', ''),
                             subject.get('units', 0),
-                            ''
-                        ),
-                        'tag': 'no_grade',
-                        'units': subject.get('units', 0)
-                    })
+                            ''),'tag': 'no_grade','units': subject.get('units', 0)})
                     semester_no_grade_courses[subject_year_level].append(course_no)
                     seen_courses.add(course_no)
 
@@ -1831,16 +1707,11 @@ class StudentScreen(ctk.CTkFrame):
         for subject in prereq_analysis['prerequisite_subject']:
             course_no = subject.get('course_no', '')
             if course_no not in seen_courses:
-                subject_groups['prerequisite'].append({
-                    'data': (
-                        course_no,
+                subject_groups['prerequisite'].append({'data': (course_no,
                         subject.get('descriptive_title', ''),
-                        subject.get('units', ''),
-                        ''
-                    ),
+                        subject.get('units', ''),''),
                     'tag': 'prerequisite',
-                    'units': subject.get('units', 0)
-                })
+                    'units': subject.get('units', 0)})
                 seen_courses.add(course_no)
 
         # Collect failed subjects
@@ -2144,7 +2015,7 @@ class StudentScreen(ctk.CTkFrame):
 
         # Draw footer image
         footer_image_path = LoginForm.resource_path("Image/Foota.jpg")  # Update this path to your footer image
-        footer_height = 50  # Adjust height as needed
+        footer_height = 80  # Adjust height as needed
         c.drawImage(footer_image_path, 0, 0, width=width, height=footer_height)
         c.save()
 
