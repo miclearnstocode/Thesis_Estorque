@@ -1616,11 +1616,10 @@ class GradeScreen(ctk.CTkFrame):
 
     def download_template(self, choice=None):
         try:
-            selected_indices = self.template_listbox.curselection()
-            if not selected_indices:
+            selected_template = self.template_var.get()
+            if not selected_template or selected_template == "Dowmload Grading Sheet":
                 CTkMessagebox(title="Info", message="No templates selected for download.")
                 return
-            selected_templates = [self.template_listbox.get(i) for i in selected_indices]
 
             target_dir = filedialog.askdirectory(title="Select Folder to Save Templates")
             if not target_dir:
@@ -1628,43 +1627,35 @@ class GradeScreen(ctk.CTkFrame):
                 return
 
             errors = []
-            for template_name in selected_templates:
-                try:
-                    # Use a new cursor for each template to avoid 'Unread result found' error
-                    with self.db_handler.connection.cursor() as cursor:
-                        cursor.execute(
-                            "SELECT file_data FROM templates WHERE file_name = %s", (template_name,)
-                        )
-                        file_data = cursor.fetchone()
-                    if file_data:
-                        file_path = os.path.join(target_dir, template_name)
-                        # Write as binary in case the template is not plain text
-                        with open(file_path, 'wb') as file:
-                            file.write(file_data[0] if isinstance(file_data[0], bytes) else file_data[0].encode('utf-8'))
-                    else:
-                        errors.append(template_name)
-                except Exception as e:
-                    print(f"Error downloading template {template_name}: {e}")
-                    errors.append(template_name)
+            try:
+                # Use a new cursor for each template to avoid 'Unread result found' error
+                self.db_handler.cursor.execute(
+                    "SELECT file_data FROM templates WHERE file_name = %s", (selected_template,)
+                )
+                file_data = self.db_handler.cursor.fetchone()
+                if file_data:
+                    file_path = os.path.join(target_dir, selected_template)
+                    # Write as binary in case the template is not plain text
+                    with open(file_path, 'wb') as file:
+                        file.write(file_data[0] if isinstance(file_data[0], bytes) else file_data[0].encode('utf-8'))
+                else:
+                    errors.append(selected_template)
+            except Exception as e:
+                print(f"Error downloading template {selected_template}: {e}")
+                errors.append(selected_template)
 
             if errors:
                 CTkMessagebox(title="Partial Success", message=f"Some templates failed to download: {', '.join(errors)}")
             else:
-                CTkMessagebox(title="Success", message="All selected templates downloaded successfully!")
+                CTkMessagebox(title="Success", message="Template downloaded successfully!")
         except Exception as e:
-            print(f"Error downloading templates: {e}")
-            CTkMessagebox(title="Error", message="Failed to download templates: Unknown error")
-
-    def upload_templates(self):
-
-        # Open file dialog to select multiple CSV files
-        file_paths = filedialog.askopenfilenames(
-            title="Select CSV Files",
-            filetypes=[("CSV Files", "*.csv")]
-        )
+            print(f"Error downloading template: {e}")
+            CTkMessagebox(title="Error", message="Failed to download template: Unknown error")
         
+    def upload_templates(self):
+        # Open file dialog to select multiple CSV files
+        file_paths = filedialog.askopenfilenames(title="Select CSV Files", filetypes=[("CSV Files", "*.csv")])
         if file_paths:
             # Call the function in database.py to save the files
             self.db_handler.save_templates_to_database(file_paths)
-
             CTkMessagebox(title="Success", message="Templates have been uploaded successfully!")

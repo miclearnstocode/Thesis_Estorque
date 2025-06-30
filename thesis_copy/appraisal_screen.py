@@ -38,8 +38,15 @@ class AppraisalScreen(ctk.CTkFrame):
         except Exception as e:
             print(f"Error loading background image: {e}")
         
-        # Buttons with updated style
-        button_style = { "fg_color": self.button_color, "hover_color": self.hover_color, "text_color": "black", "corner_radius": 10 }
+        # Button style configuration
+        button_style = {
+            "fg_color": "transparent",    
+            "hover_color": "#707070",     
+            "text_color": "black",        
+            "width": 120,                 
+            "height": 32,                 
+            "border_width": 1,            
+            "border_color": "black"}
         
         # Main title label
         self.label = ctk.CTkLabel(self, text="  Appraisal   ", font=("Vivaldi", 40), fg_color="grey70", text_color="black", corner_radius=50)
@@ -55,8 +62,8 @@ class AppraisalScreen(ctk.CTkFrame):
         self.notebook.add(self.frame1, text="Basic Information")
 
         # Basic Information Frame
-        self.basic_info_frame = ctk.CTkFrame(self.frame1, fg_color=("gainsboro", "grey79"), corner_radius=10, border_color="#FFFFFF",height=500)
-        self.basic_info_frame.place(x=360, y=90)
+        self.basic_info_frame = ctk.CTkFrame(self.frame1, fg_color=("gainsboro", "grey79"), width=600, corner_radius=10, border_color="#FFFFFF",height=500)
+        self.basic_info_frame.place(x=260, y=10)
 
         # Convert labels and entries to CTk widgets
         self.year_label = ctk.CTkLabel(self.basic_info_frame, text="Select Year:")
@@ -81,8 +88,8 @@ class AppraisalScreen(ctk.CTkFrame):
         self.create_entries()
         right_icon = Image.open(LoginForm.resource_path("icons/right.png"))
         self.right_icon = ctk.CTkImage(light_image=right_icon, dark_image=right_icon, size=(20, 20))
-        self.next_button = ctk.CTkButton(self.basic_info_frame, text="", image=self.right_icon, command=self.check_basic_info, width=50, **button_style, border_color="grey70", border_width=1)
-        self.next_button.grid(row=13, column=1, pady=10)
+        self.next_button = ctk.CTkButton(self.basic_info_frame, text="", image=self.right_icon, command=self.check_basic_info ,**button_style)
+        self.next_button.grid(row=2, column=2, pady=10)
 
         # Bind Enter key to the next button
         self.bind('<Return>', lambda e: self.check_basic_info())
@@ -149,27 +156,24 @@ class AppraisalScreen(ctk.CTkFrame):
 
         # Button frames
         button_frame = ctk.CTkFrame(self, fg_color="transparent")
-        button_frame.place(x=150, y=78)
-
-        self.back_frame = ctk.CTkFrame(self, fg_color="transparent", corner_radius=10)
-        self.back_frame.place(x=5, y=86)
+        button_frame.place(x=30, y=78)
 
         appraise_icon = Image.open(LoginForm.resource_path("icons/appraisal.png"))
         self.appraise_icon = ctk.CTkImage(light_image=appraise_icon, dark_image=appraise_icon, size=(30, 30))
-        self.appraise_button = ctk.CTkButton(button_frame, text="Appraise", image=self.appraise_icon, command=self.start_appraisal, **button_style, border_color="grey70", border_width=1)
-        self.appraise_button.grid(row=0, column=0)
+        self.appraise_button = ctk.CTkButton(button_frame, text="Appraise", image=self.appraise_icon, command=self.start_appraisal, **button_style)
+        self.appraise_button.grid(row=0, column=1, padx=10)
         save_icon = Image.open(LoginForm.resource_path("icons/save.png"))
         self.save_icon = ctk.CTkImage(light_image=save_icon, dark_image=save_icon, size=(30, 30))
-        self.save_button = ctk.CTkButton(button_frame, text="Save", image=self.save_icon, command=self.save_to_database, state="disabled", **button_style, border_color="grey70", border_width=1)
-        self.save_button.grid(row=0, column=1)
+        self.save_button = ctk.CTkButton(button_frame, text="Save", image=self.save_icon, command=self.save_to_database, state="disabled", **button_style)
+        self.save_button.grid(row=0, column=2, padx=10)
 
         self.note_label = ctk.CTkLabel(button_frame, text="NOTE: Please select student curriculum first, then existing curriculum when appraising", font=("Helvetica", 12, 'italic'), fg_color="transparent")
-        self.note_label.grid(row=0, column=2, padx=10)
+        self.note_label.grid(row=0, column=3, padx=10)
 
         back_icon = Image.open(LoginForm.resource_path("icons/back.png"))
-        self.back_icon = ctk.CTkImage(light_image=back_icon, dark_image=back_icon, size=(20, 20))
-        back_button = ctk.CTkButton(self.back_frame, text="Back", image=self.back_icon ,command=self.master.show_main_menu, border_color="grey70", border_width=1, **button_style)
-        back_button.grid(row=1, column=1, padx=0.5)
+        self.back_icon = ctk.CTkImage(light_image=back_icon, dark_image=back_icon, size=(30, 30))
+        back_button = ctk.CTkButton(button_frame, text="Back", image=self.back_icon ,command=self.master.show_main_menu, **button_style)
+        back_button.grid(row=0, column=0, padx=10)
 
         # Configure grid weights to allow proper expansion
         self.grid_rowconfigure(1, weight=1)
@@ -435,24 +439,18 @@ class AppraisalScreen(ctk.CTkFrame):
                     overall_totals['Lab'] += lab
 
                 # Insert Semester Total Row
-                semester_total_values = [
-                    "", "Total", "",
-                    f"{int(semester_totals['Units'])}",
-                    f"{int(semester_totals['Lec'])}",
-                    f"{int(semester_totals['Lab'])}"
-                ] + [""] * (len(self.tree2["columns"]) - 4)
+                semester_total_values = ["", "Total", "",f"{int(semester_totals['Units'])}",f"{int(semester_totals['Lec'])}",
+                    f"{int(semester_totals['Lab'])}"] + [""] * (len(self.tree2["columns"]) - 4)
                 self.tree2.insert("", "end", values=semester_total_values, tags=('total_row',))
 
                 self.tree2.insert("", "end", values=[""] * len(self.tree2["columns"]))
 
 
         # Insert Overall Totals
-        overall_total_values = [
-            "", "Overall Totals",
+        overall_total_values = ["", "Overall Totals",
             f"{int(overall_totals['Units'])}",
             f"{int(overall_totals['Lec'])}",
-            f"{int(overall_totals['Lab'])}"
-        ] + [""] * (len(self.tree2["columns"]) - 4)
+            f"{int(overall_totals['Lab'])}"] + [""] * (len(self.tree2["columns"]) - 4)
         self.tree2.insert("", "end", values=overall_total_values, tags=('total_row',))
 
         # Handle empty data scenario
@@ -473,21 +471,18 @@ class AppraisalScreen(ctk.CTkFrame):
             if (self.entries["ID No:"].get() and self.entries["Last Name:"].get() and
                 self.entries["First Name:"].get() and self.entries["Middle Name:"].get() and
                 self.entries["Year Level:"].get() and self.entries["Sex:"].get() and 
-                self.entries["Age:"].get() and self.entries["Email Address:"].get()):
+                self.entries["Age:"].get() and self.entries["Birthday:"].get() and self.entries["Contact Number:"].get()
+                 and self.entries["Email Address:"].get() and self.entries["Address:"].get() and self.entries["Parent/Guardian:"].get()):
                 if self.generate_appraised_id():
                     self.basic_info_entered = True
                     self.notebook.select(self.frame2)
-                    return (
-                        self.appraised_id_label.cget("text"),
-                        self.entries["ID No:"].get(),
-                        self.entries["Last Name:"].get(),
-                        self.entries["First Name:"].get(),
-                        self.entries["Middle Name:"].get(),
-                        self.entries["Year Level:"].get(),
-                        self.entries["Sex:"].get(),
-                        self.entries["Age:"].get(),
-                        self.entries["Email Address:"].get()
-                    )
+                    return (self.appraised_id_label.cget("text"),
+                        self.entries["ID No:"].get(), self.entries["Last Name:"].get(),
+                        self.entries["First Name:"].get(), self.entries["Middle Name:"].get(),
+                        self.entries["Year Level:"].get(), self.entries["Sex:"].get(),
+                        self.entries["Age:"].get(), self.entries["Birthday:"].get(),
+                        self.entries["Contact Number:"].get(), self.entries["Email Address:"].get(),
+                        self.entries["Address:"].get(),self.entries["Parent/Guardian:"].get())
                 else:
                     messagebox.showwarning("Warning", "Please complete the Appraised ID first.")
             else:
@@ -518,8 +513,8 @@ class AppraisalScreen(ctk.CTkFrame):
                     if not school_year:
                         messagebox.showwarning("Warning", "Please select a school year.")
                         return
-                    appraised_id, id_no, last_name, first_name, middle_name, year, sex, age, email_address = self.check_basic_info()
-                    db_handler.save_appraised_data(appraised_id, id_no, last_name, first_name, middle_name, year, sex, age, email_address, self.matched_subjects, school_year)
+                    appraised_id, id_no, last_name, first_name, middle_name, year, sex, age, birthday, contact_number,email_address, address, parent_guardian = self.check_basic_info()
+                    db_handler.save_appraised_data(appraised_id, id_no, last_name, first_name, middle_name, year, sex, age, birthday, contact_number, email_address, address, parent_guardian, self.matched_subjects, school_year)
 
                     messagebox.showinfo("Success", "Appraised data saved to the database successfully!")
                 else:
@@ -551,7 +546,12 @@ class AppraisalScreen(ctk.CTkFrame):
             ("Year Level:", 8, self.validate_year_level), 
             ("Sex:", 9, self.validate_sex), 
             ("Age:", 10, self.validate_age), 
-            ("Email Address:", 11, self.validate_email)]
+            ("Birthday: ", 11, self.validate_birthday),
+            ("Contact Number: ", 12, self.validate_contact),
+            ("Email Address:", 13, self.validate_email),
+            ("Address: ", 14,self.validate_address),
+            ("Parent/Guardian: ", 15,self.validate_parent_guardian)]
+        
         
         self.entries = {}
         for i, (label_text, row, validation_func) in enumerate(labels_entries):
@@ -611,12 +611,114 @@ class AppraisalScreen(ctk.CTkFrame):
         # Allow only numbers, max 3 digits
         return re.match(r'^[0-9]{0,2}$', new_value) is not None
 
+    def validate_birthday(self, new_value):
+        # Allow empty string for deletion
+        if new_value == "":
+            return True
+
+        # Only allow digits and dashes, and max length 10
+        if not re.match(r'^[0-9-]*$', new_value) or len(new_value) > 10:
+            return False
+
+        # Auto-insert dash after year and month
+        digits = new_value.replace("-", "")
+        result = ""
+
+        for i, c in enumerate(digits):
+            result += c
+            if i == 3 or i == 5:
+                result += "-"
+        # Remove trailing dash if present
+        if result.endswith("-") and len(result) > 1:
+            result = result[:-1]
+
+        # If the formatted value doesn't match the entry, update it
+        entry = self.entries.get("Birthday: ")
+        if entry and new_value != result:
+            entry.delete(0, tk.END)
+            entry.insert(0, result)
+            return False  # Prevent default insertion, since we already updated
+
+        # Validate final format: allow partial input, but only up to YYYY-MM-DD
+        if len(result) > 10:
+            return False
+
+        # Allow incomplete input, but if complete, check for valid date
+        if len(result) == 10:
+            try:
+                import datetime
+                datetime.datetime.strptime(result, "%Y-%m-%d")
+            except ValueError:
+                return False
+
+        return True
+        
+    def validate_contact(self, new_value):
+        # Allow only digits and hyphens, and max length 11
+        if not re.match(r'^[0-9-]*$', new_value) or len(new_value) > 11:
+            return False
+        
+        # Auto-insert dash after 3rd digit
+        digits = new_value.replace("-", "")
+        result = ""
+
+        for i, c in enumerate(digits):
+            result += c
+            if i == 3:
+                result += "-"
+        
+        # Remove trailing dash if present
+        if result.endswith("-") and len(result) > 1:
+            result = result[:-1]
+
+        # If the formatted value doesn't match the entry, update it
+        entry = self.entries.get("Contact Number: ")
+        if entry and new_value != result:
+            entry.delete(0, tk.END)
+            entry.insert(0, result)
+            return False
+
     def validate_email(self, new_value):
         # Basic email validation
         return re.match(r'^[a-zA-Z0-9._%+-]*@?[a-zA-Z0-9.-]*\.?[a-zA-Z]*$', new_value) is not None
-
+    def validate_address(self, new_value):
+        # Allow letters, numbers, spaces, commas, periods, and hyphens
+        if re.match(r'^[a-zA-Z0-9\s,.-]*$', new_value) is not None:
+            # Remove multiple spaces and trailing spaces
+            cleaned_address = ' '.join(word for word in new_value.split() if word)
+            
+            if cleaned_address or new_value == "":
+                # Capitalize first letter of each word
+                capitalized_address = ' '.join(word.capitalize() for word in cleaned_address.split())
+                
+                # Update entry with cleaned and capitalized address
+                current_label = self.entries.get("Address: ")
+                if current_label:
+                    current_label.delete(0, tk.END)
+                    current_label.insert(0, capitalized_address)
+                return True
+        return False
+    def validate_parent_guardian(self, new_value):
+        # Allow letters, numbers, spaces, commas, periods, and hyphens
+        if re.match(r'^[a-zA-Z0-9\s,.-]*$', new_value) is not None:
+            # Remove multiple spaces and trailing spaces
+            cleaned_name = ' '.join(word for word in new_value.split() if word)
+            
+            if cleaned_name or new_value == "":
+                # Capitalize first letter of each word
+                capitalized_name = ' '.join(word.capitalize() for word in cleaned_name.split())
+                
+                # Update entry with cleaned and capitalized name
+                current_label = self.entries.get("Parent/Guardian: ")
+                if current_label:
+                    current_label.delete(0, tk.END)
+                    current_label.insert(0, capitalized_name)
+                return True
+        return False
+    
     def move_to_next_entry(self, event, current_index, total_entries):
-        labels_order = ["ID No:", "Last Name:", "First Name:", "Middle Name:", "Year Level:", "Sex:", "Age:", "Email Address:"]
+        labels_order = ["ID No:", "Last Name:", "First Name:", "Middle Name:", "Year Level:", "Sex:", "Age:","Birthday:","Contact Number:", "Email Address:"
+                        , "Address: ", "Parent/Guardian: "]
         
         # If not at the last entry, move to next
         if current_index < total_entries - 1:

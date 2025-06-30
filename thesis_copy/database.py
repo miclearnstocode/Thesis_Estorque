@@ -31,55 +31,57 @@ class DatabaseHandler:
         self.conn.close()
     
     def saving_curriculum_data(self, processed_data):
-        # Check if the DataFrame is empty
+        import mysql.connector
+
         if processed_data.empty:
             messagebox.showerror("Error", "No data to save!")
-            return  # Exit the function if there's no data
-
-        query = """INSERT INTO curriculum_regular 
-                (Course_No, Descriptive_Title, Year_Level, Units, Lab, Lec, Prerequisite, Grades, sy_revision)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"""
+            return
 
         try:
-            # Print processed data for debugging purposes
-            print("Processed data:")
-            print(processed_data.head())  # Print the first few rows
+            effective_sy = processed_data['SY_Revision'].iloc[0]
+            curriculum_name = f"Curriculum {effective_sy}"  # Optional: replace with GUI input if needed
 
-            # Convert DataFrame to list of tuples, replacing NaN values with None for all relevant fields
-            values = [
-                (
-                    row.Course_No,
-                    row.Descriptive_Title,
-                    row.Year_Level,
+            if not self.conn.is_connected():
+                raise mysql.connector.Error("Database connection lost.")
+
+            cursor = self.conn.cursor()
+
+            # Step 1: Check if curriculum_version exists by effective_sy
+            cursor.execute("SELECT curriculum_id FROM curriculum_version WHERE effective_sy = %s", (effective_sy,))
+            result = cursor.fetchone()
+
+            if result:
+                curriculum_id = result[0]
+            else:
+                cursor.execute("INSERT INTO curriculum_version (effective_sy, name) VALUES (%s, %s)", (effective_sy, curriculum_name))
+                curriculum_id = cursor.lastrowid
+
+            # Step 2: Insert into curriculum_regular
+            query = """INSERT INTO curriculum_regular 
+                (Course_No, Descriptive_Title, Year_Level, Units, Lab, Lec, Prerequisite, Grades, sy_revision, curriculum_id)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"""
+
+            values = [(row.Course_No, row.Descriptive_Title, row.Year_Level,
                     '' if pd.isna(row.Units) else row.Units,
                     '' if pd.isna(row.Lab) else row.Lab,
                     '' if pd.isna(row.Lec) else row.Lec,
                     '' if pd.isna(row.Prerequisite) else row.Prerequisite,
                     '' if pd.isna(row.Grades) else row.Grades,
-                    '' if pd.isna(row.SY_Revision) else row.SY_Revision  # Fixed column name
-                )   
-                for _, row in processed_data.iterrows()
-            ]
+                    effective_sy, curriculum_id) for _, row in processed_data.iterrows()]
 
-            # Ensure the database connection is open
-            if self.conn.is_connected():
-                self.cursor.executemany(query, values)
-                self.conn.commit()
-                messagebox.showinfo("Success", "Data saved successfully!")
-            else:
-                raise mysql.connector.Error("Database connection lost.")
+            cursor.executemany(query, values)
+            self.conn.commit()
+            messagebox.showinfo("Success", "Curriculum data saved successfully!")
 
         except mysql.connector.Error as err:
-            # Rollback in case of error and display error message
             print("Error encountered:", err)
             if self.conn.is_connected():
                 self.conn.rollback()
-            messagebox.showerror("Error", f"Error saving data to database: {err}")
+            messagebox.showerror("Error", f"Database error: {err}")
 
         finally:
-            # Close the cursor and connection only if connected
             if self.conn.is_connected():
-                self.cursor.close()
+                cursor.close()
                 self.conn.close()
 
     # ini sa pag add student           
@@ -165,7 +167,7 @@ class DatabaseHandler:
             self.conn.rollback()
 
     # ni hu sa appraised curriculum
-    def save_appraised_data(self, appraised_id, id_no, last_name, first_name, middle_name, year, sex, age, email_address, matched_subjects, school_year):
+    def save_appraised_data(self, appraised_id, id_no, last_name, first_name, middle_name, year, sex, age, birthday, contact_number ,email_address, address, parent_guardian,matched_subjects, school_year):
         try:
             if not school_year:
                 raise ValueError("School year is required")
@@ -182,7 +184,11 @@ class DatabaseHandler:
                     year INT,
                     sex VARCHAR(10),
                     age INT,
+                    birthday DATE,
+                    contact_number VARCHAR(15),
                     email_address VARCHAR(100),
+                    address VARCHAR(255),
+                    parent_guardian VARCHAR(100),
                     course_no VARCHAR(100),
                     descriptive_title VARCHAR(100),
                     year_level DECIMAL(3,1),
@@ -192,6 +198,7 @@ class DatabaseHandler:
                     prerequisite VARCHAR(100),
                     grades DECIMAL(5,2),
                     school_year VARCHAR(20)
+                    PRIMARY KEY (appraised_id, id_no, course_no)
                 )
             """)
             #i remove the insert to students table since it is not necessart due to extra record only
@@ -200,20 +207,15 @@ class DatabaseHandler:
                 self.cursor.execute(f"""
                     INSERT INTO {table_name} (
                         appraised_id, id_no, last_name, first_name, middle_name,
-                        year, sex, age, email_address,
+                        year, sex, age, birthday, contact_number,email_address, address, parent_guardian,
                         course_no, descriptive_title, year_level, units, lec, lab, prerequisite, grades, school_year
                     )
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                """, (
-                    appraised_id,
-                    id_no, 
-                    last_name,
-                    first_name,
-                    middle_name,
-                    year,
-                    sex,
-                    age,
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, (appraised_id, id_no, last_name, first_name, middle_name, year, sex, age, birthday,
+                    contact_number if not pd.isna(contact_number) else '',
                     email_address,
+                    address if not pd.isna(address) else '',
+                    parent_guardian if not pd.isna(parent_guardian) else '',
                     row['Course_No'] if not pd.isna(row['Course_No']) else '', 
                     row['Descriptive_Title'] if not pd.isna(row['Descriptive_Title']) else '', 
                     row['Year_Level'] if not pd.isna(row['Year_Level']) else '', 
@@ -221,9 +223,7 @@ class DatabaseHandler:
                     row['Lec'] if not pd.isna(row['Lec']) else 0, 
                     row['Lab'] if not pd.isna(row['Lab']) else 0,
                     row['Prerequisite'] if not pd.isna(row['Prerequisite']) else '',
-                    row['Grades'] if not pd.isna(row['Grades']) else 0,
-                    school_year
-                ))
+                    row['Grades'] if not pd.isna(row['Grades']) else 0, school_year))
 
             self.conn.commit()
             messagebox.showinfo("Success", "Appraised data saved to the database successfully!")
@@ -273,7 +273,11 @@ class DatabaseHandler:
                 ac.year, 
                 ac.age, 
                 ac.sex, 
+                ac.birthday,
+                ac.contact_number,
                 ac.email_address,
+                ac.address,
+                ac.parent_guardian,
                 ac.course_no, 
                 ac.descriptive_title, 
                 ac.year_level, 

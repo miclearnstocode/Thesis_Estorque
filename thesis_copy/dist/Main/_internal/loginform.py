@@ -40,15 +40,10 @@ class LoginForm(ctk.CTkFrame):
         frame_holder.lift()
 
         # Define frame dimensions and position
-        frame_width = 400  
-        frame_height = 500 
-        frame_x = 470
-        frame_y = 170
-
-        # Create main frame
-        self.frame = ctk.CTkFrame(master, width=frame_width, height=frame_height, fg_color="white", corner_radius=90, border_width=0, border_color="black" )
-        self.frame.place(x=frame_x, y=frame_y)
-        self.frame.configure(border_color="#E0E0E0", border_width=1)
+        screen_width = self.master.winfo_screenwidth()
+        screen_height = self.master.winfo_screenheight()
+        frame_x = int(screen_width / 2)
+        frame_y = int(screen_height / 2)
         
         # Load and resize the CSD logo
         self.nami_image = Image.open(self.resource_path("Image/CSD.jpg"))
@@ -69,9 +64,10 @@ class LoginForm(ctk.CTkFrame):
         self.capsu_logo_label.place(x=self.master.winfo_screenwidth() - capsu_width - 20, y=20)
 
         # Create a container frame
-        self.container = ctk.CTkFrame(self.frame, fg_color="transparent", corner_radius=90)
-        self.container.place(relx=0.5, rely=0.5, relwidth=0.95, relheight=0.95, anchor="center")
-
+        self.container = ctk.CTkFrame(self.master, width=400, height=500, fg_color="white", corner_radius=15, border_width=0, border_color="black" )
+        self.container.place(x=frame_x, y=frame_y, anchor="center")
+        self.container.pack_propagate(False)
+        self.container.grid_propagate(False)
         # Create login widgets
         self.create_login_widgets()
     @staticmethod  

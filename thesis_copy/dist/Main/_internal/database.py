@@ -428,18 +428,28 @@ class DatabaseHandler:
         
     def insert_students(self, table_name, data):
         try:
-            # Insert data
+            # --- Add phone number validation here ---
+            for row in data:
+                phone = str(row.get('PHONE_NUMBER', '')).strip()
+                phone_digits = ''.join(filter(str.isdigit, phone))
+                if len(phone_digits) > 10:
+                    messagebox.showerror("Validation Error", f"Phone number '{phone}' exceeds 10 digits.")
+                    return  # Stop the insert if any phone number is invalid
+                row['PHONE_NUMBER'] = phone_digits  # Save only digits
+
             insert_query = """
                 INSERT INTO student_information (
                     ID_NO, LAST_NAME, FIRST_NAME, MIDDLE_NAME,
-                    YR, AGE, SEX, EMAIL_ADDRESS, SHS, ADDRESS, ENROLLED_YEAR
-                ) VALUES (%(ID_NO)s, %(LAST_NAME)s, %(FIRST_NAME)s, %(MIDDLE_NAME)s,
-                        %(YR)s, %(AGE)s, %(SEX)s, %(EMAIL_ADDRESS)s, %(SHS)s, 
-                        %(ADDRESS)s, %(ENROLLED_YEAR)s)
+                    YR, AGE, BIRTHDAY, SEX, PARENT_GUARDIAN, PHONE_NUMBER,
+                    EMAIL_ADDRESS, SHS, ADDRESS, ENROLLED_YEAR
+                ) VALUES (
+                    %(ID_NO)s, %(LAST_NAME)s, %(FIRST_NAME)s, %(MIDDLE_NAME)s,
+                    %(YR)s, %(AGE)s, %(BIRTHDAY)s, %(SEX)s, %(PARENT_GUARDIAN)s, %(PHONE_NUMBER)s,
+                    %(EMAIL_ADDRESS)s, %(SHS)s, %(ADDRESS)s, %(ENROLLED_YEAR)s
+                )
             """
             self.cursor.executemany(insert_query, data)
             self.conn.commit()
-            
         except mysql.connector.Error as err:
             messagebox.showerror("Database Error", f"Failed to insert data: {err}")
             self.conn.rollback()
@@ -454,9 +464,13 @@ class DatabaseHandler:
                 si.FIRST_NAME,
                 si.MIDDLE_NAME,
                 si.YR, 
-                si.AGE, 
+                si.AGE,
+                si.BIRTHDAY, 
                 si.SEX, 
+                si.PARENT_GUARDIAN,
+                si.PHONE_NUMBER,
                 si.EMAIL_ADDRESS,
+                si.ADDRESS,
                 cr.Course_No, 
                 cr.Descriptive_Title, 
                 cr.Year_Level, 
@@ -480,7 +494,9 @@ class DatabaseHandler:
             else:
                 # Update student name format in results
                 for result in curriculum_results:
-                    result['STUDENT_NAME'] = f"{result['LAST_NAME']}, {result['FIRST_NAME']} {result['MIDDLE_NAME']}".strip()
+                    middle = result['MIDDLE_NAME']
+                    middle_initial = f"{middle[0]}." if middle and len(middle) > 0 else ""
+                    result['STUDENT_NAME'] = f"{result['LAST_NAME']}, {result['FIRST_NAME']} {middle_initial}".strip()
                     # Remove individual name fields if not needed
                     del result['LAST_NAME']
                     del result['FIRST_NAME']
@@ -1332,7 +1348,6 @@ class DatabaseHandler:
             print(f"Error updating appraised grades: {e}")
             raise
                 
-
     def save_manual_grades(self, grading_data, year_level, school_year):
         try:
             # Map year levels to table names (now each table should have columns: ID_NO, LAST_NAME, FIRST_NAME, MIDDLE_NAME, SCHOOL_YEAR, COURSE_NO, GRADES)
@@ -2465,7 +2480,6 @@ class DatabaseHandler:
             print(f"Error retrieving columns: {err}")
             return []
                             
-
     def get_curriculum_regular(self):
         try:
             # Ensure connection is active
@@ -2565,12 +2579,46 @@ class DatabaseHandler:
         except mysql.connector.Error as err:
             print(f"{year_level} year Database error: {err}")
             return []
-
+    def get_next_semester(self, id_no):
+        """
+        Returns the next semester key (e.g., '1.2', '2.1', etc.) for a student based on their completed grades.
+        """
+        semester_order = ['1.1', '1.2', '2.1', '2.2', '3.1', '3.2', '4.1', '4.2']
+        completed = set()
+        all_grades = self.check_all_tables_for_grades(id_no)
+        for sem in semester_order:
+            if sem in all_grades and all_grades[sem]:
+                completed.add(sem)
+        # Find the last completed semester
+        last_completed = None
+        for sem in semester_order:
+            if sem in completed:
+                last_completed = sem
+        # Return the next semester in order
+        if last_completed:
+            idx = semester_order.index(last_completed)
+            if idx + 1 < len(semester_order):
+                return semester_order[idx + 1]
+            else:
+                return "Graduate"
+        else:
+            return semester_order[0]  # If none completed, start at 1.1
     def format_students(self, students):
         """
         Helper function to format student data into a list of dictionaries,
         fetching the latest enrollment STATUS from the enrollment table.
         """
+        def semester_number_to_word(semester_key):
+            """
+            Convert semester part of a key like '1.1' or '2.2' to '1st' or '2nd'.
+            """
+            if '.' in semester_key:
+                sem_part = semester_key.split('.')[1]
+                if sem_part == '1':
+                    return "1st"
+                elif sem_part == '2':
+                    return "2nd"
+            return semester_key  # fallback
         student_list = []
         for row in students:
             id_no = row[0]
@@ -2584,6 +2632,8 @@ class DatabaseHandler:
             """, (id_no,))
             status_result = self.cursor.fetchone()
             status = status_result[0] if status_result else "Not Enrolled"
+            # Get the next semester to be enrolled
+            next_semester = self.get_next_semester(id_no)
 
             student_list.append({
                 "ID_NO": id_no,
@@ -2591,37 +2641,75 @@ class DatabaseHandler:
                 "FIRST_NAME": row[2],
                 "MIDDLE_NAME": row[3] if row[3] else "",
                 "YEAR_LEVEL": row[4],
-                "ENROLLMENT_STATUS": status
+                "ENROLLMENT_STATUS": status,
+                "SEMESTER": semester_number_to_word(next_semester)
             })
         return student_list
+    
     def create_enrollment_table(self):
         create_table_query = """
             CREATE TABLE IF NOT EXISTS `enrollment` (
                 `enrollment_id` INT AUTO_INCREMENT PRIMARY KEY,
                 `ID_NO` VARCHAR(100) NOT NULL,
-                `ENROLLED_YEAR` INT NOT NULL,
                 `SCHOOL_YEAR` VARCHAR(20) NOT NULL,
                 `ENROLLMENT_DATE` DATETIME DEFAULT CURRENT_TIMESTAMP,
-                `STATUS` VARCHAR(20) DEFAULT 'Enrolled',
-                FOREIGN KEY (`ID_NO`) REFERENCES `student_information`(`ID_NO`)
-                    ON DELETE CASCADE
+                `STATUS` ENUM('Not Enrolled', 'Enrolled', 'Stopped', 'Returnee', 'Dropped') DEFAULT 'Not Enrolled',
+                FOREIGN KEY (`ID_NO`) REFERENCES `student_information`(`ID_NO`) ON DELETE CASCADE,
+                UNIQUE KEY unique_enrollment (`ID_NO`, `SCHOOL_YEAR`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
         """
         self.cursor.execute(create_table_query)
         self.conn.commit()
-
-    def save_enrollment(self, id_no, enrolled_year, school_year, status="Enrolled"):
-        insert_query = """
-            INSERT INTO `enrollment` 
-                (`ID_NO`, `ENROLLED_YEAR`, `SCHOOL_YEAR`, `ENROLLMENT_DATE`, `STATUS`)
-            VALUES (%s, %s, %s, NOW(), %s)
+        
+    def save_enrollment(self, id_no, school_year, status="Enrolled"):
+        """
+        Update the enrollment status for a student for a given school year.
+        If the record does not exist, insert it.
+        Warn on duplicate insert, but continue processing.
+        """
+        update_query = """
+            UPDATE `enrollment`
+            SET `STATUS` = %s, `ENROLLMENT_DATE` = NOW()
+            WHERE `ID_NO` = %s AND `SCHOOL_YEAR` = %s
         """
         try:
-            self.cursor.execute(insert_query, (id_no, enrolled_year, school_year, status))
+            self.cursor.execute(update_query, (status, id_no, school_year))
+            if self.cursor.rowcount == 0:
+                # Optionally insert if not exists
+                insert_query = """
+                    INSERT INTO `enrollment` (`ID_NO`, `SCHOOL_YEAR`, `ENROLLMENT_DATE`, `STATUS`)
+                    VALUES (%s, %s, NOW(), %s)
+                """
+                try:
+                    self.cursor.execute(insert_query, (id_no, school_year, status))
+                except mysql.connector.IntegrityError as err:
+                    # Warn about duplicate but do not crash
+                    #print(f"Warning: Duplicate enrollment for ID_NO {id_no} and SCHOOL_YEAR {school_year}. Skipping insert.")
+                    # Optionally, show a messagebox warning:
+                    messagebox.showwarning("Duplicate", f"Enrollment already exists for {id_no} in {school_year}.")
             self.conn.commit()
         except Exception as err:
             self.conn.rollback()
             raise
+
+    def update_enrollment_status_bulk(self, id_list, year_level, school_year, batch_size=100):
+        """
+        Set ENROLLMENT_STATUS to 'Enrolled' for all students in id_list for the given year_level and school_year.
+        """
+        if not id_list:
+            return
+        if not self.conn.is_connected():
+            self.conn.reconnect()
+        for i in range(0, len(id_list), batch_size):
+            batch = id_list[i:i+batch_size]
+            placeholders = ','.join(['%s'] * len(batch))
+            query = f"""
+                UPDATE enrollment
+                SET STATUS = 'Enrolled'
+                WHERE ID_NO IN ({placeholders})
+            """
+            self.cursor.execute(query, batch)
+        self.conn.commit()
 
 class DatabaseInitializer:
     """Class responsible for initializing database and tables"""
@@ -2658,7 +2746,10 @@ class DatabaseInitializer:
                         `MIDDLE_NAME` VARCHAR(100) NOT NULL,
                         `YR` VARCHAR(100) NOT NULL,
                         `AGE` VARCHAR(100) NOT NULL,
+                        `BIRTHDAY` DATE,
                         `SEX` CHAR(25) NOT NULL,
+                        `PARENT_GUARDIAN` VARCHAR(150),
+                        `PHONE_NUMBER` VARCHAR(10),
                         `EMAIL_ADDRESS` VARCHAR(100) NOT NULL,
                         `SHS` VARCHAR(100) NOT NULL,
                         `ADDRESS` VARCHAR(100) NOT NULL,

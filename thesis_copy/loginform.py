@@ -1,9 +1,11 @@
+from tkinter import messagebox
 import customtkinter as ctk
 from CTkMessagebox import CTkMessagebox
 import hashlib, os, re
 from database import DatabaseHandler
 from PIL import Image
 import sys, os
+from time import time
 class LoginForm(ctk.CTkFrame):
     def __init__(self, master, login_success_callback=None, admin_login_callback=None):
         super().__init__(master)
@@ -11,7 +13,8 @@ class LoginForm(ctk.CTkFrame):
         
         # Database Handler
         self.db_handler = DatabaseHandler()
-        
+        self.failed_attempts = []
+        self.lockout_until = 0  # timestamp when user can try again
         # Login success callback
         self.login_success_callback = login_success_callback
         self.admin_login_callback = admin_login_callback
@@ -98,6 +101,7 @@ class LoginForm(ctk.CTkFrame):
         self.email_entry = ctk.CTkEntry(self.container, width=280, height=40, placeholder_text="Enter your email", corner_radius=30)
         self.email_entry.pack(fill="x", padx=20, pady=(0, 10))
         self.email_entry.bind("<Return>", lambda event: self.focus_next_widget())
+        self.email_entry.bind("<KeyRelease>", self.auto_complete_gmail)
 
         # Password entry
         password_label = ctk.CTkLabel(self.container, text="Password", font=ctk.CTkFont(size=14))
@@ -126,7 +130,16 @@ class LoginForm(ctk.CTkFrame):
         register_link = ctk.CTkLabel(self.container, text="Register", font=ctk.CTkFont(size=12, underline=True), text_color="blue", cursor="hand2")
         register_link.place(x=221, y=431)
         register_link.bind("<Button-1>", self.open_registration)
-        
+        self.timer_label = ctk.CTkLabel(self.container, text="", text_color="red")
+        self.timer_label.pack(pady=(10, 0))
+
+    def auto_complete_gmail(self, event):
+        """Automatically complete the email domain when typing in the email entry"""
+        current_text = self.email_entry.get()
+        if current_text.endswith("@") and current_text.count("@") == 1:
+            self.email_entry.insert("end", "gmail.com")
+            self.email_entry.icursor("end")
+
     def focus_next_widget(self):
         """Move focus to password entry when Enter is pressed in email entry"""
         self.password_entry.focus_set()
@@ -149,12 +162,16 @@ class LoginForm(ctk.CTkFrame):
         return hashed_password, salt
 
     def validate_login(self):
+        current_time = time()
         # Clear any previous error message
         self.error_label.configure(text="")
         
         email = self.email_entry.get().strip()
         password = self.password_entry.get()
-
+        if current_time < self.lockout_until:
+            wait_time = int(self.lockout_until - current_time)
+            self.error_label.configure(text=f"Too many failed attempts. Please try again in {wait_time} seconds.")
+            return
         if not email or not password:
             self.error_label.configure(text="Please enter both email and password")
             return
@@ -182,10 +199,7 @@ class LoginForm(ctk.CTkFrame):
                         return
 
                     # Update last_login timestamp
-                    self.db_handler.cursor.execute(
-                        "UPDATE admin_management SET last_login = NOW() WHERE id = %s",
-                        (user_data['id'],)
-                    )
+                    self.db_handler.cursor.execute("UPDATE admin_management SET last_login = NOW() WHERE id = %s", (user_data['id'],))
                     self.db_handler.conn.commit()
                     # Success case
                     self.error_label.configure(text="Login Successful!", text_color="green")
@@ -200,7 +214,45 @@ class LoginForm(ctk.CTkFrame):
         
         except Exception as e:
             self.error_label.configure(text=f"Login error: {str(e)}")
-
+        email = self.email_entry.get().strip()
+        password = self.password_entry.get()
+        if self.is_login_valid(email, password):
+            # Reset failed attempts if login is valid
+            self.failed_attempts.clear()
+            self.lockout_until = 0
+            self.login_success_callback()
+        else:
+            self.failed_attempts.append(current_time)
+            self.failed_attempts = [t for t in self.failed_attempts if current_time - t < 60]  # Keep only last 60 seconds
+            if len(self.failed_attempts) >= 5:
+                self.lockout_until = current_time + 900 # 15 minutes
+                messagebox.showerror("Login Failed", "Too many failed attempts locked for 15 minutes. Please try again later.")
+                self.start_countdown(self.lockout_until)  # Start countdown for 15 minutes
+            else:
+                remaining = 5 - len(self.failed_attempts)
+                self.error_label.configure(text=f"Invalid email or password. {remaining} attempts remaining.")
+    def is_login_valid(self, email, password):
+        """Check if the provided email and password are valid"""
+        try:
+            user_data = self.db_handler.get_user_by_email(email)
+            if user_data:
+                hashed_password, _ = self.hash_password(password, user_data['salt'])
+                return hashed_password == user_data['password']
+            return False
+        except Exception as e:
+            print(f"Error validating login: {e}")
+            return False
+    
+    def start_countdown(self, seconds_left):
+        if seconds_left > 0:
+            mins, secs = divmod(seconds_left, 60)
+            time_str = f"Locked out: {mins:02}:{secs:02} remaining"
+            self.timer_label.configure(text=time_str)
+            # Schedule the next update after 1 second
+            self.after(1000, self.start_countdown, seconds_left - 1)
+        else:
+            self.timer_label.configure(text="You can try logging in again.")
+            self.lockout_until = 0  # unlock
 
     def open_registration(self, event=None):
         if hasattr(self, 'form_frame') and self.form_frame.winfo_exists():

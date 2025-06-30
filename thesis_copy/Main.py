@@ -18,7 +18,7 @@ from tkinter import messagebox
 class Application(ctk.CTk):
     def __init__(self):
         super().__init__()
-        self.title("BS Computer Science")
+        self.title("ComputerScience Application")
         #self.show_splash_screen()
         # Create and start the server in a separate thread
         self.server = Peer()  # Create the server instance

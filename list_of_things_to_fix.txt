@@ -1,0 +1,79 @@
+sa irreg ma add ko field bday, contact number, birthday = working on it
+madugang pa gid status if ma enroll sa
+kayuhon ang pag pag update sang unerolled to enrolled kay wala may ga update
+// madugang pa gid ang pag update sang enrolled to graduated
+// madugang pa gid ang pag update sang graduated to alumni
+ma update to sa archive ka stop kag graduated student 
+ang loginform kun mag type ka gmail atumatic ma sugpon kun mag type ka @gmail.com = done
+Use rate limiting and account lockout after failed attempts.
+tapos ang security dasun nga di maka login special character
+tapos sa admin screen panamion ang ui kag display didto add mga statuses
+or pwd nga status bar 
+SET PASSWORD FOR 'root'@'localhost' = PASSWORD('BSCS@2024!'); xampp
+this is the update for the curriculum when new curriculum enter
+ALTER TABLE curriculum_regular ADD curriculum_id INT, ADD FOREIGN KEY (curriculum_id) REFERENCES curriculum_version(curriculum_id);
+ALTER TABLE student_information ADD curriculum_id INT, ADD FOREIGN KEY (curriculum_id) REFERENCES curriculum_version(curriculum_id);
+
+✅ Option 1: Save lockout data in a JSON file
+📦 1. Create a file to store lockout info
+Save lockout_until in lockout.json:
+
+python
+Copy code
+import json
+import os
+from time import time
+
+LOCKOUT_FILE = "lockout.json"
+💾 2. Function to save lockout time
+python
+Copy code
+def save_lockout_time(self):
+    with open(LOCKOUT_FILE, "w") as file:
+        json.dump({"lockout_until": self.lockout_until}, file)
+📖 3. Function to load lockout time
+Call this in your __init__ method:
+
+python
+Copy code
+def load_lockout_time(self):
+    if os.path.exists(LOCKOUT_FILE):
+        with open(LOCKOUT_FILE, "r") as file:
+            data = json.load(file)
+            self.lockout_until = data.get("lockout_until", 0)
+    else:
+        self.lockout_until = 0
+🧪 4. Update your lockout logic
+In your validate_login() when user is locked out:
+
+python
+Copy code
+if len(self.failed_attempts) >= 5:
+    self.lockout_until = time() + 900  # 15 mins
+    self.save_lockout_time()
+    self.show_error("Too many failed attempts. Locked out for 15 minutes.")
+    self.start_countdown(900)
+And when user is allowed again:
+
+python
+Copy code
+# reset file (optional)
+if os.path.exists(LOCKOUT_FILE):
+    os.remove(LOCKOUT_FILE)
+🔁 5. Call load_lockout_time() on app startup
+In your __init__():
+
+python
+Copy code
+self.failed_attempts = []
+self.load_lockout_time()
+
+# If still locked out, show countdown
+from time import time
+if time() < self.lockout_until:
+    seconds_left = int(self.lockout_until - time())
+    self.start_countdown(seconds_left)
+✅ Done!
+This way, the lockout persists even if the app is closed, and users can't bypass the limit by restarting.
+
+Let me know if you want to extend this to per-user lockouts (e.g. one JSON entry per email).
