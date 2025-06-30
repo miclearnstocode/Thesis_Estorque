@@ -85,86 +85,98 @@ class DatabaseHandler:
                 self.conn.close()
 
     # ini sa pag add student           
-    def saving_student(self, last_name, first_name, middle_name, data, enrolled_year, bday, to_be_enrolled_years, table_name=None):
+    def saving_student_data(self, data):
+        import mysql.connector
+
+        if not data:
+            messagebox.showerror("Error", "No student data provided.")
+            return
+
         try:
-            # Ensure the student_information table exists with the correct structure
-            create_table_query = """
-                CREATE TABLE IF NOT EXISTS student_information (
-                    ID_NO VARCHAR(255) PRIMARY KEY,
-                    LAST_NAME VARCHAR(100) NOT NULL,
-                    FIRST_NAME VARCHAR(100) NOT NULL,
-                    MIDDLE_NAME VARCHAR(100),
-                    YR VARCHAR(255),
-                    AGE INT,
-                    BDAY DATE,
-                    SEX CHAR(25),
-                    EMAIL_ADDRESS VARCHAR(255),
-                    SHS VARCHAR(255),
-                    ADDRESS VARCHAR(255),
-                    ENROLLED_YEAR YEAR,
-                    TO_BE_ENROLLED_YEAR VARCHAR(255) DEFAULT NULL
-                )
-            """
-            self.cursor.execute(create_table_query)
+            if not self.conn.is_connected():
+                raise mysql.connector.Error("Database connection lost.")
+            
+            self.cursor = self.conn.cursor()
 
-            # Generate a default academic year if none is provided
-            if not to_be_enrolled_years:
-                current_year = datetime.now().year
-                to_be_enrolled_years = f"{current_year}-{current_year + 1}"  # Example: "2025-2026"
+            # Helper to get curriculum_id based on ENROLLED_YEAR
+            def get_curriculum_id_for_year(enrolled_year):
+                self.cursor.execute("""SELECT curriculum_id FROM curriculum_version WHERE effective_sy <= %s ORDER BY effective_sy DESC
+                    LIMIT 1
+                """, (enrolled_year,))
+                result = self.cursor.fetchone()
+                return result[0] if result else None
 
-            # Process the student data
             processed_data = []
             for row in data:
+                # Split full name into LAST, FIRST, MIDDLE (adjust if you're already handling this)
+                full_name = row[1]
+                parts = full_name.strip().split(",")
+                last_name = parts[0].strip()
+                first_middle = parts[1].strip().split(" ")
+                first_name = first_middle[0]
+                middle_name = " ".join(first_middle[1:]) if len(first_middle) > 1 else ""
+
+                # Date conversion for BIRTHDAY
+                try:
+                    bday = pd.to_datetime(row[6], errors='coerce').date()
+                except:
+                    bday = None
+
+                # Determine enrolled year (convert to format like '2025-2026')
+                enrolled_year = row[12]
+                to_be_enrolled_years = row[13] if len(row) > 13 else None
+
+                curriculum_id = get_curriculum_id_for_year(enrolled_year)
+
                 processed_row = (
-                    row[0],        # ID_NO
-                    last_name,     # LAST_NAME
-                    first_name,    # FIRST_NAME
-                    middle_name,   # MIDDLE_NAME
-                    row[2],        # YR
-                    row[3],        # AGE
-                    bday,          # BDAY from the function parameter
-                    row[4],        # SEX
-                    row[5],        # EMAIL_ADDRESS
-                    row[6],        # SHS
-                    row[7],        # ADDRESS
-                    enrolled_year, # ENROLLED_YEAR from selection
-                    to_be_enrolled_years  # Ensure a value is always inserted
-                )
+                    row[0],         # ID_NO
+                    last_name,      # LAST_NAME
+                    first_name,     # FIRST_NAME
+                    middle_name,    # MIDDLE_NAME
+                    row[2],         # YR
+                    row[3],         # AGE
+                    bday,           # BIRTHDAY
+                    row[4],         # SEX
+                    row[5],         # PARENT_GUARDIAN
+                    row[7],         # PHONE_NUMBER
+                    row[8],         # EMAIL_ADDRESS
+                    row[9],         # SHS
+                    row[10],        # ADDRESS
+                    enrolled_year,  # ENROLLED_YEAR
+                    to_be_enrolled_years,
+                    curriculum_id )
                 processed_data.append(processed_row)
 
-            # Check if the student already exists to prevent duplicates
+            # INSERT or UPDATE each student
             for row in processed_data:
-                id_no = row[0]
-                self.cursor.execute("SELECT COUNT(*) FROM student_information WHERE ID_NO = %s", (id_no,))
-                exists = self.cursor.fetchone()[0]
-
-                if exists:
-                    # Update existing student record
-                    update_query = """
-                        UPDATE student_information
-                        SET LAST_NAME = %s, FIRST_NAME = %s, MIDDLE_NAME = %s,
-                            YR = %s, AGE = %s, BDAY = %s, SEX = %s, EMAIL_ADDRESS = %s, 
-                            SHS = %s, ADDRESS = %s, ENROLLED_YEAR = %s, TO_BE_ENROLLED_YEAR = %s
-                        WHERE ID_NO = %s
+                self.cursor.execute("SELECT COUNT(*) FROM student_information WHERE ID_NO = %s", (row[0],))
+                if self.cursor.fetchone()[0] > 0:
+                    update_query = """UPDATE student_information
+                        SET LAST_NAME=%s, FIRST_NAME=%s, MIDDLE_NAME=%s, YR=%s, AGE=%s, BDAY=%s, 
+                            SEX=%s, PARENT_GUARDIAN=%s, PHONE_NUMBER=%s, EMAIL_ADDRESS=%s, SHS=%s,
+                            ADDRESS=%s, ENROLLED_YEAR=%s, TO_BE_ENROLLED_YEAR=%s, curriculum_id=%s
+                        WHERE ID_NO=%s
                     """
-                    self.cursor.execute(update_query, (*row[1:], id_no))
+                    self.cursor.execute(update_query, (*row[1:], row[0]))
                 else:
-                    # Insert new student record
-                    insert_query = """
-                        INSERT INTO student_information (
-                            ID_NO, LAST_NAME, FIRST_NAME, MIDDLE_NAME, YR, AGE, BDAY, SEX, 
-                            EMAIL_ADDRESS, SHS, ADDRESS, ENROLLED_YEAR, TO_BE_ENROLLED_YEAR
-                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    insert_query = """INSERT INTO student_information (
+                            ID_NO, LAST_NAME, FIRST_NAME, MIDDLE_NAME, YR, AGE, BDAY, SEX,
+                            PARENT_GUARDIAN, PHONE_NUMBER, EMAIL_ADDRESS, SHS, ADDRESS,
+                            ENROLLED_YEAR, TO_BE_ENROLLED_YEAR, curriculum_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     """
                     self.cursor.execute(insert_query, row)
 
-            # Commit changes
             self.conn.commit()
-            messagebox.showinfo("Success", "Student information saved successfully.")
+            messagebox.showinfo("Success", "Student data saved successfully!")
 
         except mysql.connector.Error as err:
-            messagebox.showerror("Database Error", f"Failed to save data: {err}")
-            self.conn.rollback()
+            if self.conn.is_connected():
+                self.conn.rollback()
+            messagebox.showerror("Database Error", f"{err}")
+        finally:
+            if self.conn.is_connected():
+                self.cursor.close()
+                self.conn.close()
 
     # ni hu sa appraised curriculum
     def save_appraised_data(self, appraised_id, id_no, last_name, first_name, middle_name, year, sex, age, birthday, contact_number ,email_address, address, parent_guardian,matched_subjects, school_year):
