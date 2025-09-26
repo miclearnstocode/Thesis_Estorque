@@ -43,12 +43,7 @@ class CurriculumScreen(ctk.CTkFrame):
 
     def create_widgets(self):
         # Button style configuration
-        button_style = {
-            "fg_color": "transparent",    
-            "hover_color": "#707070",     
-            "text_color": "black",        
-            "height": 32,                 
-            "border_width": 1,            
+        button_style = {"fg_color": "transparent", "hover_color": "#707070", "text_color": "black", "height": 32, "border_width": 1,            
             "border_color": "black"}
 
         # Additional style for regular buttons
@@ -71,23 +66,12 @@ class CurriculumScreen(ctk.CTkFrame):
         self.school_year_combo.pack(side=tk.LEFT, padx=10)
         csv_icon = Image.open(LoginForm.resource_path("icons/csv_format.png")) 
         self.csv_icon = ctk.CTkImage(light_image=csv_icon, dark_image=csv_icon, size=(30, 30))
-                # Add buttons
-        existing_curriculum_button = ctk.CTkButton(
-            import_frame, 
-            text="Existing Curriculum", 
-            image=self.csv_icon, 
-            command=functools.partial(self.load_and_process_file, "Existing Curriculum (CSV)"),
-            **regular_button_style
-        )
+        # Add buttons
+        existing_curriculum_button = ctk.CTkButton(import_frame, text="Existing Curriculum", image=self.csv_icon, command=functools.partial(self.load_and_process_file, "Existing Curriculum (CSV)"), **regular_button_style)
         existing_curriculum_button.pack(side=tk.LEFT, padx=5)
 
-        new_curriculum_button = ctk.CTkButton(
-            import_frame, 
-            text="New Curriculum", 
-            image=self.csv_icon, 
-            command=functools.partial(self.load_and_process_file, "New Curriculum (CSV)"),
-            **regular_button_style
-        )
+        new_curriculum_button = ctk.CTkButton(import_frame, text="New Curriculum", image=self.csv_icon, 
+            command=functools.partial(self.load_and_process_file, "New Curriculum (CSV)"), **regular_button_style)
         new_curriculum_button.pack(side=tk.LEFT, padx=5)
 
         # Add tooltips
@@ -101,8 +85,7 @@ class CurriculumScreen(ctk.CTkFrame):
         # Modified Treeview columns to include Prerequisite before Grades
         self.tree = ttk.Treeview(self, columns=(
             "Course_No", "Descriptive_Title", "Year_Level", 
-            "Units", "Lec", "Lab", "Prerequisite", "Grades", "SY_Revision"
-        ), show="headings")
+            "Units", "Lec", "Lab", "Prerequisite", "Grades", "SY_Revision"), show="headings")
         
         # Set headings
         self.tree.heading("Course_No", text="Course No")
@@ -163,19 +146,10 @@ class CurriculumScreen(ctk.CTkFrame):
                 self.raw_data['Lab'] = pd.to_numeric(self.raw_data['Lab'], errors='coerce')
 
                 # Predefined order of year levels
-                year_level_order = [
-                    1.1, 1.2, 
-                    2.1, 2.2, 
-                    3.1, 3.2, 
-                    4.1, 4.2
-                ]
+                year_level_order = [1.1, 1.2,  2.1, 2.2,  3.1, 3.2, 4.1, 4.2]
 
                 # Create a categorical column with the predefined order
-                self.raw_data['Year_Level_Ordered'] = pd.Categorical(
-                    self.raw_data['Year_Level'], 
-                    categories=year_level_order, 
-                    ordered=True
-                )
+                self.raw_data['Year_Level_Ordered'] = pd.Categorical(self.raw_data['Year_Level'],  categories=year_level_order, ordered=True)
 
                 # Sort the data using the new categorical column
                 grouped_data = self.raw_data.sort_values('Year_Level_Ordered')
@@ -219,14 +193,7 @@ class CurriculumScreen(ctk.CTkFrame):
                             total_lab = year_level_data['Lab'].sum()
 
                             # Insert total row
-                            self.tree.insert("", "end", values=("",
-                                "Total", 
-                                "", 
-                                total_units, 
-                                total_lec, 
-                                total_lab, 
-                                "", "", ""
-                            ), tags=('total_row',))
+                            self.tree.insert("", "end", values=("","Total", "", total_units, total_lec, total_lab, "", "", ""), tags=('total_row',))
 
                             # Add spacing rows
                             for _ in range(2):
@@ -243,17 +210,9 @@ class CurriculumScreen(ctk.CTkFrame):
                     tag = 'oddrow' if index % 2 == 0 else 'evenrow'
 
                     # Insert the actual data row
-                    self.tree.insert("", "end", values=(
-                        row['Course_No'],
-                        row['Descriptive_Title'],
-                        row['Year_Level'],
-                        row['Units'],
-                        row['Lec'],
-                        row['Lab'],
-                        row['Prerequisite'],
-                        row.get('Grades', ''),
-                        row['SY_Revision']
-                    ), tags=(tag,))
+                    self.tree.insert("", "end", values=(row['Course_No'],row['Descriptive_Title'], row['Year_Level'],
+                        row['Units'],row['Lec'],row['Lab'],
+                        row['Prerequisite'],row.get('Grades', ''),row['SY_Revision']), tags=(tag,))
 
                 # Add total row for the last year level
                 if current_year_level is not None:
@@ -263,14 +222,7 @@ class CurriculumScreen(ctk.CTkFrame):
                     total_lab = year_level_data['Lab'].sum()
 
                     # Insert final total row
-                    self.tree.insert("", "end", values=( 
-                        "Total Units, Lec, Lab Hours", 
-                        "", 
-                        total_units, 
-                        total_lec, 
-                        total_lab, 
-                        "", "", ""
-                    ), tags=('total_row',))
+                    self.tree.insert("", "end", values=( "Total Units, Lec, Lab Hours", "", total_units, total_lec, total_lab,  "", "", ""), tags=('total_row',))
 
                 # Enable the Save button now that the data is loaded
                 self.save_button.configure(state="normal")
@@ -291,7 +243,8 @@ class CurriculumScreen(ctk.CTkFrame):
                 messagebox.showerror("Error", f"An error occurred: {e}")
         else:
             messagebox.showerror("Error", "No data to save")
-            
+
+
 class CTkToolTip:
     def __init__(self, widget, text):
         self.widget = widget

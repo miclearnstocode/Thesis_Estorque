@@ -31,141 +31,155 @@ class DatabaseHandler:
         self.conn.close()
     
     def saving_curriculum_data(self, processed_data):
-        # Check if the DataFrame is empty
+        import mysql.connector
+
         if processed_data.empty:
             messagebox.showerror("Error", "No data to save!")
-            return  # Exit the function if there's no data
-
-        query = """INSERT INTO curriculum_regular 
-                (Course_No, Descriptive_Title, Year_Level, Units, Lab, Lec, Prerequisite, Grades, sy_revision)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"""
+            return
 
         try:
-            # Print processed data for debugging purposes
-            print("Processed data:")
-            print(processed_data.head())  # Print the first few rows
+            effective_sy = processed_data['SY_Revision'].iloc[0]
+            curriculum_name = f"Curriculum {effective_sy}"  # Optional: replace with GUI input if needed
 
-            # Convert DataFrame to list of tuples, replacing NaN values with None for all relevant fields
-            values = [
-                (
-                    row.Course_No,
-                    row.Descriptive_Title,
-                    row.Year_Level,
+            if not self.conn.is_connected():
+                raise mysql.connector.Error("Database connection lost.")
+
+            cursor = self.conn.cursor()
+
+            # Step 1: Check if curriculum_version exists by effective_sy
+            cursor.execute("SELECT curriculum_id FROM curriculum_version WHERE effective_sy = %s", (effective_sy,))
+            result = cursor.fetchone()
+
+            if result:
+                curriculum_id = result[0]
+            else:
+                cursor.execute("INSERT INTO curriculum_version (effective_sy, name) VALUES (%s, %s)", (effective_sy, curriculum_name))
+                curriculum_id = cursor.lastrowid
+
+            # Step 2: Insert into curriculum_regular
+            query = """INSERT INTO curriculum_regular 
+                (Course_No, Descriptive_Title, Year_Level, Units, Lab, Lec, Prerequisite, Grades, sy_revision, curriculum_id)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"""
+
+            values = [(row.Course_No, row.Descriptive_Title, row.Year_Level,
                     '' if pd.isna(row.Units) else row.Units,
                     '' if pd.isna(row.Lab) else row.Lab,
                     '' if pd.isna(row.Lec) else row.Lec,
                     '' if pd.isna(row.Prerequisite) else row.Prerequisite,
                     '' if pd.isna(row.Grades) else row.Grades,
-                    '' if pd.isna(row.SY_Revision) else row.SY_Revision  # Fixed column name
-                )   
-                for _, row in processed_data.iterrows()
-            ]
+                    effective_sy, curriculum_id) for _, row in processed_data.iterrows()]
 
-            # Ensure the database connection is open
-            if self.conn.is_connected():
-                self.cursor.executemany(query, values)
-                self.conn.commit()
-                messagebox.showinfo("Success", "Data saved successfully!")
-            else:
-                raise mysql.connector.Error("Database connection lost.")
+            cursor.executemany(query, values)
+            self.conn.commit()
+            messagebox.showinfo("Success", "Curriculum data saved successfully!")
 
         except mysql.connector.Error as err:
-            # Rollback in case of error and display error message
             print("Error encountered:", err)
             if self.conn.is_connected():
                 self.conn.rollback()
-            messagebox.showerror("Error", f"Error saving data to database: {err}")
+            messagebox.showerror("Error", f"Database error: {err}")
 
         finally:
-            # Close the cursor and connection only if connected
+            if self.conn.is_connected():
+                cursor.close()
+                self.conn.close()
+
+    # ini sa pag add student           
+    def saving_student_data(self, data):
+        import mysql.connector
+
+        if not data:
+            messagebox.showerror("Error", "No student data provided.")
+            return
+
+        try:
+            if not self.conn.is_connected():
+                raise mysql.connector.Error("Database connection lost.")
+            
+            self.cursor = self.conn.cursor()
+
+            # Helper to get curriculum_id based on ENROLLED_YEAR
+            def get_curriculum_id_for_year(enrolled_year):
+                self.cursor.execute("""SELECT curriculum_id FROM curriculum_version WHERE effective_sy <= %s ORDER BY effective_sy DESC
+                    LIMIT 1
+                """, (enrolled_year,))
+                result = self.cursor.fetchone()
+                return result[0] if result else None
+
+            processed_data = []
+            for row in data:
+                # Split full name into LAST, FIRST, MIDDLE (adjust if you're already handling this)
+                full_name = row[1]
+                parts = full_name.strip().split(",")
+                last_name = parts[0].strip()
+                first_middle = parts[1].strip().split(" ")
+                first_name = first_middle[0]
+                middle_name = " ".join(first_middle[1:]) if len(first_middle) > 1 else ""
+
+                # Date conversion for BIRTHDAY
+                try:
+                    bday = pd.to_datetime(row[6], errors='coerce').date()
+                except:
+                    bday = None
+
+                # Determine enrolled year (convert to format like '2025-2026')
+                enrolled_year = row[12]
+                to_be_enrolled_years = row[13] if len(row) > 13 else None
+
+                curriculum_id = get_curriculum_id_for_year(enrolled_year)
+
+                processed_row = (
+                    row[0],         # ID_NO
+                    last_name,      # LAST_NAME
+                    first_name,     # FIRST_NAME
+                    middle_name,    # MIDDLE_NAME
+                    row[2],         # YR
+                    row[3],         # AGE
+                    bday,           # BIRTHDAY
+                    row[4],         # SEX
+                    row[5],         # PARENT_GUARDIAN
+                    row[7],         # PHONE_NUMBER
+                    row[8],         # EMAIL_ADDRESS
+                    row[9],         # SHS
+                    row[10],        # ADDRESS
+                    enrolled_year,  # ENROLLED_YEAR
+                    to_be_enrolled_years,
+                    curriculum_id )
+                processed_data.append(processed_row)
+
+            # INSERT or UPDATE each student
+            for row in processed_data:
+                self.cursor.execute("SELECT COUNT(*) FROM student_information WHERE ID_NO = %s", (row[0],))
+                if self.cursor.fetchone()[0] > 0:
+                    update_query = """UPDATE student_information
+                        SET LAST_NAME=%s, FIRST_NAME=%s, MIDDLE_NAME=%s, YR=%s, AGE=%s, BDAY=%s, 
+                            SEX=%s, PARENT_GUARDIAN=%s, PHONE_NUMBER=%s, EMAIL_ADDRESS=%s, SHS=%s,
+                            ADDRESS=%s, ENROLLED_YEAR=%s, TO_BE_ENROLLED_YEAR=%s, curriculum_id=%s
+                        WHERE ID_NO=%s
+                    """
+                    self.cursor.execute(update_query, (*row[1:], row[0]))
+                else:
+                    insert_query = """INSERT INTO student_information (
+                            ID_NO, LAST_NAME, FIRST_NAME, MIDDLE_NAME, YR, AGE, BDAY, SEX,
+                            PARENT_GUARDIAN, PHONE_NUMBER, EMAIL_ADDRESS, SHS, ADDRESS,
+                            ENROLLED_YEAR, TO_BE_ENROLLED_YEAR, curriculum_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    """
+                    self.cursor.execute(insert_query, row)
+
+            self.conn.commit()
+            messagebox.showinfo("Success", "Student data saved successfully!")
+
+        except mysql.connector.Error as err:
+            if self.conn.is_connected():
+                self.conn.rollback()
+            messagebox.showerror("Database Error", f"{err}")
+        finally:
             if self.conn.is_connected():
                 self.cursor.close()
                 self.conn.close()
 
-    # ini sa pag add student           
-    def saving_student(self, last_name, first_name, middle_name, data, enrolled_year, bday, to_be_enrolled_years, table_name=None):
-        try:
-            # Ensure the student_information table exists with the correct structure
-            create_table_query = """
-                CREATE TABLE IF NOT EXISTS student_information (
-                    ID_NO VARCHAR(255) PRIMARY KEY,
-                    LAST_NAME VARCHAR(100) NOT NULL,
-                    FIRST_NAME VARCHAR(100) NOT NULL,
-                    MIDDLE_NAME VARCHAR(100),
-                    YR VARCHAR(255),
-                    AGE INT,
-                    BDAY DATE,
-                    SEX CHAR(25),
-                    EMAIL_ADDRESS VARCHAR(255),
-                    SHS VARCHAR(255),
-                    ADDRESS VARCHAR(255),
-                    ENROLLED_YEAR YEAR,
-                    TO_BE_ENROLLED_YEAR VARCHAR(255) DEFAULT NULL
-                )
-            """
-            self.cursor.execute(create_table_query)
-
-            # Generate a default academic year if none is provided
-            if not to_be_enrolled_years:
-                current_year = datetime.now().year
-                to_be_enrolled_years = f"{current_year}-{current_year + 1}"  # Example: "2025-2026"
-
-            # Process the student data
-            processed_data = []
-            for row in data:
-                processed_row = (
-                    row[0],        # ID_NO
-                    last_name,     # LAST_NAME
-                    first_name,    # FIRST_NAME
-                    middle_name,   # MIDDLE_NAME
-                    row[2],        # YR
-                    row[3],        # AGE
-                    bday,          # BDAY from the function parameter
-                    row[4],        # SEX
-                    row[5],        # EMAIL_ADDRESS
-                    row[6],        # SHS
-                    row[7],        # ADDRESS
-                    enrolled_year, # ENROLLED_YEAR from selection
-                    to_be_enrolled_years  # Ensure a value is always inserted
-                )
-                processed_data.append(processed_row)
-
-            # Check if the student already exists to prevent duplicates
-            for row in processed_data:
-                id_no = row[0]
-                self.cursor.execute("SELECT COUNT(*) FROM student_information WHERE ID_NO = %s", (id_no,))
-                exists = self.cursor.fetchone()[0]
-
-                if exists:
-                    # Update existing student record
-                    update_query = """
-                        UPDATE student_information
-                        SET LAST_NAME = %s, FIRST_NAME = %s, MIDDLE_NAME = %s,
-                            YR = %s, AGE = %s, BDAY = %s, SEX = %s, EMAIL_ADDRESS = %s, 
-                            SHS = %s, ADDRESS = %s, ENROLLED_YEAR = %s, TO_BE_ENROLLED_YEAR = %s
-                        WHERE ID_NO = %s
-                    """
-                    self.cursor.execute(update_query, (*row[1:], id_no))
-                else:
-                    # Insert new student record
-                    insert_query = """
-                        INSERT INTO student_information (
-                            ID_NO, LAST_NAME, FIRST_NAME, MIDDLE_NAME, YR, AGE, BDAY, SEX, 
-                            EMAIL_ADDRESS, SHS, ADDRESS, ENROLLED_YEAR, TO_BE_ENROLLED_YEAR
-                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    """
-                    self.cursor.execute(insert_query, row)
-
-            # Commit changes
-            self.conn.commit()
-            messagebox.showinfo("Success", "Student information saved successfully.")
-
-        except mysql.connector.Error as err:
-            messagebox.showerror("Database Error", f"Failed to save data: {err}")
-            self.conn.rollback()
-
     # ni hu sa appraised curriculum
-    def save_appraised_data(self, appraised_id, id_no, last_name, first_name, middle_name, year, sex, age, email_address, matched_subjects, school_year):
+    def save_appraised_data(self, appraised_id, id_no, last_name, first_name, middle_name, year, sex, age, birthday, contact_number ,email_address, address, parent_guardian,matched_subjects, school_year):
         try:
             if not school_year:
                 raise ValueError("School year is required")
@@ -182,7 +196,11 @@ class DatabaseHandler:
                     year INT,
                     sex VARCHAR(10),
                     age INT,
+                    birthday DATE,
+                    contact_number VARCHAR(15),
                     email_address VARCHAR(100),
+                    address VARCHAR(255),
+                    parent_guardian VARCHAR(100),
                     course_no VARCHAR(100),
                     descriptive_title VARCHAR(100),
                     year_level DECIMAL(3,1),
@@ -192,6 +210,7 @@ class DatabaseHandler:
                     prerequisite VARCHAR(100),
                     grades DECIMAL(5,2),
                     school_year VARCHAR(20)
+                    PRIMARY KEY (appraised_id, id_no, course_no)
                 )
             """)
             #i remove the insert to students table since it is not necessart due to extra record only
@@ -200,20 +219,15 @@ class DatabaseHandler:
                 self.cursor.execute(f"""
                     INSERT INTO {table_name} (
                         appraised_id, id_no, last_name, first_name, middle_name,
-                        year, sex, age, email_address,
+                        year, sex, age, birthday, contact_number,email_address, address, parent_guardian,
                         course_no, descriptive_title, year_level, units, lec, lab, prerequisite, grades, school_year
                     )
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                """, (
-                    appraised_id,
-                    id_no, 
-                    last_name,
-                    first_name,
-                    middle_name,
-                    year,
-                    sex,
-                    age,
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, (appraised_id, id_no, last_name, first_name, middle_name, year, sex, age, birthday,
+                    contact_number if not pd.isna(contact_number) else '',
                     email_address,
+                    address if not pd.isna(address) else '',
+                    parent_guardian if not pd.isna(parent_guardian) else '',
                     row['Course_No'] if not pd.isna(row['Course_No']) else '', 
                     row['Descriptive_Title'] if not pd.isna(row['Descriptive_Title']) else '', 
                     row['Year_Level'] if not pd.isna(row['Year_Level']) else '', 
@@ -221,9 +235,7 @@ class DatabaseHandler:
                     row['Lec'] if not pd.isna(row['Lec']) else 0, 
                     row['Lab'] if not pd.isna(row['Lab']) else 0,
                     row['Prerequisite'] if not pd.isna(row['Prerequisite']) else '',
-                    row['Grades'] if not pd.isna(row['Grades']) else 0,
-                    school_year
-                ))
+                    row['Grades'] if not pd.isna(row['Grades']) else 0, school_year))
 
             self.conn.commit()
             messagebox.showinfo("Success", "Appraised data saved to the database successfully!")
@@ -273,7 +285,11 @@ class DatabaseHandler:
                 ac.year, 
                 ac.age, 
                 ac.sex, 
+                ac.birthday,
+                ac.contact_number,
                 ac.email_address,
+                ac.address,
+                ac.parent_guardian,
                 ac.course_no, 
                 ac.descriptive_title, 
                 ac.year_level, 

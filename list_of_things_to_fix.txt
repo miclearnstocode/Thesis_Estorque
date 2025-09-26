@@ -1,15 +1,20 @@
-sa irreg ma add ko field bday, contact number, birthday = working on it
-madugang pa gid status if ma enroll sa
-kayuhon ang pag pag update sang unerolled to enrolled kay wala may ga update
-// madugang pa gid ang pag update sang enrolled to graduated
-// madugang pa gid ang pag update sang graduated to alumni
-ma update to sa archive ka stop kag graduated student 
-ang loginform kun mag type ka gmail atumatic ma sugpon kun mag type ka @gmail.com = done
-Use rate limiting and account lockout after failed attempts.
-tapos ang security dasun nga di maka login special character
-tapos sa admin screen panamion ang ui kag display didto add mga statuses
-or pwd nga status bar 
+    new error regitration cannot save to the database when it is in application phase in development it save but in deploy it isn't
+    my suggestion is to update database connection and automatically open when opening the application
+    sa irreg ma add ko field bday, contact number, birthday = working on it
+    madugang pa gid status if ma enroll sa
+    kayuhon ang pag pag update sang unerolled to enrolled kay wala may ga update
+    // madugang pa gid ang pag update sang enrolled to graduated
+    // madugang pa gid ang pag update sang graduated to alumni
+    ma update to sa archive ka stop kag graduated student 
+    ang loginform kun mag type ka gmail atumatic ma sugpon kun mag type ka @gmail.com = done
+    Use rate limiting and account lockout after failed attempts.
+    tapos ang security dasun nga di maka login special character
+    tapos sa admin screen panamion ang ui kag display didto add mga statuses
+    or pwd nga status bar 
+
 SET PASSWORD FOR 'root'@'localhost' = PASSWORD('BSCS@2024!'); xampp
+SET PASSWORD FOR 'comscie'@'localhost' = PASSWORD('BS_Comscie@2025!');
+
 this is the update for the curriculum when new curriculum enter
 ALTER TABLE curriculum_regular ADD curriculum_id INT, ADD FOREIGN KEY (curriculum_id) REFERENCES curriculum_version(curriculum_id);
 ALTER TABLE student_information ADD curriculum_id INT, ADD FOREIGN KEY (curriculum_id) REFERENCES curriculum_version(curriculum_id);
@@ -77,3 +82,13 @@ if time() < self.lockout_until:
 This way, the lockout persists even if the app is closed, and users can't bypass the limit by restarting.
 
 Let me know if you want to extend this to per-user lockouts (e.g. one JSON entry per email).
+
+
+Best practices to follow:
+Use connection pooling if possible. This allows sharing a small number of persistent connections efficiently rather than one per function.
+
+Gracefully handle connection interruptions. Implement retries or re-establish connections if a timeout or disconnect occurs.
+
+Explicitly close connections when truly done. For example, when the app closes or a task finishes fully, close the DB connection to free up resources.
+
+Avoid leaving transactions open for long periods. Commit or rollback promptly to prevent locking issues.

@@ -1663,9 +1663,7 @@ class DatabaseHandler:
             role VARCHAR(50) DEFAULT 'user',
             is_active BOOLEAN DEFAULT FALSE,
             last_login DATETIME,
-            registration_date DATETIME NOT NULL
-        )
-        """
+            registration_date DATETIME NOT NULL)"""
         try:
             self.cursor.execute(create_table_query)
             self.conn.commit()
@@ -1725,14 +1723,13 @@ class DatabaseHandler:
                 'user',           # Default role
                 False,            # Default is_active status
                 current_time,     # Registration date
-                current_time      # Set last_login to current time
-            ))
+                current_time))      # Set last_login to current time
             
             # Commit transaction
             self.conn.commit()
             
             # Log successful registration
-            logging.info(f"New user registered: {username} ({email}) with ID: {id}")
+            CTkMessagebox(title="Sucessful Login", message= f"New user registered: {username} ({email}) with ID: {id}")
             
             return True
         
@@ -1745,17 +1742,17 @@ class DatabaseHandler:
             if db_error.errno == mysql.connector.errorcode.ER_DUP_ENTRY:
                 raise ValueError("A user with this ID, email, or username already exists")
             
-            raise RuntimeError(f"Database error occurred: {db_error}")
+            raise CTkMessagebox(title="Database", message=f"Database error occurred: {db_error}")
         
         except ValueError as ve:
             # Validation error handling
-            print(f"Validation Error: {ve}")
+            CTkMessagebox(title="Error in Database Validation",message=f"Validation Error: {ve}")
             self.conn.rollback()
             raise
         
         except Exception as e:
             # Catch-all for any other unexpected errors
-            print(f"Unexpected Error in save_user: {e}")
+            CTkMessagebox(title="Error in Database",message=f"Unexpected Error in save_user: {e}")
             self.conn.rollback()
             raise RuntimeError(f"An unexpected error occurred: {e}")
                 
@@ -1791,7 +1788,7 @@ class DatabaseHandler:
             return None
         
         except Error as e:
-            print(f"Error retrieving user: {e}")
+            CTkMessagebox(title="Error in Database Retrieval",message=f"Error retrieving user: {e}")
             return None
 
     def __del__(self):
@@ -1802,7 +1799,7 @@ class DatabaseHandler:
                 if self.conn.is_connected():
                     self.cursor.close()
                     self.conn.close()
-                    print("MySQL connection explicitly closed")
+                    CTkMessagebox(title="MySQL Connection1",message="MySQL connection explicitly closed")
         except:
             pass
     def close(self):
@@ -1812,9 +1809,9 @@ class DatabaseHandler:
             if self.conn.is_connected():
                 self.cursor.close()
                 self.conn.close()
-                print("MySQL connection explicitly closed")
+                CTkMessagebox(title="MySQL Connection2",message="MySQL connection explicitly closed")
         except Exception as e:
-            print(f"Error closing connection: {e}")
+            CTkMessagebox(title="MySQL Connection3",message=f"Error closing connection: {e}")
             
     def create_templates_table(self):
         """
@@ -1825,15 +1822,13 @@ class DatabaseHandler:
             id INT AUTO_INCREMENT PRIMARY KEY,
             file_name VARCHAR(255) NOT NULL,
             file_data LONGTEXT NOT NULL,
-            uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
-        """
+            uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);"""
         try:
             self.cursor.execute(query)
             self.conn.commit()
-            print("Table 'templates' created or already exists.")
+            CTkMessagebox(title="Database Templates Table",message="Table 'templates' created or already exists.")
         except Exception as e:
-            print(f"Error creating table: {e}")
+            CTkMessagebox(title="Database Templates Table Error",message=f"Error creating table: {e}")
             self.conn.rollback()
 
     def save_templates_to_database(self, file_paths):
@@ -1872,8 +1867,7 @@ class DatabaseHandler:
             grade_data = {}
             semesters = [
                 "1.1", "1.2", "2.1", "2.2",
-                "3.1", "3.2", "4.1", "4.2"
-            ]
+                "3.1", "3.2", "4.1", "4.2"]
             
             for semester in semesters:
                 grade_data[semester] = self.get_grades_by_semester(semester, "2023-2024", "All")

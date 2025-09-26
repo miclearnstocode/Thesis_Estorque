@@ -1,10 +1,10 @@
-ID_NO,LAST_NAME,FIRST_NAME,MIDDLE_NAME,YR,AGE,SEX,EMAIL_ADDRESS,SHS,ADDRESS
-2021-322048,Alim,Christine Joy,,1,22,F,michaelestorque123@gmail.com,Panay National High School,Panay Capiz
-2022-321700,Arroyo,EJ,,1,23,M,arroyo.ej@student.capsu.edu.ph,Capiz National High School,Punta Tabuc roxas city capiz
-2021-322078,Baral,Mark Rey Ann,,1,21,M,baral.markreyann@student.capsu.edu.ph,St. Anthony College of Roxas City,Panay Capiz
-2021-325058,Daulo,Fritz Gerold,,1,22,M,daulo.fritzgerold@student.capsu.edu.ph,Filamer Christian University,Lanot roxas city capiz
-2021-321640,Doce,Marc Jason,,1,24,M,doce.marcjason@student.capsu.edu.ph,Capiz National High School,Panay Capiz
-2021-321607,Glumalid,Erika May,,1,23,F,glumalid.erickamay@student.capsu.edu.ph,Cong. Ramon Arnaldo High School,Tanza Sur Roxas City Capiz
-2021-321610,Golero,Henzel,,1,22,M,golero.henzel@student.capsu.edu.ph,Filamer Christian University,Panay Capiz
-2021-321603,Guzman,Josh,,1,21,M,guzman.josh@student.capsu.edu.ph,Capiz National High School,Brgy II Roxas City Capiz
-2022-321702,Lorenzo,Shaina,,1,23,F,lorenzo.shaina@student.capsu.edu.ph,Inzo Arnaldo Integrated School,Inzo Roxas City Capiz
+ID_NO,LAST_NAME,FIRST_NAME,MIDDLE_NAME,YR,AGE,BIRTHDAY,SEX,PARENT_GUARDIAN,PHONE_NUMBER,EMAIL_ADDRESS,SHS,ADDRESS
+2021-322048,Alim,Christine,Joy,1,22,03/15/2002,F,Maria Alim,9178456123,michaelestorque123@gmail.com,Panay National High School,Panay Capiz
+2022-321700,Arroyo,EJ,Santos,1,23,08/22/2001,M,Roberto Arroyo,9267891234,arroyo.ej@student.capsu.edu.ph,Capiz National High School,Punta Tabuc roxas city capiz
+2021-322078,Baral,Mark,Rey Ann,1,21,11/08/2003,M,Ana Baral,9356789012,baral.markreyann@student.capsu.edu.ph,St. Anthony College of Roxas City,Panay Capiz
+2021-325058,Daulo,Fritz,Gerold,1,22,06/14/2002,M,Gerald Daulo,9445678901,daulo.fritzgerold@student.capsu.edu.ph,Filamer Christian University,Lanot roxas city capiz
+2021-321640,Doce,Marc,Jason,1,24,02/28/2000,M,Jason Doce Sr.,9534567890,doce.marcjason@student.capsu.edu.ph,Capiz National High School,Panay Capiz
+2021-321607,Glumalid,Erika,May,1,23,07/19/2001,F,Carmen Glumalid,9623456789,glumalid.erickamay@student.capsu.edu.ph,Cong. Ramon Arnaldo High School,Tanza Sur Roxas City Capiz
+2021-321610,Golero,Henzel,Cruz,1,22,12/05/2002,M,Pedro Golero,9712345678,golero.henzel@student.capsu.edu.ph,Filamer Christian University,Panay Capiz
+2021-321603,Guzman,Josh,Rivera,1,21,09/11/2003,M,Luis Guzman,9801234567,guzman.josh@student.capsu.edu.ph,Capiz National High School,Brgy II Roxas City Capiz
+2022-321702,Lorenzo,Shaina,Dela Cruz,1,23,04/30/2001,F,Rosa Lorenzo,9890123456,lorenzo.shaina@student.capsu.edu.ph,Inzo Arnaldo Integrated School,Inzo Roxas City Capiz
