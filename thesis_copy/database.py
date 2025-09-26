@@ -1875,7 +1875,7 @@ class DatabaseHandler:
             return grade_data
             
         except Exception as e:
-            print(f"Error preloading grade data: {e}")
+            CTkMessagebox(title="Database Error Preload of Grade",message=f"Error preloading grade data: {e}")
             return {}
         
     def get_grades_by_semester(self, year_level, school_year, sex_filter):
@@ -1888,8 +1888,7 @@ class DatabaseHandler:
                 "3.1": "third_year_first_semester",
                 "3.2": "third_year_second_semester",
                 "4.1": "fourth_year_first_semester",
-                "4.2": "fourth_year_second_semester"
-            }
+                "4.2": "fourth_year_second_semester"}
             
             table_name = table_mapping.get(year_level)
             if not table_name:
@@ -1940,13 +1939,15 @@ class DatabaseHandler:
             
             return {
                 'columns': df.columns.tolist(),
-                'data': df.to_dict('records')  # Convert DataFrame to list of dictionaries
-            }
+                'data': df.to_dict('records')} # Convert DataFrame to list of dictionaries
+            
             
         except mysql.connector.Error as err:
+            CTkMessagebox(message=f"Database Error: {err}")
             print(f"Database Error: {err}")
             raise
         except Exception as e:
+            CTkMessagebox
             print(f"Error loading grades: {e}")
             raise
 
