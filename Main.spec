@@ -1,12 +1,36 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+block_cipher = None
 
 a = Analysis(
     ['thesis_copy\\Main.py'],
-    pathex=[],
+    pathex=[],  # You can add paths here if needed, but no imports!
     binaries=[],
-    datas=[],
-    hiddenimports=[],
+    datas=[
+        # Include config.ini - format: (source, destination)
+        ('config.ini', '.'),
+        
+        # Include config_manager.py
+        ('config_manager.py', '.'),
+        
+        # Include icons directory
+        ('icons', 'icons'),
+        
+        # Include assets directory  
+        ('assets', 'assets'),
+    ],
+    hiddenimports=[
+        'mysql.connector',
+        'mysql.connector.locales.eng.client_error',  # Often missing
+        'customtkinter',
+        'CTkMessagebox',
+        'PIL',
+        'PIL._tkinter_finder',
+        'pandas',
+        'numpy',
+        'tkinter',
+        'configparser'
+    ],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
@@ -14,7 +38,8 @@ a = Analysis(
     noarchive=False,
     optimize=0,
 )
-pyz = PYZ(a.pure)
+
+pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
 exe = EXE(
     pyz,

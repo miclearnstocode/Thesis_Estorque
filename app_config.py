@@ -1,9 +1,10 @@
 #database
-host='localhost', #192.168.254.125
-user='root',
-password='', 
-database='department',
-port=3306,
+#192.168.254.125
+host='localhost'
+user='comscie'
+password='BS_Comscie@2025!'
+database='department'
+port=3306
 allow_local_infile=True
 
 #icon paths

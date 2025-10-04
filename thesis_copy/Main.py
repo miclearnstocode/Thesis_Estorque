@@ -102,7 +102,7 @@ class Application(ctk.CTk):
         # Configure white background for splash
         self.splash.configure(fg_color="white")
         
-        # Load CSU logo
+        # Load CapSU logo
         try:
             csu_logo = Image.open(LoginForm.resource_path("Image/Capiz_State_University 2.png"))
             self.csu_logo_image = ctk.CTkImage(light_image=csu_logo,dark_image=csu_logo,size=(300, 300))
@@ -112,7 +112,7 @@ class Application(ctk.CTk):
             logo_label.pack(pady=30)
             
         except Exception as e:
-            print(f"Error loading CSU logo: {e}")
+            print(f"Error loading CapSU logo: {e}")
         """ Naga ubra pa ko thesis ko December 31, 2024 11:57pm 3 
             minutes bag o ang new year sang 2025"""
         # Add welcome text
@@ -237,7 +237,6 @@ class Application(ctk.CTk):
         # Start progress in a daemon thread
         threading.Thread(target=progress, daemon=True).start()
         
-        
     def check_system_requirements(self):
         """Check if system meets basic requirements"""
         try:
@@ -349,7 +348,7 @@ class Application(ctk.CTk):
                 self.loading_label.configure(text=error_message)
                 raise Exception(error_message)
         return False
-      
+
     def load_images(self):
         """Load and store all images used in the application"""
         try:
@@ -607,7 +606,6 @@ class Application(ctk.CTk):
             # Configure grid weights
             self.rowconfigure(0, weight=1)
             self.columnconfigure(1, weight=1)
-
 
     def create_window_controls(self):
         """Create window control buttons"""

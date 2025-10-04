@@ -5,28 +5,86 @@ import pandas as pd
 from tkinter import messagebox
 import mysql.connector
 from datetime import datetime
-import time, os, logging
+import time, os, logging, sys
 import traceback
-
+from config_manager import config_manager
 
 class DatabaseHandler:
     def __init__(self):
-        db_init = DatabaseInitializer()
-        db_init.create_database_and_tables()
-
-        # Initialize database connection
-        self.conn, self.cursor = self.get_db_connection()
+        try:
+            # Get configuration from config manager
+            db_config = config_manager.get_database_config()
+            
+            self.host = db_config['host']
+            self.user = db_config['user']
+            self.password = db_config['password']
+            self.database = db_config['database']
+            self.port = db_config['port']
+            self.allow_local_infile = db_config['allow_local_infile']
+            
+            logging.info(f"Database config loaded: {self.host}, {self.user}, {self.database}")
+            
+            # Initialize database
+            db_init = DatabaseInitializer(host=self.host, user=self.user, password=self.password, port=self.port)
+            
+            if db_init.create_database_and_tables():
+                self.conn, self.cursor = self.get_db_connection()
+                if self.conn and self.conn.is_connected():
+                    logging.info("Database initialized successfully")
+                else:
+                    logging.error("Failed to establish database connection")
+                    self.show_connection_error("Failed to connect to database")
+            else:
+                logging.error("Failed to initialize database tables")
+                self.show_connection_error("Failed to initialize database")
+                
+        except Exception as e:
+            logging.error(f"DatabaseHandler initialization failed: {e}")
+            self.show_config_error(e)
+            
     def get_db_connection(self):
-        conn = mysql.connector.connect(
-            host='localhost', #192.168.254.125
-            user='comscie',
-            password='BS_Comscie@2025!', 
-            database='department',
-            port=3306,
-            allow_local_infile=True)
-        cursor = conn.cursor()
-        return conn, cursor
-
+        try:
+            conn = mysql.connector.connect(host=self.host, user=self.user,
+                password=self.password, 
+                database=self.database, port=self.port, allow_local_infile=self.allow_local_infile)
+            cursor = conn.cursor()
+            logging.info("Database connection established successfully")
+            return conn, cursor
+        except mysql.connector.Error as err:
+            # Provide more helpful error messages
+            error_messages = {
+                2003: "Cannot connect to MySQL server. Please ensure:\n• XAMPP MySQL service is running\n• MySQL is started in XAMPP Control Panel",
+                1045: "Access denied - check username and password",
+                1049: "Database does not exist",
+                2005: "Unknown MySQL server host"}
+            
+            user_message = error_messages.get(err.errno, f"Database error: {err}")
+            
+            # Show error message (you might want to pass this back to the login form)
+            print(f"Database connection failed: {user_message}")
+            raise Exception(user_message)
+        
+    def show_config_error(self, error):
+        """Show configuration error to user"""
+        CTkMessagebox(
+            title="Configuration Error", message=f"Failed to load database configuration:\n{error}\n\n"
+            "Please check app_config.py file.")
+    def show_connection_error(self, error):
+        """Show connection error to user"""
+        error_messages = {1045: "Access denied - Check username and password",
+            1049: "Database 'department' does not exist", 
+            2003: "Cannot connect to MySQL server - Make sure MySQL is running",
+            2005: "Unknown MySQL server host - Check host address"}
+        
+        user_message = error_messages.get(error.errno, f"Database error: {error}")
+        
+        CTkMessagebox(title="Database Connection Failed",
+            message=f"{user_message}\n\n"
+            "Please ensure:\n"
+            "1. MySQL server is running\n"
+            "2. Database credentials in app_config.py are correct\n"
+            "3. 'department' database exists")
+        
     def close_db_connection(self):
         self.conn.close()
     
@@ -1964,8 +2022,7 @@ class DatabaseHandler:
                 "3.1": "third_year_first_semester",
                 "3.2": "third_year_second_semester",
                 "4.1": "fourth_year_first_semester",
-                "4.2": "fourth_year_second_semester"
-            }
+                "4.2": "fourth_year_second_semester"}
             
             table_name = table_mapping.get(year_level)
             if not table_name:
