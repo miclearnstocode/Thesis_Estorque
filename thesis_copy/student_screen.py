@@ -48,9 +48,7 @@ class StudentScreen(ctk.CTkFrame):
 
         ctk.CTkLabel(self,  text="Student", font=("Vivaldi", 40, "bold"), text_color="black", fg_color="transparent",  corner_radius=50, padx=20, pady=10).pack(pady=30)
         # Button style configuration
-        button_style = {"fg_color": "transparent","hover_color": "#707070",     
-            "text_color": "black", "height": 32,                 
-            "border_width": 1, "border_color": "black", "corner_radius": 6}
+        button_style = {"fg_color": "transparent","hover_color": "#707070", "text_color": "black", "height": 32, "border_width": 1, "border_color": "black", "corner_radius": 6}
         
         self.regular_frame = ctk.CTkFrame(self, fg_color="transparent")
         self.regular_frame.pack(pady=20)
@@ -232,8 +230,7 @@ class StudentScreen(ctk.CTkFrame):
                 student for student in self.student_data[year]
                 if search_term in student["ID_NO"].lower() or
                 search_term in student["LAST_NAME"].lower() or
-                search_term in student["FIRST_NAME"].lower()
-            ]
+                search_term in student["FIRST_NAME"].lower()]
 
             # Repopulate the treeview with filtered results
             for i, student in enumerate(filtered_students):
@@ -382,8 +379,7 @@ class StudentScreen(ctk.CTkFrame):
         # Get current year level subjects
         current_year_subjects = [
             subject for subject in curriculum_data 
-            if subject and str(subject.get('YEAR_LEVEL', '')) == str(selected_year_semester)
-        ]
+            if subject and str(subject.get('YEAR_LEVEL', '')) == str(selected_year_semester)]
 
         # Analyze each subject for the current year
         for subject in current_year_subjects:
@@ -421,10 +417,7 @@ class StudentScreen(ctk.CTkFrame):
             if can_enroll:
                 enrollable_subjects.append(subject)
 
-        return {
-            'enrollable': enrollable_subjects,
-            'prerequisite_subjects': prerequisite_subjects
-        }
+        return {'enrollable': enrollable_subjects, 'prerequisite_subjects': prerequisite_subjects}
     
     def search_student(self):
         id_no = self.search_var.get().strip()
@@ -473,11 +466,7 @@ class StudentScreen(ctk.CTkFrame):
                 year_semester_mapping = {'1': ['1.1', '1.2'],'2': ['2.1', '2.2'],'3': ['3.1', '3.2'],'4': ['4.1', '4.2']}
                 
                 # Use dictionary for O(1) lookup time
-                semester_conversion = {'first_year_first_semester': '1.1',
-                    'first_year_second_semester': '1.2','second_year_first_semester': '2.1',
-                    'second_year_second_semester': '2.2','third_year_first_semester': '3.1',
-                    'third_year_second_semester': '3.2','fourth_year_first_semester': '4.1',
-                    'fourth_year_second_semester': '4.2'}
+                semester_conversion = {'first_year_first_semester': '1.1', 'first_year_second_semester': '1.2','second_year_first_semester': '2.1', 'second_year_second_semester': '2.2','third_year_first_semester': '3.1', 'third_year_second_semester': '3.2','fourth_year_first_semester': '4.1', 'fourth_year_second_semester': '4.2'}
                 
                 # Convert to set for O(1) lookup time
                 completed_yr_sem = {semester_conversion[sem] for sem in completed_semesters 
@@ -518,8 +507,7 @@ class StudentScreen(ctk.CTkFrame):
         self.tree = ttk.Treeview(student_frame, columns=table_student, show='headings', height=2)
         self.tree.pack(fill="both", expand=True)
 
-        column_widths = {"ID NO": 130,"STUDENT NAME": 300,"YEAR": 80,
-            "AGE": 80,"SEX": 80,"EMAIL_ADDRESS": 300}
+        column_widths = {"ID NO": 130,"STUDENT NAME": 300,"YEAR": 80, "AGE": 80,"SEX": 80,"EMAIL_ADDRESS": 300}
 
         for column in table_student:
             self.tree.heading(column, text=column)
@@ -531,9 +519,7 @@ class StudentScreen(ctk.CTkFrame):
         for row in student_data["curriculum_data"]:
             student_id = row.get("ID_NO", "")
             if student_id not in inserted_ids:
-                self.tree.insert("", "end", values=(student_id,
-                    row.get("STUDENT_NAME", ""),row.get("YR", ""),
-                    row.get("AGE", ""), row.get("SEX", ""), row.get("EMAIL_ADDRESS", "")))
+                self.tree.insert("", "end", values=(student_id, row.get("STUDENT_NAME", ""),row.get("YR", ""), row.get("AGE", ""), row.get("SEX", ""), row.get("EMAIL_ADDRESS", "")))
                 self.student_name = row.get("STUDENT_NAME", "")  
                 self.year_level = row.get("YR", "")
                 self.sex = row.get("SEX","")
@@ -560,8 +546,7 @@ class StudentScreen(ctk.CTkFrame):
         vsb.pack(side="right", fill="y")
 
         # Adjust column widths for curriculum tree
-        curriculum_column_widths = {"Course No.": 130, "Descriptive Title": 300,
-            "Year Level": 90, "Units": 80, "Lec": 80, "Lab": 80, "Pre-requisite": 150, "Grade": 90}
+        curriculum_column_widths = {"Course No.": 130, "Descriptive Title": 300, "Year Level": 90, "Units": 80, "Lec": 80, "Lab": 80, "Pre-requisite": 150, "Grade": 90}
 
         for column in table_curriculum:
             self.curriculum_tree.heading(column, text=column)
@@ -830,12 +815,7 @@ class StudentScreen(ctk.CTkFrame):
         for subject in prerequisite_analysis['enrollable']:
             course_no = subject.get('COURSE_NO', '')
             if course_no not in seen_courses:
-                row_tuple = (
-                    course_no,
-                    subject.get('DESCRIPTIVE_TITLE', ''),
-                    subject.get('UNITS', ''),
-                    ''  # Faculty
-                )
+                row_tuple = (course_no, subject.get('DESCRIPTIVE_TITLE', ''), subject.get('UNITS', ''), '')
                 self.treeview.insert("", "end", values=row_tuple)
                 seen_courses.add(course_no)
                 try:
@@ -848,12 +828,7 @@ class StudentScreen(ctk.CTkFrame):
         for subject in prerequisite_analysis['prerequisite_subjects']:
             course_no = subject.get('COURSE_NO', '')
             if course_no not in seen_courses:
-                row_tuple = (
-                    course_no,
-                    subject.get('DESCRIPTIVE_TITLE', ''),
-                    subject.get('UNITS', ''),
-                    ''  # Faculty
-                )
+                row_tuple = (course_no, subject.get('DESCRIPTIVE_TITLE', ''), subject.get('UNITS', ''), '')
                 self.treeview.insert("", "end", values=row_tuple, tags=('prerequisite',))
                 seen_courses.add(course_no)
                 try:
@@ -864,7 +839,6 @@ class StudentScreen(ctk.CTkFrame):
 
         # Add total units row
         self.treeview.insert("", "end", values=("Total", "", total_units, ""))
-
         # Configure tag for prerequisite subjects
         self.treeview.tag_configure('prerequisite', foreground='red')  #red for prerequisite subjects
 
@@ -1042,23 +1016,12 @@ class StudentScreen(ctk.CTkFrame):
             row_heights.append(max(20, max_lines * 15))  # Minimum 20, or 15 points per line
 
         # Update Table creation with row heights
-        t = Table(data, 
-                 colWidths=[1.5*inch, 3.5*inch, 1*inch, 1.5*inch],
-                 rowHeights=row_heights)
+        t = Table(data, colWidths=[1.5*inch, 3.5*inch, 1*inch, 1.5*inch], rowHeights=row_heights)
 
         # Keep existing table styles
-        t.setStyle(TableStyle([
-            ('GRID', (0,0), (-1,-1), 0.5, colors.black),  # Grid lines
-            ('BOX', (0,0), (-1,-1), 0.5, colors.black),  # Border around the table
-            ('FONTNAME', (0,0), (-1,-1), 'TimesNewRoman'),
-            ('FONTSIZE', (0,0), (-1,-1), 12),
-            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-            ('FONTNAME', (0,0), (-1,0), 'TimesNewRoman-Bold'),
-            ('FONTSIZE', (0,0), (-1,0), 12),
-            ('FONTNAME', (0,1), (0,-1), 'TimesNewRoman-Bold'),  # Bold font for Course No
-            ('FONTNAME', (2,-1), (2,-1), 'TimesNewRoman-Bold'),
-        ]))
+        t.setStyle(TableStyle([('GRID', (0,0), (-1,-1), 0.5, colors.black), ('BOX', (0,0), (-1,-1), 0.5, colors.black),  # Border around the table
+            ('FONTNAME', (0,0), (-1,-1), 'TimesNewRoman'), ('FONTSIZE', (0,0), (-1,-1), 12), ('ALIGN', (0,0), (-1,-1), 'CENTER'), ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+            ('FONTNAME', (0,0), (-1,0), 'TimesNewRoman-Bold'), ('FONTSIZE', (0,0), (-1,0), 12), ('FONTNAME', (0,1), (0,-1), 'TimesNewRoman-Bold'), ('FONTNAME', (2,-1), (2,-1), 'TimesNewRoman-Bold'),]))
 
         # Draw the table on the canvas
         w, h = t.wrapOn(c, width, height)
@@ -1132,7 +1095,6 @@ class StudentScreen(ctk.CTkFrame):
         # Clear search frame before showing new search bar
         for widget in self.search_frame.winfo_children():
             widget.destroy()
- 
         # Search label
         ctk.CTkLabel(self.search_frame, text="Irregular Students ID NO:",font=ctk.CTkFont(size=14)).pack(side="left", padx=5)
         def validate_input(new_value):
@@ -1386,12 +1348,7 @@ class StudentScreen(ctk.CTkFrame):
         for subj in corequisite_subjects:
             print(f"  - {subj.get('course_no')}: Year {subj.get('year_level')}")
 
-        return {
-            'enrollable_subject': enrollable_subjects,
-            'prerequisite_subject': prerequisite_subjects,
-            'corequisite_subject': corequisite_subjects,
-            'failed_subject': failed_subjects,
-            'no_grade_course': no_grade_courses}
+        return {'enrollable_subject': enrollable_subjects, 'prerequisite_subject': prerequisite_subjects, 'corequisite_subject': corequisite_subjects, 'failed_subject': failed_subjects, 'no_grade_course': no_grade_courses}
 
     def search_student_irregular(self):
         identifier = self.search_var.get().strip().capitalize()
@@ -1446,9 +1403,7 @@ class StudentScreen(ctk.CTkFrame):
                 first_name = student_info.get("first_name", "").strip()
                 middle_name = student_info.get("middle_name", "").strip()
                 student_name = f"{last_name} {first_name} {middle_name}".strip()
-                self.tree.insert("", "end", values=(student_info.get("id_no", ""),
-                    student_name, student_info.get("year", ""),
-                    student_info.get("age", ""), student_info.get("sex", ""), student_info.get("email_address", "")))
+                self.tree.insert("", "end", values=(student_info.get("id_no", ""), student_name, student_info.get("year", ""), student_info.get("age", ""), student_info.get("sex", ""), student_info.get("email_address", "")))
                 self.student_name_irreg = student_name            
                 self.year = student_info.get("year", "")
                 self.sex_irreg = student_info.get("sex", "")
@@ -1469,9 +1424,7 @@ class StudentScreen(ctk.CTkFrame):
             self.curriculum_tree.configure(yscrollcommand=vsb.set)
             vsb.pack(side="right", fill="y")
 
-            curriculum_column_widths = {"Course No.": 130,"Descriptive Title": 300,
-                "Year Level": 90,"Units": 80,"Lec": 80,
-                "Lab": 80,"Pre-requisite": 150,"Grade": 90}
+            curriculum_column_widths = {"Course No.": 130,"Descriptive Title": 300, "Year Level": 90,"Units": 80,"Lec": 80, "Lab": 80,"Pre-requisite": 150,"Grade": 90}
 
             for column in table_curriculum:
                 self.curriculum_tree.heading(column, text=column)
@@ -1720,15 +1673,7 @@ class StudentScreen(ctk.CTkFrame):
                 course_no = subject.get('course_no', '')
                 if course_no not in seen_courses:
                     subject_groups['failed'].append({
-                        'data': (
-                            course_no,
-                            subject.get('descriptive_title', ''),
-                            subject.get('units', ''),
-                            ''
-                        ),
-                        'tag': 'failed',
-                        'units': subject.get('units', 0)
-                    })
+                        'data': (course_no, subject.get('descriptive_title', ''), subject.get('units', ''), ''), 'tag': 'failed', 'units': subject.get('units', 0)})
                     seen_courses.add(course_no)
 
         # Now insert subjects in the desired order
@@ -1737,12 +1682,7 @@ class StudentScreen(ctk.CTkFrame):
 
         for category in display_order:
             for subject in subject_groups[category]:
-                self.treeview.insert(
-                    "",
-                    "end",
-                    values=subject['data'],
-                    tags=(subject['tag'],) if subject['tag'] else ()
-                )
+                self.treeview.insert("", "end", values=subject['data'], tags=(subject['tag'],) if subject['tag'] else ())
                 try:
                     units = int(subject['units'])
                 except (ValueError, TypeError):
@@ -1930,7 +1870,6 @@ class StudentScreen(ctk.CTkFrame):
         c.drawString(40, y, "Contact No:___________________________")
         y -= 20
 
-
         table_columns = ["Course Number", "Course Title", "Unit Credit", "Faculty"]
         data = [table_columns]
         total_units = 0        
@@ -1958,23 +1897,14 @@ class StudentScreen(ctk.CTkFrame):
             row_heights.append(max(20, max_lines * 15))  # Minimum 20, or 15 points per line
 
         # Update Table creation with row heights
-        t = Table(data, 
-                 colWidths=[1.5*inch, 3.5*inch, 1*inch, 1.5*inch],
-                 rowHeights=row_heights)
+        t = Table(data, colWidths=[1.5*inch, 3.5*inch, 1*inch, 1.5*inch], rowHeights=row_heights)
 
         # Keep existing table styles
-        t.setStyle(TableStyle([
-            ('GRID', (0,0), (-1,-1), 0.5, colors.black),  # Grid lines
+        t.setStyle(TableStyle([('GRID', (0,0), (-1,-1), 0.5, colors.black),  # Grid lines
             ('BOX', (0,0), (-1,-1), 0.5, colors.black),  # Border around the table
-            ('FONTNAME', (0,0), (-1,-1), 'TimesNewRoman'),
-            ('FONTSIZE', (0,0), (-1,-1), 12),
-            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-            ('FONTNAME', (0,0), (-1,0), 'TimesNewRoman-Bold'),
-            ('FONTSIZE', (0,0), (-1,0), 12),
-            ('FONTNAME', (0,1), (0,-1), 'TimesNewRoman-Bold'),  # Bold font for Course No
-            ('FONTNAME', (2,-1), (2,-1), 'TimesNewRoman-Bold'),
-        ]))
+            ('FONTNAME', (0,0), (-1,-1), 'TimesNewRoman'), ('FONTSIZE', (0,0), (-1,-1), 12), ('ALIGN', (0,0), (-1,-1), 'CENTER'), ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+            ('FONTNAME', (0,0), (-1,0), 'TimesNewRoman-Bold'), ('FONTSIZE', (0,0), (-1,0), 12), ('FONTNAME', (0,1), (0,-1), 'TimesNewRoman-Bold'),  # Bold font for Course No
+            ('FONTNAME', (2,-1), (2,-1), 'TimesNewRoman-Bold'),]))
 
         # Draw the table on the canvas
         w, h = t.wrapOn(c, width, height)
@@ -2161,19 +2091,8 @@ class StudentScreen(ctk.CTkFrame):
                     self.treeview.delete(*self.treeview.get_children())
 
                     for i, row in enumerate(display_data):
-                        values = [
-                            row.get('ID_NO', ''),
-                            row.get('STUDENT_NAME', ''),
-                            row.get('YR', ''),
-                            row.get('AGE', ''),
-                            row.get('BIRTHDAY', ''),
-                            row.get('SEX', ''),
-                            row.get('PARENT_GUARDIAN', ''),
-                            row.get('PHONE_NUMBER', ''),
-                            row.get('EMAIL_ADDRESS', ''),
-                            row.get('SHS', ''),
-                            row.get('ADDRESS', '')
-                        ]
+                        values = [row.get('ID_NO', ''), row.get('STUDENT_NAME', ''), row.get('YR', ''), row.get('AGE', ''), row.get('BIRTHDAY', ''), row.get('SEX', ''),
+                            row.get('PARENT_GUARDIAN', ''), row.get('PHONE_NUMBER', ''), row.get('EMAIL_ADDRESS', ''), row.get('SHS', ''), row.get('ADDRESS', '')]
                         tag = 'evenrow' if i % 2 == 0 else 'oddrow'
                         self.treeview.insert('', 'end', values=values, tags=(tag,))
 
