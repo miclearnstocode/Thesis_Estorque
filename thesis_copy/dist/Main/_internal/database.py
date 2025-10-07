@@ -5,28 +5,86 @@ import pandas as pd
 from tkinter import messagebox
 import mysql.connector
 from datetime import datetime
-import time, os, logging
+import time, os, logging, sys
 import traceback
-
+from config_manager import config_manager
 
 class DatabaseHandler:
     def __init__(self):
-        db_init = DatabaseInitializer()
-        db_init.create_database_and_tables()
-
-        # Initialize database connection
-        self.conn, self.cursor = self.get_db_connection()
+        try:
+            # Get configuration from config manager
+            db_config = config_manager.get_database_config()
+            
+            self.host = db_config['host']
+            self.user = db_config['user']
+            self.password = db_config['password']
+            self.database = db_config['database']
+            self.port = db_config['port']
+            self.allow_local_infile = db_config['allow_local_infile']
+            
+            logging.info(f"Database config loaded: {self.host}, {self.user}, {self.database}")
+            
+            # Initialize database
+            db_init = DatabaseInitializer(host=self.host, user=self.user, password=self.password, port=self.port)
+            
+            if db_init.create_database_and_tables():
+                self.conn, self.cursor = self.get_db_connection()
+                if self.conn and self.conn.is_connected():
+                    logging.info("Database initialized successfully")
+                else:
+                    logging.error("Failed to establish database connection")
+                    self.show_connection_error("Failed to connect to database")
+            else:
+                logging.error("Failed to initialize database tables")
+                self.show_connection_error("Failed to initialize database")
+                
+        except Exception as e:
+            logging.error(f"DatabaseHandler initialization failed: {e}")
+            self.show_config_error(e)
+            
     def get_db_connection(self):
-        conn = mysql.connector.connect(
-            host='localhost', #192.168.254.125
-            user='comscie',
-            password='BS_Comscie@2025!', 
-            database='department',
-            port=3306,
-            allow_local_infile=True)
-        cursor = conn.cursor()
-        return conn, cursor
-
+        try:
+            conn = mysql.connector.connect(host=self.host, user=self.user,
+                password=self.password, 
+                database=self.database, port=self.port, allow_local_infile=self.allow_local_infile)
+            cursor = conn.cursor()
+            logging.info("Database connection established successfully")
+            return conn, cursor
+        except mysql.connector.Error as err:
+            # Provide more helpful error messages
+            error_messages = {
+                2003: "Cannot connect to MySQL server. Please ensure:\n• XAMPP MySQL service is running\n• MySQL is started in XAMPP Control Panel",
+                1045: "Access denied - check username and password",
+                1049: "Database does not exist",
+                2005: "Unknown MySQL server host"}
+            
+            user_message = error_messages.get(err.errno, f"Database error: {err}")
+            
+            # Show error message (you might want to pass this back to the login form)
+            print(f"Database connection failed: {user_message}")
+            raise Exception(user_message)
+        
+    def show_config_error(self, error):
+        """Show configuration error to user"""
+        CTkMessagebox(
+            title="Configuration Error", message=f"Failed to load database configuration:\n{error}\n\n"
+            "Please check app_config.py file.")
+    def show_connection_error(self, error):
+        """Show connection error to user"""
+        error_messages = {1045: "Access denied - Check username and password",
+            1049: "Database 'department' does not exist", 
+            2003: "Cannot connect to MySQL server - Make sure MySQL is running",
+            2005: "Unknown MySQL server host - Check host address"}
+        
+        user_message = error_messages.get(error.errno, f"Database error: {error}")
+        
+        CTkMessagebox(title="Database Connection Failed",
+            message=f"{user_message}\n\n"
+            "Please ensure:\n"
+            "1. MySQL server is running\n"
+            "2. Database credentials in app_config.py are correct\n"
+            "3. 'department' database exists")
+        
     def close_db_connection(self):
         self.conn.close()
     
@@ -1663,9 +1721,7 @@ class DatabaseHandler:
             role VARCHAR(50) DEFAULT 'user',
             is_active BOOLEAN DEFAULT FALSE,
             last_login DATETIME,
-            registration_date DATETIME NOT NULL
-        )
-        """
+            registration_date DATETIME NOT NULL)"""
         try:
             self.cursor.execute(create_table_query)
             self.conn.commit()
@@ -1725,14 +1781,13 @@ class DatabaseHandler:
                 'user',           # Default role
                 False,            # Default is_active status
                 current_time,     # Registration date
-                current_time      # Set last_login to current time
-            ))
+                current_time))      # Set last_login to current time
             
             # Commit transaction
             self.conn.commit()
             
             # Log successful registration
-            logging.info(f"New user registered: {username} ({email}) with ID: {id}")
+            CTkMessagebox(title="Sucessful Login", message= f"New user registered: {username} ({email}) with ID: {id}")
             
             return True
         
@@ -1745,17 +1800,17 @@ class DatabaseHandler:
             if db_error.errno == mysql.connector.errorcode.ER_DUP_ENTRY:
                 raise ValueError("A user with this ID, email, or username already exists")
             
-            raise RuntimeError(f"Database error occurred: {db_error}")
+            raise CTkMessagebox(title="Database", message=f"Database error occurred: {db_error}")
         
         except ValueError as ve:
             # Validation error handling
-            print(f"Validation Error: {ve}")
+            CTkMessagebox(title="Error in Database Validation",message=f"Validation Error: {ve}")
             self.conn.rollback()
             raise
         
         except Exception as e:
             # Catch-all for any other unexpected errors
-            print(f"Unexpected Error in save_user: {e}")
+            CTkMessagebox(title="Error in Database",message=f"Unexpected Error in save_user: {e}")
             self.conn.rollback()
             raise RuntimeError(f"An unexpected error occurred: {e}")
                 
@@ -1791,7 +1846,7 @@ class DatabaseHandler:
             return None
         
         except Error as e:
-            print(f"Error retrieving user: {e}")
+            CTkMessagebox(title="Error in Database Retrieval",message=f"Error retrieving user: {e}")
             return None
 
     def __del__(self):
@@ -1802,7 +1857,7 @@ class DatabaseHandler:
                 if self.conn.is_connected():
                     self.cursor.close()
                     self.conn.close()
-                    print("MySQL connection explicitly closed")
+                    CTkMessagebox(title="MySQL Connection1",message="MySQL connection explicitly closed")
         except:
             pass
     def close(self):
@@ -1812,9 +1867,9 @@ class DatabaseHandler:
             if self.conn.is_connected():
                 self.cursor.close()
                 self.conn.close()
-                print("MySQL connection explicitly closed")
+                CTkMessagebox(title="MySQL Connection2",message="MySQL connection explicitly closed")
         except Exception as e:
-            print(f"Error closing connection: {e}")
+            CTkMessagebox(title="MySQL Connection3",message=f"Error closing connection: {e}")
             
     def create_templates_table(self):
         """
@@ -1825,15 +1880,13 @@ class DatabaseHandler:
             id INT AUTO_INCREMENT PRIMARY KEY,
             file_name VARCHAR(255) NOT NULL,
             file_data LONGTEXT NOT NULL,
-            uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
-        """
+            uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);"""
         try:
             self.cursor.execute(query)
             self.conn.commit()
-            print("Table 'templates' created or already exists.")
+            CTkMessagebox(title="Database Templates Table",message="Table 'templates' created or already exists.")
         except Exception as e:
-            print(f"Error creating table: {e}")
+            CTkMessagebox(title="Database Templates Table Error",message=f"Error creating table: {e}")
             self.conn.rollback()
 
     def save_templates_to_database(self, file_paths):
@@ -1872,8 +1925,7 @@ class DatabaseHandler:
             grade_data = {}
             semesters = [
                 "1.1", "1.2", "2.1", "2.2",
-                "3.1", "3.2", "4.1", "4.2"
-            ]
+                "3.1", "3.2", "4.1", "4.2"]
             
             for semester in semesters:
                 grade_data[semester] = self.get_grades_by_semester(semester, "2023-2024", "All")
@@ -1881,7 +1933,7 @@ class DatabaseHandler:
             return grade_data
             
         except Exception as e:
-            print(f"Error preloading grade data: {e}")
+            CTkMessagebox(title="Database Error Preload of Grade",message=f"Error preloading grade data: {e}")
             return {}
         
     def get_grades_by_semester(self, year_level, school_year, sex_filter):
@@ -1894,8 +1946,7 @@ class DatabaseHandler:
                 "3.1": "third_year_first_semester",
                 "3.2": "third_year_second_semester",
                 "4.1": "fourth_year_first_semester",
-                "4.2": "fourth_year_second_semester"
-            }
+                "4.2": "fourth_year_second_semester"}
             
             table_name = table_mapping.get(year_level)
             if not table_name:
@@ -1946,13 +1997,15 @@ class DatabaseHandler:
             
             return {
                 'columns': df.columns.tolist(),
-                'data': df.to_dict('records')  # Convert DataFrame to list of dictionaries
-            }
+                'data': df.to_dict('records')} # Convert DataFrame to list of dictionaries
+            
             
         except mysql.connector.Error as err:
+            CTkMessagebox(message=f"Database Error: {err}")
             print(f"Database Error: {err}")
             raise
         except Exception as e:
+            CTkMessagebox
             print(f"Error loading grades: {e}")
             raise
 
@@ -1969,8 +2022,7 @@ class DatabaseHandler:
                 "3.1": "third_year_first_semester",
                 "3.2": "third_year_second_semester",
                 "4.1": "fourth_year_first_semester",
-                "4.2": "fourth_year_second_semester"
-            }
+                "4.2": "fourth_year_second_semester"}
             
             table_name = table_mapping.get(year_level)
             if not table_name:

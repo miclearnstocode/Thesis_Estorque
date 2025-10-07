@@ -70,14 +70,7 @@ class GradeScreen(ctk.CTkFrame):
         ctk.CTkLabel(self, text="   Grades  ", font=("Vivaldi", 30),fg_color="transparent", text_color="black").pack(pady=30)
 
         # Button style configuration
-        button_style = {
-            "fg_color": "transparent",    
-            "hover_color": "#707070",     
-            "text_color": "black",        
-            "width": 120,                 
-            "height": 32,                 
-            "border_width": 1,            
-            "border_color": "black"}
+        button_style = {"fg_color": "transparent", "hover_color": "#707070", "text_color": "black", "width": 120, "height": 32, "border_width": 1, "border_color": "black"}
 
         # Create a frame to hold the year and semester selectors
         selection_frame = ctk.CTkFrame(self)
@@ -129,16 +122,7 @@ class GradeScreen(ctk.CTkFrame):
         self.back_frame.place(x=11, y=70)
 
         # Template download dropdown style
-        template_style = {
-            "fg_color": "white",
-            "button_color": "#F0F0F0",
-            "button_hover_color": "#E0E0E0",
-            "text_color": "black",
-            "dropdown_fg_color": "white",
-            "dropdown_text_color": "black",
-            "dropdown_hover_color": "#E0E0E0",
-            "width": 200,
-            "corner_radius": 6}
+        template_style = {"fg_color": "white", "button_color": "#F0F0F0", "button_hover_color": "#E0E0E0", "text_color": "black", "dropdown_fg_color": "white", "dropdown_text_color": "black", "dropdown_hover_color": "#E0E0E0", "width": 200, "corner_radius": 6}
 
         self.db_handler.cursor.execute("SELECT file_name FROM templates")
         templates = [row[0] for row in self.db_handler.cursor.fetchall()]
@@ -486,17 +470,8 @@ class GradeScreen(ctk.CTkFrame):
         
         ctk.CTkLabel(input_frame, text="School Year:").grid(row=7, column=0, padx=5, pady=5)
         school_year_var = ctk.StringVar(value=school_years[0])
-        school_year_dropdown = ctk.CTkOptionMenu(
-            input_frame,
-            variable=school_year_var,
-            values=school_years,
-            fg_color="white",
-            button_color="white",
-            button_hover_color="#707070",
-            text_color="black",
-            dropdown_fg_color="white",
-            dropdown_text_color="black",
-            dropdown_hover_color="#707070")
+        school_year_dropdown = ctk.CTkOptionMenu(input_frame, variable=school_year_var, values=school_years, fg_color="white",
+            button_color="white", button_hover_color="#707070", text_color="black", dropdown_fg_color="white", dropdown_text_color="black", dropdown_hover_color="#707070")
         school_year_dropdown.grid(row=7, column=1, padx=5, pady=5)
 
         # Button frame
@@ -504,14 +479,7 @@ class GradeScreen(ctk.CTkFrame):
         button_frame.place(x=890,y=212)
 
         # Buttons with consistent styling
-        button_style = {
-            "fg_color": "transparent",
-            "hover_color": "#707070",
-            "text_color": "black",
-            "width": 120,
-            "height": 32,
-            "border_width": 1,
-            "border_color": "black"}
+        button_style = {"fg_color": "transparent", "hover_color": "#707070", "text_color": "black", "width": 120, "height": 32, "border_width": 1, "border_color": "black"}
 
         # Keep all the original functions
         def add_grade():
@@ -614,13 +582,7 @@ class GradeScreen(ctk.CTkFrame):
                         continue
                 else:
                     # Regular student grades
-                    grades_data.append({
-                        'ID_NO': id_no,
-                        'Last Name': values[1],
-                        'First Name': values[2],
-                        'Middle Name': values[3],
-                        'Course No.': course_no,
-                        'Grade': grade})
+                    grades_data.append({'ID_NO': id_no, 'Last Name': values[1], 'First Name': values[2], 'Middle Name': values[3], 'Course No.': course_no, 'Grade': grade})
 
             # Handle invalid students
             if invalid_students:
@@ -664,16 +626,12 @@ class GradeScreen(ctk.CTkFrame):
                     success_message += f"Updated grades in appraised curriculum: {len(appraised_updates)}"
 
                 CTkMessagebox(title="Success", message=success_message)
-
             except Exception as e:
                 CTkMessagebox(title="Save Error", message=f"Failed to save grades: {str(e)}")
 
-
         # Add buttons with the new style
         ctk.CTkButton(button_frame, text="Add Grade", command=add_grade, **button_style).pack(side=tk.LEFT, padx=5)
-
         ctk.CTkButton(button_frame,text="Delete Grade", command=delete_grade, **button_style).pack(side=tk.LEFT, padx=5)
-
         ctk.CTkButton(button_frame,text="Save Grades",command=save_grades,**button_style).pack(side=tk.LEFT, padx=5)
 
     def open_file_dialog(self, year, semester, choice):
@@ -737,9 +695,7 @@ class GradeScreen(ctk.CTkFrame):
                 self.school_year = self.school_year_var.get()  # Store school year
                 self.display_grading_data(grading_data)
                 self.save_button.configure(state="normal")
-
                 return True
-
             return False
 
         except MemoryError:
@@ -751,7 +707,6 @@ class GradeScreen(ctk.CTkFrame):
             CTkMessagebox(title="Error", message=f"Error loading file: {e}").pack()
             return False
         
-
     def get_cache_size(self):
         """Calculate current cache size in bytes"""
         return sys.getsizeof(self.cache_data)
@@ -765,7 +720,6 @@ class GradeScreen(ctk.CTkFrame):
     def manage_cache_memory(self):
         """Manage cache size and remove expired items"""
         #current_size = self.get_cache_size()
-        
         # Remove expired items first
         expired_keys = [key for key in list(self.cache_data.keys())
             if self.is_cache_expired(key)]
@@ -805,7 +759,6 @@ class GradeScreen(ctk.CTkFrame):
             # Store data and timestamp
             self.cache_data[key] = data
             self.cache_timestamps[key] = datetime.now()
-            
             return data
             
         except Exception as e:
@@ -886,26 +839,13 @@ class GradeScreen(ctk.CTkFrame):
                             # Extract just the course codes for the email
                             course_list = [course['course_code'] for course in incomplete_courses]
                             
-                            self.send_email(student_email=student_email,
-                                last_name=last_name,
-                                first_name=first_name,
-                                middle_name=middle_name,
-                                student_id=student_id,
-                                missing_courses=course_list,
-                                notification_type="Not Complete")
+                            self.send_email(student_email=student_email, last_name=last_name, first_name=first_name, middle_name=middle_name, student_id=student_id, missing_courses=course_list, notification_type="Not Complete")
 
                 processed_students += 1
                 self.update_status(f"Processed {processed_students}/{total_students} students")
                 
                 # Cache individual student results with year update info
-                processed_results.append({
-                    'student_id': student_id,
-                    'last_name': last_name,
-                    'first_name': first_name,
-                    'middle_name': middle_name,
-                    'incomplete_courses': incomplete_courses,
-                    'year_updated': new_yr if 'new_yr' in locals() else None
-                })
+                processed_results.append({'student_id': student_id, 'last_name': last_name, 'first_name': first_name, 'middle_name': middle_name, 'incomplete_courses': incomplete_courses, 'year_updated': new_yr if 'new_yr' in locals() else None})
 
             self.cache_data[cache_key] = processed_results
             self.update_status("All students processed and year levels updated!", final=True)
@@ -938,11 +878,7 @@ class GradeScreen(ctk.CTkFrame):
         self.monitor_memory_usage()
         self.clear_cache()
         if hasattr(self, 'year') and hasattr(self, 'semester'):
-            return self.import_grading_sheet(
-                self.current_file_path,
-                self.year,
-                self.semester
-            )
+            return self.import_grading_sheet(self.current_file_path, self.year, self.semester)
 
     def send_email(self, student_email, last_name, first_name, middle_name, student_id, missing_courses, notification_type):
         try:
@@ -1129,9 +1065,7 @@ class GradeScreen(ctk.CTkFrame):
                     return True, processed_data
                 elif action == "Update":
                     return True, grading_data
-
             return True, grading_data
-
         except Exception as e:
             CTkMessagebox(title="Error", message=f"Error checking for existing grades: {e}")
             return False, None
@@ -1187,11 +1121,7 @@ class GradeScreen(ctk.CTkFrame):
                 return
 
             if import_choice == "Regular":
-                success = self.db_handler.save_grading_data(
-                    grading_data=processed_data,
-                    year=self.year,
-                    semester=self.semester,
-                    school_year=school_year)
+                success = self.db_handler.save_grading_data(grading_data=processed_data, year=self.year, semester=self.semester, school_year=school_year)
             else:  #thi is for Irregular
                 grade_data = processed_data.copy()
                 grade_data['school_year'] = self.school_year_var.get().strip()
@@ -1199,11 +1129,7 @@ class GradeScreen(ctk.CTkFrame):
                 exclude_columns = ['id_no', 'last_name', 'first_name', 'middle_name']
                 course_columns = [col for col in grade_data.columns if col not in exclude_columns]
                 
-                melted_data = grade_data.melt(
-                    id_vars=['id_no', 'school_year'],
-                    value_vars=course_columns,
-                    var_name='course_no',
-                    value_name='grades')
+                melted_data = grade_data.melt(id_vars=['id_no', 'school_year'], value_vars=course_columns, var_name='course_no', value_name='grades')
                 
                 melted_data['grades'] = melted_data['grades'].apply(
                     lambda x: 'INC' if x == '' or pd.isna(x) else x)
@@ -1237,9 +1163,7 @@ class GradeScreen(ctk.CTkFrame):
         
         # Clean up data values
         for col in clean_data.columns:
-            clean_data[col] = clean_data[col].apply(
-                lambda x: str(x).strip().upper() if pd.notna(x) else ''
-            )
+            clean_data[col] = clean_data[col].apply(lambda x: str(x).strip().upper() if pd.notna(x) else '')
         
         self.data_frame = tk.Frame(self, bg="#008080")
         self.data_frame.pack(expand=True, fill='both', padx=10, pady=10)
@@ -1306,7 +1230,6 @@ class GradeScreen(ctk.CTkFrame):
                                     widget.destroy()
                             except:
                                 pass
-                        
                         # Destroy the window if it still exists
                         if window.winfo_exists():
                             window.destroy()
@@ -1315,7 +1238,6 @@ class GradeScreen(ctk.CTkFrame):
                     finally:
                         # Clear the reference
                         setattr(self, window_name, None)
-            
             # Clean up variables
             vars_to_cleanup = ['year_semester_var', 'school_year_var', 'sex_var']
             
@@ -1385,7 +1307,6 @@ class GradeScreen(ctk.CTkFrame):
         filter_frame = ctk.CTkFrame(self.view_edit_window,bg_color="transparent")
         filter_frame.pack(pady=10, padx=10, fill="x")
         
-
         # Year Level dropdown
         ctk.CTkLabel(filter_frame, text="Year Level:", font=("Helvetica", 12)).pack(side=tk.LEFT, padx=5)
         self.year_semester_var = ctk.StringVar(value="Select")
@@ -1439,10 +1360,7 @@ class GradeScreen(ctk.CTkFrame):
             style = ttk.Style()
             style.configure("Treeview", font=("Helvetica", 12),  rowheight=35, background="white", fieldbackground="white", foreground="black") 
             style.configure("Treeview.Heading", font=("Helvetica", 12, "bold"), background="white", foreground="black")
-            self.grade_tree = ttk.Treeview(
-                self.tree_frame,
-                columns=grades_info['columns'],
-                show="headings")
+            self.grade_tree = ttk.Treeview(self.tree_frame, columns=grades_info['columns'], show="headings")
             
             # Configure tag colors for alternating rows
             self.grade_tree.tag_configure('oddrow', background='#E8E8E8')  # Light grey
@@ -1474,7 +1392,6 @@ class GradeScreen(ctk.CTkFrame):
             
             # Set up grade editing
             self.setup_grade_editing()
-            
         except Exception as e:
             messagebox.showerror("Error", f"Error loading grades: {e}")
 
@@ -1555,10 +1472,7 @@ class GradeScreen(ctk.CTkFrame):
             
             # Handle empty grade (if allowed)
             if not grade_str:
-                msg = CTkMessagebox(
-                    title="Confirm",
-                    message="Are you sure you want to clear this grade?",
-                    icon="question", option_1="Yes", option_2="No")
+                msg = CTkMessagebox(title="Confirm", message="Are you sure you want to clear this grade?", icon="question", option_1="Yes", option_2="No")
                 response = msg.ask()
                 if response:
                     new_grade = None
@@ -1575,14 +1489,7 @@ class GradeScreen(ctk.CTkFrame):
                 year_level = self.year_semester_var.get()
                 school_year = self.school_year_var.get()
                 
-                success = self.db_handler.update_grade(
-                    student_id, 
-                    column_name, 
-                    new_grade, 
-                    year_level, 
-                    school_year
-                )
-                
+                success = self.db_handler.update_grade(student_id, column_name, new_grade,  year_level, school_year)
                 if success:
                     # Update treeview
                     values = list(self.grade_tree.item(item)['values'])
@@ -1629,9 +1536,7 @@ class GradeScreen(ctk.CTkFrame):
             errors = []
             try:
                 # Use a new cursor for each template to avoid 'Unread result found' error
-                self.db_handler.cursor.execute(
-                    "SELECT file_data FROM templates WHERE file_name = %s", (selected_template,)
-                )
+                self.db_handler.cursor.execute("SELECT file_data FROM templates WHERE file_name = %s", (selected_template,))
                 file_data = self.db_handler.cursor.fetchone()
                 if file_data:
                     file_path = os.path.join(target_dir, selected_template)

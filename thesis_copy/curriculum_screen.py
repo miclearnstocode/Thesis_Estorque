@@ -43,8 +43,7 @@ class CurriculumScreen(ctk.CTkFrame):
 
     def create_widgets(self):
         # Button style configuration
-        button_style = {"fg_color": "transparent", "hover_color": "#707070", "text_color": "black", "height": 32, "border_width": 1,            
-            "border_color": "black"}
+        button_style = {"fg_color": "transparent", "hover_color": "#707070", "text_color": "black", "height": 32, "border_width": 1, "border_color": "black"}
 
         # Additional style for regular buttons
         regular_button_style = {**button_style,"width": 120}
@@ -83,9 +82,7 @@ class CurriculumScreen(ctk.CTkFrame):
         style.configure("Treeview", rowheight=35, font=("Helvetica", 12)) 
         style.configure("Treeview.Heading", font=("Helvetica", 12))
         # Modified Treeview columns to include Prerequisite before Grades
-        self.tree = ttk.Treeview(self, columns=(
-            "Course_No", "Descriptive_Title", "Year_Level", 
-            "Units", "Lec", "Lab", "Prerequisite", "Grades", "SY_Revision"), show="headings")
+        self.tree = ttk.Treeview(self, columns=("Course_No", "Descriptive_Title", "Year_Level", "Units", "Lec", "Lab", "Prerequisite", "Grades", "SY_Revision"), show="headings")
         
         # Set headings
         self.tree.heading("Course_No", text="Course No")
@@ -243,7 +240,6 @@ class CurriculumScreen(ctk.CTkFrame):
                 messagebox.showerror("Error", f"An error occurred: {e}")
         else:
             messagebox.showerror("Error", "No data to save")
-
 
 class CTkToolTip:
     def __init__(self, widget, text):

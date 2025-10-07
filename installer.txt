@@ -3,7 +3,7 @@
 # Ensure you have PyInstaller installed:
 pyinstaller --noconsole --onedir --add-data "grade_screen.py;." --add-data "loginform.py;." --add-data "curriculum_screen.py;." --add-data "database.py;." --add-data "archive_screen.py;." --add-data "appraisal_screen.py;." --add-data "admin_screen.py;." --add-data "../icons;icons" --add-data "../Image;Image" Main.py
 with console for debugging
-pyinstaller --noconsole --onedir --add-data "grade_screen.py;." --add-data "loginform.py;." --add-data "curriculum_screen.py;." --add-data "database.py;." --add-data "archive_screen.py;." --add-data "appraisal_screen.py;." --add-data "admin_screen.py;." --add-data "print_all.py;." --add-data "../icons;icons" --add-data "../Image;Image" --add-data "pictures;thesis_copy/pictures" Main.py
+pyinstaller --noconsole --onedir --add-data "grade_screen.py;." --add-data "loginform.py;." --add-data "curriculum_screen.py;." --add-data "database.py;." --add-data "archive_screen.py;." --add-data "appraisal_screen.py;." --add-data "admin_screen.py;." --add-data "config_manager.py;." --add-data "print_all.py;." --add-data "../icons;icons" --add-data "../Image;Image" --add-data "pictures;thesis_copy/pictures" Main.py
 
 pyinstaller --onedir --add-data "grade_screen.py;." --add-data "loginform.py;." --add-data "curriculum_screen.py;." --add-data "database.py;." --add-data "archive_screen.py;." --add-data "appraisal_screen.py;." --add-data "admin_screen.py;." --add-data "print_all.py;." --add-data "../icons;icons" --add-data "../Image;Image" --add-data "pictures;thesis_copy/pictures" Main.py
 for grades
@@ -16,8 +16,7 @@ def get_db_connection(self):
             password='your_password',
             database='your_database_name',
             port=3306,
-            allow_local_infile=True
-        )
+            allow_local_infile=True)
         cursor = conn.cursor()
         return conn, cursor
     except mysql.connector.Error as err:

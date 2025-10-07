@@ -104,7 +104,7 @@ class Application(ctk.CTk):
         
         # Load CapSU logo
         try:
-            csu_logo = Image.open(LoginForm.resource_path("Image/Capiz_State_University 2.png"))
+            csu_logo = Image.open(LoginForm.resource_path("Image/Capiz_State_University_2.png"))
             self.csu_logo_image = ctk.CTkImage(light_image=csu_logo,dark_image=csu_logo,size=(300, 300))
             
             # Create and pack logo label

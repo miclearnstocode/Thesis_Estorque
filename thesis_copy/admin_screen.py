@@ -221,13 +221,7 @@ class AdminScreen(ctk.CTkFrame):
         self.left_frame = ctk.CTkFrame(master=self.main_container, fg_color="#F0F0F0")
         self.left_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
         # Button style configuration
-        button_style = {
-            "fg_color": "transparent",    
-            "hover_color": "#707070",     
-            "text_color": "black",        
-            "height": 32,                 
-            "border_width": 1,            
-            "border_color": "black"}
+        button_style = {"fg_color": "transparent", "hover_color": "#707070", "text_color": "black", "height": 32, "border_width": 1, "border_color": "black"}
         # Button container frame in left frame
         button_container = ctk.CTkFrame(self.left_frame, fg_color="transparent")
         button_container.pack(fill="x", pady=20, padx=10)
@@ -245,7 +239,6 @@ class AdminScreen(ctk.CTkFrame):
         # Update refresh button to use enhanced method
         self.refresh_btn = ctk.CTkButton(button_container, text="Refresh", command=self.enhanced_refresh, width=150,**button_style)
         self.refresh_btn.pack(pady=5)
-        
         
         # Center Frame (for Treeview)
         self.center_frame = ctk.CTkFrame(self.main_container)
@@ -306,11 +299,7 @@ class AdminScreen(ctk.CTkFrame):
         # Configure alternating colors
         style.map('Treeview', background=[('selected', '#0078D7')],)  # Selection color
 
-        style.configure('Treeview', 
-            background='white',  # Default background
-            fieldbackground='white',  # Color of empty space
-            selectbackground='#0078D7'  # Selection color
-        )
+        style.configure('Treeview', background='white',fieldbackground='white', selectbackground='#0078D7')
 
         # Create Treeview
         self.user_tree = ttk.Treeview(tree_frame,columns=('ID', 'Name', 'Email', 'Status', 'Pause'),
@@ -453,18 +442,9 @@ class AdminScreen(ctk.CTkFrame):
             h_scrollbar = ttk.Scrollbar(container_frame, orient="horizontal", command=self.canvas.get_tk_widget().xview)
             
             # Configure canvas with scrollbars
-            self.canvas.get_tk_widget().configure(
-                yscrollcommand=v_scrollbar.set,
-                xscrollcommand=h_scrollbar.set
-            )
+            self.canvas.get_tk_widget().configure(yscrollcommand=v_scrollbar.set, xscrollcommand=h_scrollbar.set)
 
-            self.canvas.get_tk_widget().grid(
-                row=0, 
-                column=0, 
-                sticky="nsew", 
-                padx=10, 
-                pady=10
-            )
+            self.canvas.get_tk_widget().grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
             v_scrollbar.grid(row=0, column=1, sticky="ns")
             h_scrollbar.grid(row=1, column=0, sticky="ew")
             
@@ -514,19 +494,10 @@ class AdminScreen(ctk.CTkFrame):
                 checkbox = '☒' if not is_active else '☐'
                 status = 'Active' if is_active else 'Paused'
                 
-                tags = (
-                    'evenrow' if index % 2 == 0 else 'oddrow', 
-                    status.lower()
-                )
+                tags = ('evenrow' if index % 2 == 0 else 'oddrow', status.lower())
                 
                 # Insert user into treeview
-                self.user_tree.insert('', 'end', values=(
-                    user_id,    # ID
-                    username,   # Username
-                    email,      # Email
-                    status,     # Status
-                    checkbox    # Pause checkbox
-                ), tags=tags)
+                self.user_tree.insert('', 'end', values=(user_id, username, email, status, checkbox), tags=tags)
             
             # Configure row and status colors
             self.user_tree.tag_configure('active', foreground='green')
@@ -547,10 +518,7 @@ class AdminScreen(ctk.CTkFrame):
             bool: True if update was successful, False otherwise
         """
         try:
-            self.db_handler.cursor.execute(
-                "UPDATE admin_management SET is_active = %s WHERE id = %s",
-                (new_status, user_id)
-            )
+            self.db_handler.cursor.execute("UPDATE admin_management SET is_active = %s WHERE id = %s",(new_status, user_id))
             self.db_handler.conn.commit()
             return True
         except Exception as e:
@@ -584,10 +552,7 @@ class AdminScreen(ctk.CTkFrame):
                 user_id = values[0]
                 
                 # Fetch current user status
-                self.db_handler.cursor.execute(
-                    "SELECT is_active FROM admin_management WHERE id = %s",
-                    (user_id,)
-                )
+                self.db_handler.cursor.execute("SELECT is_active FROM admin_management WHERE id = %s",(user_id,))
                 result = self.db_handler.cursor.fetchone()
                 
                 if result is None:
@@ -668,18 +633,12 @@ class AdminScreen(ctk.CTkFrame):
         try:
             for user_id in selected_users:
                 # Get current status
-                self.db_handler.cursor.execute(
-                    "SELECT is_active FROM Admin_management WHERE id = %s",
-                    (user_id,)
-                )
+                self.db_handler.cursor.execute("SELECT is_active FROM Admin_management WHERE id = %s", (user_id,))
                 current_status = self.db_handler.cursor.fetchone()[0]
                 
                 # Toggle status
                 new_status = not current_status
-                self.db_handler.cursor.execute(
-                    "UPDATE Admin_management SET is_active = %s WHERE id = %s",
-                    (new_status, user_id)
-                )
+                self.db_handler.cursor.execute("UPDATE Admin_management SET is_active = %s WHERE id = %s", (new_status, user_id))
             
             self.db_handler.conn.commit()
             self.checkbox_states.clear()  # Clear selections after update
@@ -697,28 +656,15 @@ class AdminScreen(ctk.CTkFrame):
     
     def setup_right_frame(self):
         # Title for Account Approvals
-        approval_title = ctk.CTkLabel(
-            master=self.right_frame,
-            text="Account Approvals",
-            font=ctk.CTkFont(size=16, weight="bold")
-        )
+        approval_title = ctk.CTkLabel(master=self.right_frame, text="Account Approvals", font=ctk.CTkFont(size=16, weight="bold"))
         approval_title.pack(pady=(20, 10))
 
         # Create scrollable frame for pending accounts
-        self.pending_accounts_frame = ctk.CTkScrollableFrame(
-            master=self.right_frame,
-            width=200,
-            height=400
-        )
+        self.pending_accounts_frame = ctk.CTkScrollableFrame(master=self.right_frame, width=200, height=400)
         self.pending_accounts_frame.pack(fill="both", expand=True, padx=10, pady=10)
 
         # Add Approve Selected button
-        self.approve_btn = ctk.CTkButton(
-            master=self.right_frame,
-            text="Approve Selected",
-            command=self.approve_selected_accounts,
-            width=150
-        )
+        self.approve_btn = ctk.CTkButton(master=self.right_frame, text="Approve Selected", command=self.approve_selected_accounts, width=150)
         self.approve_btn.pack(pady=(0, 20))
 
         # Load pending accounts
@@ -746,23 +692,14 @@ class AdminScreen(ctk.CTkFrame):
 
             # Handle no pending accounts
             if not pending_accounts:
-                no_pending_label = ctk.CTkLabel(
-                    self.pending_accounts_frame,
-                    text="No pending accounts",
-                    text_color="gray"
-                )
+                no_pending_label = ctk.CTkLabel(self.pending_accounts_frame, text="No pending accounts", text_color="gray")
                 no_pending_label.pack(pady=10)
                 return
 
             # Create checkboxes for pending accounts
             for user_id, name in pending_accounts:
                 checkbox_var = ctk.BooleanVar()
-                checkbox = ctk.CTkCheckBox(
-                    self.pending_accounts_frame,
-                    text=name, 
-                    variable=checkbox_var,
-                    font=ctk.CTkFont(size=12)
-                )
+                checkbox = ctk.CTkCheckBox(self.pending_accounts_frame, text=name, variable=checkbox_var, font=ctk.CTkFont(size=12))
                 checkbox.pack(pady=5, padx=10, anchor="w")
                 self.approval_checkboxes[user_id] = checkbox_var
 

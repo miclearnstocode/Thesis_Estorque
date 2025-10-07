@@ -4,12 +4,14 @@ from CTkMessagebox import CTkMessagebox
 import hashlib, os, re
 from database import DatabaseHandler
 from PIL import Image
-import sys, os
+import sys, os, psutil, subprocess
 from time import time
+
 class LoginForm(ctk.CTkFrame):
     def __init__(self, master, login_success_callback=None, admin_login_callback=None):
         super().__init__(master)
         self.master = master
+        self.check_xampp_services()
         
         # Database Handler
         self.db_handler = DatabaseHandler()
@@ -80,6 +82,81 @@ class LoginForm(ctk.CTkFrame):
         except AttributeError:
             base_path = os.path.abspath(".")  # Running normally
         return os.path.join(base_path, relative_path)
+    
+    def check_xampp_services(self):
+        """Check if XAMPP MySQL service is running, prompt user if not"""
+        def is_mysql_running():
+            """Check if MySQL process is running"""
+            try:
+                for proc in psutil.process_iter(['name']):
+                    if proc.info['name'] and 'mysqld' in proc.info['name'].lower():
+                        return True
+                return False
+            except Exception as e:
+                print(f"Error checking MySQL process: {e}")
+                return False
+        
+        def find_xampp_path():
+            """Find XAMPP installation path"""
+            possible_paths = [
+                r"C:\xampp",
+                r"D:\xampp", 
+                r"E:\xampp",
+                os.path.join(os.environ.get('ProgramFiles', ''), 'xampp'),
+                os.path.join(os.environ.get('ProgramFiles(x86)', ''), 'xampp')]
+            
+            for path in possible_paths:
+                control_panel = os.path.join(path, 'xampp-control.exe')
+                if os.path.exists(control_panel):
+                    return path
+            return None
+        
+        def start_xampp_control():
+            """Start XAMPP Control Panel"""
+            xampp_path = find_xampp_path()
+            if xampp_path:
+                control_panel = os.path.join(xampp_path, 'xampp-control.exe')
+                try:
+                    subprocess.Popen([control_panel])
+                    return True
+                except Exception as e:
+                    print(f"Failed to start XAMPP Control Panel: {e}")
+            return False
+        
+        # Check if MySQL is running
+        if not is_mysql_running():
+            # Show warning message
+            msg = CTkMessagebox(
+                title="Database Service Required",
+                message="MySQL database service is not running.\n\n"
+                       "This application requires XAMPP MySQL to be running.\n\n"
+                       "Do you want to open XAMPP Control Panel to start MySQL service?",
+                icon="warning", option_1="Open XAMPP", option_2="Continue Anyway", option_3="Exit")
+            
+            response = msg.get()
+            
+            if response == "Open XAMPP":
+                if start_xampp_control():
+                    CTkMessagebox(title="XAMPP Control Panel",
+                        message="XAMPP Control Panel has been opened.\n\n"
+                               "Please start the MySQL service and then try logging in again.",
+                        icon="info")
+                else:
+                    CTkMessagebox(title="XAMPP Not Found",
+                        message="XAMPP Control Panel not found.\n\n"
+                               "Please ensure XAMPP is installed and start MySQL service manually.",
+                        icon="error")
+                # Keep the login form open for user to retry
+                return False
+                
+            elif response == "Exit":
+                self.master.quit()
+                return False
+            elif response == "Continue Anyway":
+                # User wants to try anyway (maybe they'll start service manually)
+                return True
+        
+        return True
     
     def create_login_widgets(self):
         # Clear existing widgets except the CSD logo
@@ -162,6 +239,8 @@ class LoginForm(ctk.CTkFrame):
         return hashed_password, salt
 
     def validate_login(self):
+        if not self.check_xampp_services():
+            return  # XAMPP services not running, exit validation
         current_time = time()
         # Clear any previous error message
         self.error_label.configure(text="")
@@ -265,8 +344,7 @@ class LoginForm(ctk.CTkFrame):
             hash_function=self.hash_password, 
             back_callback=self.create_login_widgets,
             login_success_callback=self.login_success_callback,  # Pass the login success callback
-            admin_login_callback=self.admin_login_callback
-        )
+            admin_login_callback=self.admin_login_callback)
 
 class RegistrationForm:
     def __init__(self, master, db_handler, hash_function, back_callback, login_success_callback=None, admin_login_callback=None):

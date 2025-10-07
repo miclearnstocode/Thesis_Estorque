@@ -39,14 +39,7 @@ class AppraisalScreen(ctk.CTkFrame):
             print(f"Error loading background image: {e}")
         
         # Button style configuration
-        button_style = {
-            "fg_color": "transparent",    
-            "hover_color": "#707070",     
-            "text_color": "black",        
-            "width": 120,                 
-            "height": 32,                 
-            "border_width": 1,            
-            "border_color": "black"}
+        button_style = {"fg_color": "transparent", "hover_color": "#707070", "text_color": "black", "width": 120, "height": 32, "border_width": 1, "border_color": "black"}
         
         # Main title label
         self.label = ctk.CTkLabel(self, text="  Appraisal   ", font=("Vivaldi", 40), fg_color="grey70", text_color="black", corner_radius=50)
@@ -283,16 +276,7 @@ class AppraisalScreen(ctk.CTkFrame):
             row_index = 0
             for index, row in group.iterrows():
                 # Prepare values for the treeview
-                values = [
-                    row.get('Course_No', ''),
-                    row.get('Descriptive_Title', ''),
-                    row.get('Year_Level', ''),
-                    row.get('Units', ''),
-                    row.get('Lec', ''),
-                    row.get('Lab', ''),
-                    row.get('Prerequisite', ''),
-                    row.get('Grades', '')
-                ]
+                values = [row.get('Course_No', ''), row.get('Descriptive_Title', ''), row.get('Year_Level', ''), row.get('Units', ''), row.get('Lec', ''), row.get('Lab', ''), row.get('Prerequisite', ''), row.get('Grades', '')]
                 
                     # Determine the tag for the row based on the explicit counter
                 tag = 'oddrow' if row_index % 2 == 0 else 'evenrow'
@@ -306,10 +290,7 @@ class AppraisalScreen(ctk.CTkFrame):
                 year_total_lab += float(row.get('Lab', 0))
 
             # Insert year level total row
-            year_total_values = ["","Total", "", 
-                f"{int(round(year_total_units))}", 
-                f"{int(round(year_total_lec))}", 
-                f"{int(round(year_total_lab))}",  "",  ""]
+            year_total_values = ["","Total", "", f"{int(round(year_total_units))}", f"{int(round(year_total_lec))}", f"{int(round(year_total_lab))}",  "",  ""]
             self.tree1.insert("", "end", values=year_total_values, tags=('year_total_row',), )
 
             # Update overall totals
@@ -321,15 +302,7 @@ class AppraisalScreen(ctk.CTkFrame):
             self.tree1.insert("", "end", values=["", "", "", "", "", "", "", ""])
 
         # Add overall total row
-        overall_total_values = ["",
-            "Overall Total", 
-            "",
-            f"{int(round(overall_total_units))}", 
-            f"{int(round(overall_total_lec))}", 
-            f"{int(round(overall_total_lab))}", 
-            "", 
-            ""
-        ]
+        overall_total_values = ["","Overall Total", "", f"{int(round(overall_total_units))}", f"{int(round(overall_total_lec))}", f"{int(round(overall_total_lab))}", "", ""]
         self.tree1.insert("", "end", values=overall_total_values, tags=('overall_total_row',))
 
         # If no data was inserted, show a message
@@ -343,15 +316,9 @@ class AppraisalScreen(ctk.CTkFrame):
 
 
     def get_semester_title(self, year, semester):
-        year_titles = {
-            1: 'First Year',
-            2: 'Second Year',
-            3: 'Third Year',
-            4: 'Fourth Year'}
+        year_titles = {1: 'First Year', 2: 'Second Year', 3: 'Third Year', 4: 'Fourth Year'}
         
-        semester_titles = {
-            1: 'First Semester',
-            2: 'Second Semester'}
+        semester_titles = {1: 'First Semester', 2: 'Second Semester'}
         
         return f"{year_titles.get(year, 'Unknown Year')} - {semester_titles.get(semester, 'Unknown Semester')}"
         
@@ -439,18 +406,14 @@ class AppraisalScreen(ctk.CTkFrame):
                     overall_totals['Lab'] += lab
 
                 # Insert Semester Total Row
-                semester_total_values = ["", "Total", "",f"{int(semester_totals['Units'])}",f"{int(semester_totals['Lec'])}",
-                    f"{int(semester_totals['Lab'])}"] + [""] * (len(self.tree2["columns"]) - 4)
+                semester_total_values = ["", "Total", "",f"{int(semester_totals['Units'])}",f"{int(semester_totals['Lec'])}", f"{int(semester_totals['Lab'])}"] + [""] * (len(self.tree2["columns"]) - 4)
                 self.tree2.insert("", "end", values=semester_total_values, tags=('total_row',))
 
                 self.tree2.insert("", "end", values=[""] * len(self.tree2["columns"]))
 
 
         # Insert Overall Totals
-        overall_total_values = ["", "Overall Totals",
-            f"{int(overall_totals['Units'])}",
-            f"{int(overall_totals['Lec'])}",
-            f"{int(overall_totals['Lab'])}"] + [""] * (len(self.tree2["columns"]) - 4)
+        overall_total_values = ["", "Overall Totals", f"{int(overall_totals['Units'])}", f"{int(overall_totals['Lec'])}", f"{int(overall_totals['Lab'])}"] + [""] * (len(self.tree2["columns"]) - 4)
         self.tree2.insert("", "end", values=overall_total_values, tags=('total_row',))
 
         # Handle empty data scenario
@@ -538,19 +501,10 @@ class AppraisalScreen(ctk.CTkFrame):
                 print(f"Error resizing background: {e}")
 
     def create_entries(self):
-        labels_entries = [
-            ("ID No:", 4, self.validate_id_no), 
-            ("Last Name:", 5, self.validate_last_name), 
-            ("First Name:", 6, self.validate_first_name), 
-            ("Middle Name:", 7, self.validate_middle_name), 
-            ("Year Level:", 8, self.validate_year_level), 
-            ("Sex:", 9, self.validate_sex), 
-            ("Age:", 10, self.validate_age), 
-            ("Birthday: ", 11, self.validate_birthday),
-            ("Contact Number: ", 12, self.validate_contact),
-            ("Email Address:", 13, self.validate_email),
-            ("Address: ", 14,self.validate_address),
-            ("Parent/Guardian: ", 15,self.validate_parent_guardian)]
+        labels_entries = [("ID No:", 4, self.validate_id_no),  ("Last Name:", 5, self.validate_last_name), ("First Name:", 6, self.validate_first_name), 
+            ("Middle Name:", 7, self.validate_middle_name), ("Year Level:", 8, self.validate_year_level), ("Sex:", 9, self.validate_sex), 
+            ("Age:", 10, self.validate_age), ("Birthday: ", 11, self.validate_birthday), ("Contact Number: ", 12, self.validate_contact), ("Email Address:", 13, self.validate_email),
+            ("Address: ", 14,self.validate_address),("Parent/Guardian: ", 15,self.validate_parent_guardian)]
         
         
         self.entries = {}
@@ -650,7 +604,6 @@ class AppraisalScreen(ctk.CTkFrame):
                 datetime.datetime.strptime(result, "%Y-%m-%d")
             except ValueError:
                 return False
-
         return True
         
     def validate_contact(self, new_value):
@@ -717,8 +670,7 @@ class AppraisalScreen(ctk.CTkFrame):
         return False
     
     def move_to_next_entry(self, event, current_index, total_entries):
-        labels_order = ["ID No:", "Last Name:", "First Name:", "Middle Name:", "Year Level:", "Sex:", "Age:","Birthday:","Contact Number:", "Email Address:"
-                        , "Address: ", "Parent/Guardian: "]
+        labels_order = ["ID No:", "Last Name:", "First Name:", "Middle Name:", "Year Level:", "Sex:", "Age:","Birthday:","Contact Number:", "Email Address:", "Address: ", "Parent/Guardian: "]
         
         # If not at the last entry, move to next
         if current_index < total_entries - 1:
