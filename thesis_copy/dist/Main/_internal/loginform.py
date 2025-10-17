@@ -58,7 +58,7 @@ class LoginForm(ctk.CTkFrame):
         self.nami_photo = ctk.CTkImage(light_image=self.nami_image, dark_image=self.nami_image, size=(100, 100))
 
         # Load and resize the Capiz State University logo
-        self.capsu_image = Image.open(self.resource_path("Image/Capiz_State_University 2.png"))
+        self.capsu_image = Image.open(self.resource_path("Image/Capiz_State_University_2.png"))
         capsu_width = 150
         capsu_height = 150
         self.capsu_image = self.capsu_image.resize((capsu_width, capsu_height), Image.LANCZOS)
@@ -98,12 +98,7 @@ class LoginForm(ctk.CTkFrame):
         
         def find_xampp_path():
             """Find XAMPP installation path"""
-            possible_paths = [
-                r"C:\xampp",
-                r"D:\xampp", 
-                r"E:\xampp",
-                os.path.join(os.environ.get('ProgramFiles', ''), 'xampp'),
-                os.path.join(os.environ.get('ProgramFiles(x86)', ''), 'xampp')]
+            possible_paths = [r"C:\xampp", r"D:\xampp",  r"E:\xampp", os.path.join(os.environ.get('ProgramFiles', ''), 'xampp'), os.path.join(os.environ.get('ProgramFiles(x86)', ''), 'xampp')]
             
             for path in possible_paths:
                 control_panel = os.path.join(path, 'xampp-control.exe')
@@ -126,12 +121,10 @@ class LoginForm(ctk.CTkFrame):
         # Check if MySQL is running
         if not is_mysql_running():
             # Show warning message
-            msg = CTkMessagebox(
-                title="Database Service Required",
+            msg = CTkMessagebox(title="Database Service Required",
                 message="MySQL database service is not running.\n\n"
                        "This application requires XAMPP MySQL to be running.\n\n"
-                       "Do you want to open XAMPP Control Panel to start MySQL service?",
-                icon="warning", option_1="Open XAMPP", option_2="Continue Anyway", option_3="Exit")
+                       "Do you want to open XAMPP Control Panel to start MySQL service?", icon="warning", option_1="Open XAMPP", option_2="Continue Anyway", option_3="Exit")
             
             response = msg.get()
             
@@ -139,13 +132,11 @@ class LoginForm(ctk.CTkFrame):
                 if start_xampp_control():
                     CTkMessagebox(title="XAMPP Control Panel",
                         message="XAMPP Control Panel has been opened.\n\n"
-                               "Please start the MySQL service and then try logging in again.",
-                        icon="info")
+                               "Please start the MySQL service and then try logging in again.", icon="info")
                 else:
                     CTkMessagebox(title="XAMPP Not Found",
                         message="XAMPP Control Panel not found.\n\n"
-                               "Please ensure XAMPP is installed and start MySQL service manually.",
-                        icon="error")
+                               "Please ensure XAMPP is installed and start MySQL service manually.", icon="error")
                 # Keep the login form open for user to retry
                 return False
                 
@@ -464,13 +455,7 @@ class RegistrationForm:
         self.show_confirm_password_cb = ctk.CTkCheckBox(confirm_entry_frame,text="Show",width=20,height=20,checkbox_width=16,checkbox_height=16,corner_radius=3,fg_color="#2196F3",hover_color="#1976D2",command=lambda: self.toggle_password_visibility(self.confirm_password_entry),font=("Helvetica", 12))
         self.show_confirm_password_cb.pack(side="right", padx=(5, 0))
        # Add error label above register button
-        self.reg_error_label = ctk.CTkLabel(
-            self.scrollable_frame,
-            text="",
-            text_color="red",
-            font=ctk.CTkFont(size=12),
-            wraplength=280
-        )
+        self.reg_error_label = ctk.CTkLabel(self.scrollable_frame, text="", text_color="red", font=ctk.CTkFont(size=12), wraplength=280)
         self.reg_error_label.pack(pady=(5, 0))
 
         regis_icon =Image.open(LoginForm.resource_path("icons/register.png"))
@@ -569,19 +554,10 @@ class RegistrationForm:
             hashed_password, salt = self.hash_password(password)
             
             # Save the new user with username instead of name
-            self.db_handler.save_user(
-                id = new_id,
-                email=email,
-                hashed_password=hashed_password,
-                salt=salt,
-                username=name  # Using name as username
-            )
+            self.db_handler.save_user(id = new_id, email=email, hashed_password=hashed_password, salt=salt, username=name)
             
             # Show success message briefly
-            self.reg_error_label.configure(
-                text="Registration successful! Please wait for admin approval.", 
-                text_color="green"
-            )
+            self.reg_error_label.configure(text="Registration successful! Please wait for admin approval.", text_color="green")
             
             # Clear the frame before calling back_callback
             for widget in self.original_master.winfo_children():
@@ -630,11 +606,7 @@ class RegistrationForm:
         confirm_password = self.confirm_password_entry.get()
 
         if not username or not password or not confirm_password:
-            CTkMessagebox(
-                title="Error",
-                message="All fields are required",
-                icon="error"
-            )
+            CTkMessagebox(title="Error", message="All fields are required", icon="error")
             return
 
         # Validate password
@@ -644,13 +616,8 @@ class RegistrationForm:
             return
 
         if password != confirm_password:
-            CTkMessagebox(
-                title="Error",
-                message="Passwords do not match",
-                icon="error"
-            )
+            CTkMessagebox(title="Error", message="Passwords do not match", icon="error")
             return
-
         try:
             # Your existing registration code here
             pass

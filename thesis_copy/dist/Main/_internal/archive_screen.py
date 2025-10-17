@@ -54,14 +54,7 @@ class ArchiveScreen(ctk.CTkFrame):
 
     def create_widgets(self):
         # Base button style configuration
-        button_style = {
-            "fg_color": "transparent",    
-            "hover_color": "#707070",     
-            "text_color": "black",        
-            "height": 32,                 
-            "border_width": 1,            
-            "border_color": "black"      
-        }
+        button_style = {"fg_color": "transparent", "hover_color": "#707070", "text_color": "black",  "height": 32, "border_width": 1, "border_color": "black"}
 
         # Additional styles for different button types
         regular_button_style = {**button_style, "width": 120}
@@ -128,13 +121,7 @@ class ArchiveScreen(ctk.CTkFrame):
             # Check if student is a tuple or dictionary
             if isinstance(student, tuple):
                 # If tuple, use index-based access
-                student_data = {
-                    'ID_NO': student[0],
-                    'FULL_NAME': student[1],
-                    'YR': student[2],  # Current year (e.g., 1, 2, 3, 4)
-                    'ENROLLED_YEAR': student[3],  # Year the student enrolled
-                    'YEAR_GRADUATED': "N/A"  # Default value
-                }
+                student_data = {'ID_NO': student[0], 'FULL_NAME': student[1], 'YR': student[2], 'ENROLLED_YEAR': student[3], 'YEAR_GRADUATED': "N/A"}
             else:
                 # If dictionary, use key-based access
                 student_data = student
@@ -156,14 +143,7 @@ class ArchiveScreen(ctk.CTkFrame):
 
             # Create clickable buttons for each student field
             for col, key in enumerate(['ID_NO', 'FULL_NAME', 'YR', 'ENROLLED_YEAR', 'YEAR_GRADUATED']):
-                btn = ctk.CTkButton(
-                    self.table_frame,
-                    text=str(student_data.get(key, "N/A")),  # Use "N/A" if key is missing
-                    fg_color="transparent",  # Make it look like a label
-                    hover_color="#707070",   # Add hover effect
-                    text_color="black",      # Match label text color
-                    command=lambda s=student_data: self.on_student_click(s)  # Bind click event
-                )
+                btn = ctk.CTkButton(self.table_frame, text=str(student_data.get(key, "N/A")), fg_color="transparent", hover_color="#707070", text_color="black", command=lambda s=student_data: self.on_student_click(s))
                 btn.grid(row=row, column=col, padx=5, pady=2, sticky="w" if col < 2 else "ew")
     styles = getSampleStyleSheet()   
     # Register Times New Roman font
@@ -192,7 +172,7 @@ class ArchiveScreen(ctk.CTkFrame):
                 canvas.drawString(x_centered, page_height - 120, text)
 
             # Footer image on every page
-            footer_image_path = LoginForm.resource_path("Image/Footer.jpg")
+            footer_image_path = LoginForm.resource_path("Image/Foota.jpg")
             canvas.drawImage(footer_image_path, x=0, y=0, width=595.27, height=70)
             
             # Non-official logo (watermark effect)
@@ -251,13 +231,7 @@ class ArchiveScreen(ctk.CTkFrame):
             doc = BaseDocTemplate(pdf_filename, pagesize=A4)
 
             # Create frames that account for header and footer
-            frame = Frame(
-                doc.leftMargin, 
-                doc.bottomMargin + 100,  # Add space for footer
-                doc.width, 
-                doc.height - 200,  # Reduce height for header and footer
-                id='normal'
-            )
+            frame = Frame(doc.leftMargin, doc.bottomMargin + 100, doc.width, doc.height - 200, id='normal')
 
             # Create page template
             template = PageTemplate(id='TestTemplate', frames=frame, onPage=page_layout)
@@ -266,31 +240,15 @@ class ArchiveScreen(ctk.CTkFrame):
             # Define styles
             styles = getSampleStyleSheet()
             # Create a custom style with Times New Roman
-            times_normal_style = ParagraphStyle(
-                'TimesNormalStyle',
-                parent=styles['Normal'],
-                fontName='TimesNewRoman',
-                fontSize=12
-            )
-            # Create a bold Times New Roman style
-            times_bold_style = ParagraphStyle(
-                'TimesBoldStyle',
-                parent=styles['Normal'],
-                fontName='TimesNewRomanBold',
-                fontSize=12
-            )
+            times_normal_style = ParagraphStyle('TimesNormalStyle', parent=styles['Normal'], fontName='TimesNewRoman', fontSize=12)
 
             # Create a list to hold the PDF content
             content = []
 
             # Add student information as paragraphs
-            student_info = [
-                ("ID Number", student_data.get('ID_NO', 'N/A')),
-                ("Full Name", student_data.get('FULL_NAME', 'N/A')),
-                ("Year", student_data.get('YR', 'N/A')),
-                ("Enrolled Year", student_data.get('ENROLLED_YEAR', '')),
-                ("Year Graduated", student_data.get('YEAR_GRADUATED', 'N/A'))
-            ]
+            student_info = [("ID Number", student_data.get('ID_NO', 'N/A')), ("Full Name", student_data.get('FULL_NAME', 'N/A')),
+                ("Year", student_data.get('YR', 'N/A')), ("Enrolled Year", student_data.get('ENROLLED_YEAR', '')),
+                ("Year Graduated", student_data.get('YEAR_GRADUATED', 'N/A'))]
 
             for label, value in student_info:
                 content.append(Paragraph(f"<b>{label}:</b> {value}", times_normal_style))
@@ -313,13 +271,7 @@ class ArchiveScreen(ctk.CTkFrame):
 
 
             # Define the custom style for year semester
-            year_level_style = ParagraphStyle(
-                'YearLevelStyle',
-                parent=styles['Normal'],  # Use Normal as the base style
-                fontSize=12,              # Set font size to 12
-                fontName='TimesNewRomanBold',
-                spaceAfter=5
-            )
+            year_level_style = ParagraphStyle('YearLevelStyle', parent=styles['Normal'],  fontSize=12, fontName='TimesNewRomanBold', spaceAfter=5)
             # Prepare combined course data for table
             combined_course_data = {}
 
@@ -327,8 +279,7 @@ class ArchiveScreen(ctk.CTkFrame):
             if curriculum_data and isinstance(curriculum_data[0], (tuple, list)):
                 curriculum_data = [
                     dict(zip(curriculum_columns, course)) 
-                    for course in curriculum_data
-                ]
+                    for course in curriculum_data]
                 
                 # Group courses by year and semester
                 for curriculum_course in curriculum_data:
@@ -364,33 +315,17 @@ class ArchiveScreen(ctk.CTkFrame):
                     if year_semester not in combined_course_data:
                         combined_course_data[year_semester] = []
 
-                    combined_course_data[year_semester].append([
-                        Paragraph(course_no, times_normal_style),
-                        Paragraph(descriptive_title, times_normal_style),
-                        units,
-                        lec,
-                        lab,
-                        Paragraph(prerequisite, times_normal_style),
-                        grade
-                    ])
+                    combined_course_data[year_semester].append([Paragraph(course_no, times_normal_style), Paragraph(descriptive_title, times_normal_style), units, lec, lab, Paragraph(prerequisite, times_normal_style), grade])
 
             for year_semester, course_data in combined_course_data.items():
                 if course_data:
                     course_table = Table(
-                        [["Course No.", "Descriptive Title", "Units", "Lec", "Lab", "Prerequisite", "Grade"]] + course_data,
-                        colWidths=[60, 200, 40, 40, 40, 80, 40]
-                    )
-                    course_table.setStyle(TableStyle([
-                        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-                        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-                        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                        ('FONTNAME', (0, 0), (-1, 0), 'TimesNewRomanBold'),
-                        ('BACKGROUND', (0, 1), (-1, -1), colors.transparent),
-                        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                        ('GRID', (0, 0), (-1, -1), 1, colors.black),
-                        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-                        ('FONTNAME', (0, 1), (-1, -1), 'TimesNewRoman')
-                    ]))
+                        [["Course No.", "Descriptive Title", "Units", "Lec", "Lab", "Prerequisite", "Grade"]] + course_data, colWidths=[60, 200, 40, 40, 40, 80, 40])
+                    course_table.setStyle(TableStyle([('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke), ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                        ('FONTNAME', (0, 0), (-1, 0), 'TimesNewRomanBold'), ('BACKGROUND', (0, 1), (-1, -1), colors.transparent),
+                        ('BOTTOMPADDING', (0, 0), (-1, 0), 12), ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                        ('VALIGN', (0, 0), (-1, -1), 'TOP'), ('FONTNAME', (0, 1), (-1, -1), 'TimesNewRoman')]))
                     content.append(Paragraph("&nbsp;&nbsp;" + year_semester, year_level_style))
                     content.append(course_table)
                     content.append(Spacer(1, 42))
@@ -414,15 +349,10 @@ class ArchiveScreen(ctk.CTkFrame):
 
     def get_year_level_title(self, year_level):
         """Simple mapping of year levels to descriptive titles"""
-        return {
-            "1.1": "First Year First Semester",
-            "1.2": "First Year Second Semester",
-            "2.1": "Second Year First Semester",
-            "2.2": "Second Year Second Semester",
-            "3.1": "Third Year First Semester",
-            "3.2": "Third Year Second Semester",
-            "4.1": "Fourth Year First Semester",
-            "4.2": "Fourth Year Second Semester"}.get(str(year_level), year_level)
+        return {"1.1": "First Year First Semester", "1.2": "First Year Second Semester",
+            "2.1": "Second Year First Semester", "2.2": "Second Year Second Semester",
+            "3.1": "Third Year First Semester", "3.2": "Third Year Second Semester",
+            "4.1": "Fourth Year First Semester", "4.2": "Fourth Year Second Semester"}.get(str(year_level), year_level)
 
     def perform_search(self):
         search_term = self.search_entry.get()
@@ -469,9 +399,7 @@ class ArchiveScreen(ctk.CTkFrame):
         """
         try:
             # Open file dialog to select graduates file
-            file_path = filedialog.askopenfilename(
-                title="Select Graduates File",
-                filetypes=[("CSV files", "*.csv"), ("Excel files", "*.xlsx"), ("All files", "*.*")])
+            file_path = filedialog.askopenfilename(title="Select Graduates File", filetypes=[("CSV files", "*.csv"), ("Excel files", "*.xlsx"), ("All files", "*.*")])
 
             if not file_path:
                 return  # User cancelled file selection
@@ -564,9 +492,7 @@ class ArchiveScreen(ctk.CTkFrame):
         """
         try:
             # Open file dialog to select curriculum file
-            file_path = filedialog.askopenfilename(
-                title="Select Curriculum File",
-                filetypes=[("CSV files", "*.csv"),("Excel files", "*.xlsx"),("All files", "*.*")])
+            file_path = filedialog.askopenfilename(title="Select Curriculum File", filetypes=[("CSV files", "*.csv"),("Excel files", "*.xlsx"),("All files", "*.*")])
 
             if not file_path:
                 return  # User cancelled file selection
