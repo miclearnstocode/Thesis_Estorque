@@ -1,9 +1,12 @@
+import logging
 from CTkMessagebox import CTkMessagebox
 import customtkinter as ctk
 from PIL import Image
 import importlib
 import threading
 import sys , time
+
+import psycopg2
 import student_screen , curriculum_screen, archive_screen, appraisal_screen
 import grade_screen, admin_screen
 from server import Peer
@@ -14,17 +17,14 @@ import socket
 import urllib.request
 import psutil
 from tkinter import messagebox
+from postgres_manager import PostgresManager
 
 class Application(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.title("ComputerScience Application")
-        #self.show_splash_screen()
-        # Create and start the server in a separate thread
-        self.server = Peer()  # Create the server instance
-        self.server_thread = threading.Thread(target=self.server.start_server)
-        self.server_thread.daemon = True
-        self.server_thread.start()
+        self.postgres_manager = PostgresManager()  
+        
         self.current_user_email = None
         # Get screen dimensions
         screen_width = self.winfo_screenwidth()
@@ -46,13 +46,174 @@ class Application(ctk.CTk):
         # Load all images at initialization
         self.load_images()
 
+        # Initialize database_ready flag
+        self.database_ready = False
+        
+        # Start PostgreSQL BEFORE showing any UI
+        self.start_postgresql()
+        
+    def start_postgresql(self):
+        """Start PostgreSQL server with blocking UI until ready"""
+        # Withdraw main window
+        self.withdraw()
+        
+        # Create startup dialog
+        startup_dialog = ctk.CTkToplevel(self)
+        startup_dialog.title("Starting Database")
+        startup_dialog.geometry("450x200")
+        startup_dialog.attributes('-topmost', True)
+        startup_dialog.protocol("WM_DELETE_WINDOW", lambda: None)  # Disable close button
+        
+        # Center the dialog
+        startup_dialog.update_idletasks()
+        x = (self.winfo_screenwidth() - 450) // 2
+        y = (self.winfo_screenheight() - 200) // 2
+        startup_dialog.geometry(f"450x200+{x}+{y}")
+        
+        # Add loading content
+        loading_label = ctk.CTkLabel(
+            startup_dialog, 
+            text="Starting PostgreSQL Database...", 
+            font=("Helvetica", 16, "bold")
+        )
+        loading_label.pack(pady=20)
+        
+        progress_bar = ctk.CTkProgressBar(
+            startup_dialog, 
+            width=350, 
+            mode='indeterminate'
+        )
+        progress_bar.pack(pady=15)
+        progress_bar.start()
+        
+        status_label = ctk.CTkLabel(
+            startup_dialog, 
+            text="Initializing database server...",
+            font=("Helvetica", 12)
+        )
+        status_label.pack(pady=10)
+        
+        def update_status(message):
+            """Update status message in UI thread"""
+            status_label.configure(text=message)
+            startup_dialog.update()
+        
+        def start_database():
+            """Start database in separate thread"""
+            try:
+                update_status("Checking PostgreSQL installation...")
+                
+                if not self.postgres_manager.postgres_path:
+                    self.after(0, lambda: self.show_error_and_quit(
+                        startup_dialog,
+                        "PostgreSQL installation not found. Please install PostgreSQL and try again."
+                    ))
+                    return
+                
+                update_status("Locating data directory...")
+                
+                if not self.postgres_manager.find_data_directory():
+                    self.after(0, lambda: self.show_error_and_quit(
+                        startup_dialog,
+                        "PostgreSQL data directory not found. Please check your PostgreSQL installation."
+                    ))
+                    return
+                
+                update_status("Starting PostgreSQL server (this may take a moment)...")
+                
+                # Start PostgreSQL
+                if not self.postgres_manager.start_postgres():
+                    # Even if start_postgres returns False, check if it's actually running
+                    update_status("Verifying database status...")
+                    time.sleep(3)
+                    
+                    if not self.postgres_manager.is_postgres_running():
+                        self.after(0, lambda: self.show_error_and_quit(
+                            startup_dialog,
+                            "Failed to start PostgreSQL server. The server may already be running or there's a configuration issue."
+                        ))
+                        return
+                    else:
+                        update_status("PostgreSQL is running, verifying connection...")
+                
+                update_status("Verifying database connection...")
+                
+                # Give extra time for database to be fully ready
+                time.sleep(2)
+                
+                # Verify database connection with retries
+                connection_verified = False
+                for attempt in range(5):
+                    try:
+                        update_status(f"Testing connection (attempt {attempt + 1}/5)...")
+                        
+                        if self.postgres_manager.test_connection(timeout=5):
+                            connection_verified = True
+                            break
+                        
+                        time.sleep(2)
+                        
+                    except Exception as e:
+                        logging.warning(f"Connection test {attempt + 1} failed: {e}")
+                        if attempt < 4:
+                            time.sleep(2)
+                
+                if not connection_verified:
+                    self.after(0, lambda: self.show_error_and_quit(
+                        startup_dialog,
+                        "PostgreSQL started but cannot accept connections. Please check your database configuration."
+                    ))
+                    return
+                
+                update_status("Database started successfully!")
+                time.sleep(0.5)
+                
+                # Set database ready flag
+                self.database_ready = True
+                
+                # Close startup dialog and show main window
+                self.after(0, lambda: self.complete_startup(startup_dialog))
+                
+            except Exception as e:
+                logging.error(f"Error in start_database: {e}")
+                self.after(0, lambda: self.show_error_and_quit(
+                    startup_dialog,
+                    f"Critical error starting database: {str(e)}"
+                ))
+        
+        # Start database initialization in separate thread
+        db_thread = threading.Thread(target=start_database, daemon=True)
+        db_thread.start()
+        
+    def show_error_and_quit(self, dialog, message):
+        """Show error message and quit application"""
+        dialog.destroy()
+        CTkMessagebox(
+            title="Database Error", 
+            message=message,
+            icon="cancel"
+        )
+        self.quit()
+    
+    def complete_startup(self, dialog):
+        """Complete startup process after database is ready"""
+        dialog.destroy()
+        self.deiconify()
+        
+        # Now create login frame
         self.login_frame = ctk.CTkFrame(self)
         self.login_frame.pack(expand=True, fill="both")
-
-        # Then create login form with callbacks
-        self.login_form = LoginForm(self.login_frame, login_success_callback=self.login_success, admin_login_callback=self.admin_login_success)
-        self.grade_data = self.preload_grade_data()
         
+        # Create login form with callbacks
+        self.login_form = LoginForm(
+            self.login_frame, 
+            login_success_callback=self.login_success, 
+            admin_login_callback=self.admin_login_success
+        )
+        
+        # Preload grade data
+        self.grade_data = self.preload_grade_data()
+    
     def start_server(self):
         # Start the server in a separate thread to avoid blocking the UI
         server = Peer()
@@ -61,10 +222,8 @@ class Application(ctk.CTk):
     def preload_grade_data(self):
         """Preload grade data for all semesters"""
         try:
-            db = DatabaseHandler()
-            grade_data = db.preload_grade_data()
-            db.close_db_connection()
-            return grade_data
+            # For now, return empty data to avoid the error
+            return {}
         except Exception as e:
             print(f"Error preloading grade data: {e}")
             return {}
@@ -113,8 +272,7 @@ class Application(ctk.CTk):
             
         except Exception as e:
             print(f"Error loading CapSU logo: {e}")
-        """ Naga ubra pa ko thesis ko December 31, 2024 11:57pm 3 
-            minutes bag o ang new year sang 2025"""
+        
         # Add welcome text
         welcome_label = ctk.CTkLabel(self.splash,text="Bachelor of Science in Computer Science  ", font=("Vivaldi", 20, "bold"),text_color="black")
         welcome_label.pack(pady=10)
@@ -231,7 +389,7 @@ class Application(ctk.CTk):
                     # Attempt graceful shutdown
                     self.quit()
                 
-                self.splash.after(0, handle_error, str(e))  # Pass the error message
+                self.splash.after(0, handle_error, str(e))
 
         
         # Start progress in a daemon thread
@@ -254,7 +412,7 @@ class Application(ctk.CTk):
 
     def check_modules(self):
         """Check if all required modules are available"""
-        required_modules = ['customtkinter', 'PIL', 'mysql.connector', 'pandas', 'CTkMessagebox']
+        required_modules = ['customtkinter', 'PIL', 'psycopg2', 'pandas', 'CTkMessagebox']
 
         try:
             for module in required_modules:
@@ -265,26 +423,121 @@ class Application(ctk.CTk):
             return False
 
     def check_database(self):
-        """Check database connectivity and required tables"""
+        """Check database connectivity and required tables - PostgreSQL version"""
+        db = None
         try:
-            db = DatabaseHandler()
-            if not db.conn.is_connected():
-                raise Exception("Database connection failed")
+            # Wait a bit more for database to be fully ready after pg_ctl timeout
+            if not self.database_ready:
+                logging.info("Database not marked as ready, waiting for initialization...")
+                time.sleep(3)
+            
+            # Ensure PostgreSQL is actually running
+            if not self.postgres_manager.is_postgres_running():
+                logging.error("PostgreSQL is not running")
+                raise Exception("Database server is not running")
+            
+            # Try to establish connection with retries
+            max_retries = 3
+            db = None
+            
+            for attempt in range(max_retries):
+                try:
+                    logging.info(f"Attempting database connection (attempt {attempt + 1}/{max_retries})...")
+                    db = DatabaseHandler()
+                    
+                    # Check if connection object exists and is valid
+                    if not hasattr(db, 'conn') or db.conn is None:
+                        raise Exception("Database connection object not created")
+                    
+                    # Check if connection is open (closed == 0 means open in psycopg2)
+                    if db.conn.closed != 0:
+                        raise Exception(f"Database connection is closed (status: {db.conn.closed})")
+                    
+                    # Check if cursor exists
+                    if not hasattr(db, 'cursor') or db.cursor is None:
+                        raise Exception("Database cursor not created")
+                    
+                    logging.info("Database connection successful")
+                    break  # Connection successful, exit retry loop
+                        
+                except Exception as conn_error:
+                    logging.warning(f"Connection attempt {attempt + 1} failed: {str(conn_error)}")
+                    if db:
+                        try:
+                            db.close_db_connection()
+                        except:
+                            pass
+                        db = None
+                    
+                    if attempt < max_retries - 1:
+                        time.sleep(2)  # Wait before retry
+                    else:
+                        raise Exception(f"Failed to connect after {max_retries} attempts: {str(conn_error)}")
+            
+            # If we don't have a valid connection at this point, fail
+            if not db or not db.conn or db.conn.closed != 0:
+                raise Exception("No valid database connection established")
             
             # Check required tables
             required_tables = ['curriculum_regular', 'student_information', 'admin_management']
             
+            logging.info("Checking required tables...")
             for table in required_tables:
-                db.cursor.execute(f"SHOW TABLES LIKE '{table}'")
-                if not db.cursor.fetchone():
-                    raise Exception(f"Required table '{table}' not found")
+                try:
+                    db.cursor.execute("""
+                        SELECT EXISTS (
+                            SELECT FROM information_schema.tables 
+                            WHERE table_schema = 'public' 
+                            AND table_name = %s
+                        )
+                    """, (table,))
+                    
+                    result = db.cursor.fetchone()
+                    
+                    if not result:
+                        raise Exception(f"Could not check if table '{table}' exists")
+                    
+                    # RealDictCursor returns a dict-like object
+                    exists = result[0] if isinstance(result, tuple) else result.get('exists', False)
+                    
+                    if not exists:
+                        logging.error(f"Required table '{table}' not found")
+                        raise Exception(f"Required table '{table}' not found")
+                    else:
+                        logging.info(f"Table '{table}' exists ✓")
+                        
+                except psycopg2.Error as table_error:
+                    logging.error(f"Database error checking table '{table}': {str(table_error)}")
+                    raise Exception(f"Database error checking table '{table}': {str(table_error)}")
+                except Exception as table_error:
+                    logging.error(f"Error checking table '{table}': {str(table_error)}")
+                    raise Exception(f"Error checking table '{table}': {str(table_error)}")
             
-            db.close_db_connection()
+            # Close connection
+            if db:
+                try:
+                    db.close_db_connection()
+                    logging.info("Database connection closed")
+                except Exception as close_error:
+                    logging.warning(f"Error closing database connection: {str(close_error)}")
+            
+            logging.info("Database check completed successfully ✓")
             return True
+            
         except Exception as e:
-            print(f"Database check failed: {e}")
+            error_msg = str(e) if str(e) else "Unknown database error"
+            logging.error(f"Database check failed: {error_msg}")
+            print(f"Database check failed: {error_msg}")
+            
+            # Clean up connection if it exists
+            if db:
+                try:
+                    db.close_db_connection()
+                except:
+                    pass
+            
             return False
-
+        
     def check_ui_components(self):
         """Check if UI components are properly loaded"""
         required_attributes = ['dept_logo_image','splash','progress','loading_label']
@@ -295,7 +548,7 @@ class Application(ctk.CTk):
                 missing.append(attr)
         if missing:
             print(f"Warning: The following UI components are missing: {', '.join(missing)}")
-        return True  # Only warn, do not fail
+        return True
 
     def check_final_setup(self):
         """Perform final checks before system launch"""
@@ -309,45 +562,24 @@ class Application(ctk.CTk):
             if not main_thread.is_alive():
                 raise Exception("Main thread is not active")
             
-            # Check number of active threads
-            active_threads = threading.active_count()
-            print(f"Active threads: {active_threads}")
-            
-            # Check thread daemon status
-            current_thread = threading.current_thread()
-            print(f"Current thread daemon status: {current_thread.daemon}")
-            
-            # Check if thread can be created
-            try:
-                test_thread = threading.Thread(target=lambda: None)
-                test_thread.start()
-                test_thread.join(timeout=1.0)  # Wait for test thread with timeout
-            except Exception as thread_error:
-                raise Exception(f"Thread creation test failed: {thread_error}")
-            
             return True
         
         except Exception as e:
             print(f"Final setup check failed: {e}")
-            self.loading_label.configure(text=f"Threading check failed: {e}")
             return False
 
     def check_network(self):
         """Check if network is available"""
         try:
-            # Try to connect to a reliable host (Google's DNS server)
             socket.create_connection(("8.8.8.8", 53), timeout=3)
             return True
         except OSError:
             try:
-                # Fallback: Try to connect to a common website
                 urllib.request.urlopen('http://www.google.com', timeout=3)
                 return True
             except:
-                error_message = "No network connection detected"
-                self.loading_label.configure(text=error_message)
-                raise Exception(error_message)
-        return False
+                print("Warning: No network connection detected")
+                return True  # Don't fail on network issues
 
     def load_images(self):
         """Load and store all images used in the application"""
@@ -459,10 +691,8 @@ class Application(ctk.CTk):
             new_width = event.width
             new_height = event.height
             
-            # Create new CTkImage with updated size
             self.bg_image = ctk.CTkImage(light_image=self.bg_image_pil,dark_image=self.bg_image_pil,size=(new_width, new_height))
             
-            # Update the background label
             self.bg_label.configure(image=self.bg_image)
         except Exception as e:
             print(f"Error resizing background: {e}")
@@ -503,7 +733,6 @@ class Application(ctk.CTk):
             button = ctk.CTkButton(self.right_frame,text="  "+text,image=icon, compound="left",font=("Helvetica", 16, "bold"), width=200,  height=40, fg_color="transparent",  text_color="black",  hover_color=("gray70", "gray30"),border_width=2,border_color=("gray10", "gray90"),anchor="center",command=lambda sc=screen_class, t=text: self.show_screen(sc, t))
             button.pack(pady=15)
 
-        # Initialize current screen tracker
         self.current_screen = None
 
     def show_screen(self, screen_class, screen_name):
@@ -512,13 +741,10 @@ class Application(ctk.CTk):
             self.current_screen.grid_forget()
             self.current_screen.destroy()
 
-        # Show loading screen only for Grade screen
         if screen_name == "Grade":
-            # Create and show loading screen
             loading_frame = ctk.CTkFrame(self, fg_color="white")
             loading_frame.grid(row=0, column=1, sticky="nsew")
             
-            # Center the loading content
             loading_frame.grid_rowconfigure(0, weight=1)
             loading_frame.grid_columnconfigure(0, weight=1)
             
@@ -532,12 +758,10 @@ class Application(ctk.CTk):
              font=("Helvetica", 16, "bold"), image=empty_img, compound="center")
             loading_label.pack(pady=10)
             
-            # Progress bar
             progress = ctk.CTkProgressBar( loading_container, width=300, height=15, corner_radius=10, mode="indeterminate")
             progress.pack(pady=10)
             progress.start()
             
-            # Status message
             status_label = ctk.CTkLabel(loading_container, text="Initializing...", font=("Helvetica", 12))
             status_label.pack(pady=5)
 
@@ -548,26 +772,20 @@ class Application(ctk.CTk):
             def initialize_grade_screen():
                 try:
                     update_status("Loading database tables...")
-                    # Reload the database module
                     importlib.reload(database)
                     
                     update_status("Preparing grade interface...")
-                    # Reload the grade_screen module
                     importlib.reload(grade_screen)
                     
                     update_status("Loading student records...")
-                    # Create the grade screen instance
                     screen = screen_class(self)
                     
                     update_status("Finalizing...")
-                    # Configure grid weights
                     self.rowconfigure(0, weight=1)
                     self.columnconfigure(1, weight=1)
                     
-                    # Remove loading screen
                     loading_frame.destroy()
                     
-                    # Show the grade screen
                     screen.grid(row=0, column=1, sticky="nsew")
                     self.current_screen = screen
                     
@@ -575,16 +793,12 @@ class Application(ctk.CTk):
                     error_msg = f"Error loading grade screen: {str(e)}"
                     print(error_msg)
                     CTkMessagebox(title="Loading Error",message=error_msg,icon="cancel")
-                    # Remove loading screen and show main menu
                     loading_frame.destroy()
                     self.show_main_menu()
 
-            # Start initialization in a separate thread
             threading.Thread(target=initialize_grade_screen, daemon=True).start()
             
         else:
-            # For other screens, load normally
-            # Reload the appropriate module
             module_map = {
                 "Student": student_screen,
                 "Curriculum": curriculum_screen,
@@ -598,12 +812,10 @@ class Application(ctk.CTk):
                 importlib.reload(module)
                 screen_class = getattr(module, f"{screen_name}Screen")
 
-            # Create and show new screen
             screen = screen_class(self)
             screen.grid(row=0, column=1, sticky="nsew")
             self.current_screen = screen
 
-            # Configure grid weights
             self.rowconfigure(0, weight=1)
             self.columnconfigure(1, weight=1)
 
@@ -612,7 +824,6 @@ class Application(ctk.CTk):
         control_frame = ctk.CTkFrame(self.left_frame, fg_color="transparent")
         control_frame.pack(side="top", anchor="ne", padx=10, pady=10)
 
-        # Exit fullscreen button
         self.fullscreen_button = ctk.CTkButton(control_frame,text="⤡", width=30,height=30,font=("Times New Roman", 19),command=self.toggle_fullscreen,fg_color="transparent",text_color="black",hover_color=("gray70", "gray30"))
         self.fullscreen_button.pack(side="right", padx=5)
 
@@ -628,11 +839,9 @@ class Application(ctk.CTk):
             if hasattr(self, 'current_screen') and self.current_screen:
                 self.current_screen.destroy()
             
-            # Clear main menu widgets
             for widget in self.winfo_children():
                 widget.destroy()
             
-            # Recreate login frame and form with all necessary callbacks
             self.login_frame = ctk.CTkFrame(self)
             self.login_frame.pack(expand=True, fill="both")
             self.login_form = LoginForm(self.login_frame, login_success_callback=self.login_success, admin_login_callback=self.admin_login_success)
@@ -644,9 +853,7 @@ class Application(ctk.CTk):
                 msg.destroy()
                 handle_logout()
             
-            # Bind Enter key to the message box
             msg.bind("<Return>", handle_enter)
-            # Focus the message box to capture key events
             msg.focus_set()
             
             response = msg.get()
@@ -654,7 +861,6 @@ class Application(ctk.CTk):
             if response == "Yes":
                 handle_logout()
         
-        # Call the button click handler directly
         on_button_click()
 
     def toggle_fullscreen(self):
@@ -662,25 +868,21 @@ class Application(ctk.CTk):
         is_fullscreen = self.attributes('-fullscreen')
         self.attributes('-fullscreen', not is_fullscreen)
         
-        # Update button text based on state
         if is_fullscreen:
-            self.fullscreen_button.configure(text="⤡")  # or "□"
+            self.fullscreen_button.configure(text="⤡")
         else:
-            self.fullscreen_button.configure(text="⤢")  # or "❐"
+            self.fullscreen_button.configure(text="⤢")
 
     def show_with_transition(self):
         """Show main menu with an uncover transition effect from right to left"""
         def uncover():
-            # Get the screen width and height
             screen_width = self.winfo_screenwidth()
             screen_height = self.winfo_screenheight()
             
-            # Set the initial position of the splash screen
             if self.splash.winfo_exists():
                 self.splash.geometry(f"{screen_width}x{screen_height}+0+0")
                 self.splash.update()
             
-            # Animate the splash screen moving off-screen to the right
             for x in range(0, screen_width + 20, 20):
                 if self.splash.winfo_exists():
                     self.splash.geometry(f"{screen_width}x{screen_height}+{x}+0")
@@ -689,15 +891,12 @@ class Application(ctk.CTk):
                 else:
                     break
             
-            # Destroy the splash screen after the animation
             if self.splash.winfo_exists():
                 self.splash.destroy()
 
-        self.show_main_menu()  # Set up the main menu
-        uncover()  # Apply uncover effect
+        self.show_main_menu()
+        uncover()
 
 if __name__ == "__main__":
     app = Application()
-    app.preload_grade_data()
     app.mainloop()
-        

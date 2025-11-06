@@ -1,20 +1,30 @@
-from configparser import Error
+# database.py
 import logging
 import re
-from CTkMessagebox import CTkMessagebox
 import pandas as pd
 from tkinter import messagebox
 import psycopg2
 import psycopg2.extras
 from datetime import datetime
-import time, os, logging, sys
-import traceback
+import time, os, logging
 from psycopg2.extras import RealDictCursor
 from config_manager import config_manager
+from postgres_manager import PostgresManager
 
 class DatabaseHandler:
     def __init__(self):
         try:
+            #comscie@2025
+            # Initialize PostgreSQL manager and ensure it's running
+            self.postgres_manager = PostgresManager()
+            postgres_config = config_manager.get_postgres_config()
+            
+            if postgres_config.get('auto_start', True):
+                if not self.postgres_manager.ensure_postgres_running():
+                    logging.error("Failed to start PostgreSQL server")
+                    self.show_connection_error("Failed to start PostgreSQL server")
+                    return
+            
             # Get configuration from config manager
             db_config = config_manager.get_database_config()
             
@@ -25,25 +35,14 @@ class DatabaseHandler:
             self.port = db_config['port']
             
             logging.info(f"Database config loaded: {self.host}, {self.user}, {self.database}")
+            self.conn = None
+            self.cursor = None
             
-            # Initialize PostgreSQL database
-            db_init = DatabaseInitializer(host=self.host,user=self.user,password=self.password,port=self.port)
-            
-            if db_init.create_database_and_tables():
-                self.conn, self.cursor = self.get_db_connection()
-                if self.conn:
-                    logging.info("PostgreSQL database initialized successfully")
-                else:
-                    logging.error("Failed to establish PostgreSQL database connection")
-                    self.show_connection_error("Failed to connect to PostgreSQL database")
-            else:
-                logging.error("Failed to initialize PostgreSQL database tables")
-                self.show_connection_error("Failed to initialize PostgreSQL database")
-                
+            # Get initial connection
+            self.conn, self.cursor = self.get_db_connection()
         except Exception as e:
             logging.error(f"DatabaseHandler initialization failed: {e}")
             self.show_config_error(e)
-
             
     def get_db_connection(self):
         try:
@@ -82,9 +81,7 @@ class DatabaseHandler:
         
     def show_config_error(self, error):
         """Show configuration error to user"""
-        CTkMessagebox(
-            title="Configuration Error", message=f"Failed to load database configuration:\n{error}\n\n"
-            "Please check app_config.py file.")
+        print("Configuration Error",error)
         
     def show_connection_error(self, error):
         """Show connection error to user"""
@@ -94,13 +91,7 @@ class DatabaseHandler:
             2005: "Unknown PostgreSQL server host - Check host address"}
         
         user_message = error_messages.get(error.errno, f"Database error: {error}")
-        
-        CTkMessagebox(title="Database Connection Failed",
-            message=f"{user_message}\n\n"
-            "Please ensure:\n"
-            "1. PostgreSQL server is running\n"
-            "2. Database credentials in app_config.py are correct\n"
-            "3. 'department' database exists")
+        print("Database Connection Failed", user_message)
         
     def close_db_connection(self):
         self.conn.close()
@@ -639,34 +630,39 @@ class DatabaseHandler:
                 cr.Prerequisite
             FROM student_information si
             LEFT JOIN curriculum_regular cr 
-                ON cr.YEAR_LEVEL = si.YR
-            WHERE si.ID_NO = %s OR cr.YEAR_LEVEL = %s
+                ON (cr.YEAR_LEVEL::TEXT LIKE si.YR::TEXT || '.%' OR cr.YEAR_LEVEL = %s)
+            WHERE si.ID_NO = %s
         """
-        curriculum_params = (id_no, year_level)
+        curriculum_params = (year_level, id_no)
 
         try:
-            #Ensure PostgreSQL connection is active
+            # Ensure PostgreSQL connection is active
             if not self.conn or self.conn.closed != 0:
                 raise psycopg2.Error("Database connection lost.")
 
-            #Use psycopg2 cursor safely
+            # Use psycopg2 cursor safely
             with self.conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
                 cursor.execute(curriculum_query, curriculum_params)
                 curriculum_results = cursor.fetchall()
 
             if not curriculum_results:
                 logging.warning(f"No curriculum data found for ID_NO: {id_no}, Year Level: {year_level}")
+                curriculum_results = []
             else:
-                # Format full name
+                # Format full name with proper error handling
                 for result in curriculum_results:
-                    middle = result.get('MIDDLE_NAME', '')
-                    middle_initial = f"{middle[0]}." if middle else ""
-                    result['STUDENT_NAME'] = f"{result['LAST_NAME']}, {result['FIRST_NAME']} {middle_initial}".strip()
+                    try:
+                        middle = result.get('MIDDLE_NAME', '') or ''
+                        middle_initial = f"{middle[0]}." if middle else ""
+                        result['STUDENT_NAME'] = f"{result['LAST_NAME']}, {result['FIRST_NAME']} {middle_initial}".strip()
 
-                    # Optionally remove raw name parts
-                    result.pop('LAST_NAME', None)
-                    result.pop('FIRST_NAME', None)
-                    result.pop('MIDDLE_NAME', None)
+                        # Optionally remove raw name parts
+                        result.pop('LAST_NAME', None)
+                        result.pop('FIRST_NAME', None)
+                        result.pop('MIDDLE_NAME', None)
+                    except (KeyError, IndexError) as e:
+                        logging.warning(f"Error formatting student name: {e}")
+                        result['STUDENT_NAME'] = "Unknown Student"
 
         except psycopg2.Error as err:
             logging.error(f"Database error while fetching student data: {err}")
@@ -675,12 +671,24 @@ class DatabaseHandler:
             logging.error(f"Unexpected error while fetching student data: {e}")
             raise RuntimeError(f"Unexpected error while fetching student data: {e}")
 
-        #Map year levels to semester tables
-        table_mapping = {'1.1': 'first_year_first_semester', '1.2': 'first_year_second_semester',
-            '2.1': 'second_year_first_semester', '2.2': 'second_year_second_semester', '3.1': 'third_year_first_semester', '3.2': 'third_year_second_semester', '4.1': 'fourth_year_first_semester', '4.2': 'fourth_year_second_semester'}
+        # Map year levels to semester tables
+        table_mapping = {
+            '1.1': 'first_year_first_semester', 
+            '1.2': 'first_year_second_semester',
+            '2.1': 'second_year_first_semester', 
+            '2.2': 'second_year_second_semester', 
+            '3.1': 'third_year_first_semester', 
+            '3.2': 'third_year_second_semester', 
+            '4.1': 'fourth_year_first_semester', 
+            '4.2': 'fourth_year_second_semester'
+        }
 
-        #Fetch all grades
-        all_grades_data = self.check_all_tables_for_grades(id_no)
+        # Fetch all grades with error handling
+        all_grades_data = {}
+        try:
+            all_grades_data = self.check_all_tables_for_grades(id_no)
+        except Exception as e:
+            logging.warning(f"Error fetching grades data: {e}")
 
         current_table = table_mapping.get(year_level)
         if current_table:
@@ -691,39 +699,50 @@ class DatabaseHandler:
         else:
             enrollment_status = f"Invalid year level: {year_level}"
 
-        #Merge grade data into curriculum results
+        # Merge grade data into curriculum results with error handling
         for curriculum in curriculum_results:
             course_no = curriculum.get('Course_No')
-            for table, grades in all_grades_data.items():
-                if course_no in grades:
-                    curriculum[f'Grade_{table}'] = grades[course_no]
+            if course_no:
+                for table, grades in all_grades_data.items():
+                    if course_no in grades:
+                        curriculum[f'Grade_{table}'] = grades[course_no]
 
         logging.debug(f"All grades data: {all_grades_data}")
         logging.debug(f"Curriculum data with grades: {curriculum_results}")
 
-        #Safely fetch all curriculum_regular rows
-        with self.conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
-            cursor.execute("SELECT * FROM curriculum_regular")
-            curriculum_regular_data = cursor.fetchall()
+        # Safely fetch all curriculum_regular rows
+        curriculum_regular_data = []
+        try:
+            with self.conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
+                cursor.execute("SELECT * FROM curriculum_regular")
+                curriculum_regular_data = cursor.fetchall()
+        except Exception as e:
+            logging.warning(f"Error fetching curriculum regular data: {e}")
 
-        return {"curriculum_data": curriculum_results, "curriculum_regular_data": curriculum_regular_data,
-            "enrollment_status": enrollment_status, "table_exists": current_table in all_grades_data if current_table else False,
+        return {
+            "curriculum_data": curriculum_results, 
+            "curriculum_regular_data": curriculum_regular_data,
+            "enrollment_status": enrollment_status, 
+            "table_exists": current_table in all_grades_data if current_table else False,
             "has_grades": bool(all_grades_data.get(current_table)) if current_table else False,
-            "grades_data": all_grades_data}
+            "grades_data": all_grades_data
+        }
 
     
-        # pag check ng grade sa regular student
-    
+    # pag check ng grade sa regular student
     def check_all_tables_for_grades(self, id_no):
-        table_names = ['first_year_first_semester', 'first_year_second_semester','second_year_first_semester', 'second_year_second_semester', 'third_year_first_semester', 'third_year_second_semester',
-            'fourth_year_first_semester', 'fourth_year_second_semester']
+        table_names = [
+            'first_year_first_semester', 'first_year_second_semester',
+            'second_year_first_semester', 'second_year_second_semester', 
+            'third_year_first_semester', 'third_year_second_semester',
+            'fourth_year_first_semester', 'fourth_year_second_semester'
+        ]
 
         all_grades_data = {}
 
         # Loop through all semester tables
         for table in table_names:
             try:
-                # Use double quotes only if table names have uppercase/mixed case, else safe as-is
                 query = f"""
                     SELECT course_no, grades
                     FROM {table}
@@ -734,7 +753,7 @@ class DatabaseHandler:
                 if not self.conn or self.conn.closed != 0:
                     raise psycopg2.Error("Database connection lost.")
 
-                #Use psycopg2 cursor safely
+                # Use psycopg2 cursor safely
                 with self.conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
                     cursor.execute(query, (id_no,))
                     results = cursor.fetchall()
@@ -752,7 +771,7 @@ class DatabaseHandler:
                         logging.debug(f"Found grades in {table}: {grades_data}")
 
             except psycopg2.errors.UndefinedTable:
-                #Table might not exist — skip silently
+                # Table might not exist — skip silently
                 logging.warning(f"Table '{table}' does not exist. Skipping.")
                 continue
             except psycopg2.Error as err:
@@ -761,6 +780,7 @@ class DatabaseHandler:
             except Exception as e:
                 logging.error(f"Unexpected error checking {table}: {e}")
                 continue
+        
         return all_grades_data
 
     def get_latest_school_year(self, id_no):
@@ -928,7 +948,7 @@ class DatabaseHandler:
             FROM
                 student_information si
             LEFT JOIN
-                curriculum_regular cr ON cr.year_level = %s
+                curriculum_regular cr ON (cr.year_level::TEXT LIKE si.yr::TEXT || '.%' OR cr.year_level = %s)
             WHERE
                 si.id_no = %s
         """
@@ -1163,14 +1183,14 @@ class DatabaseHandler:
             if self.conn and self.conn.closed == 0:
                 self.conn.rollback()
             logging.error(f"Database error while saving grades: {err}")
-            CTkMessagebox(title="Database Error", message=f"Database Error: {err}")
+            print("Database Error save_grading_data", err)
             return False
 
         except Exception as e:
             if self.conn and self.conn.closed == 0:
                 self.conn.rollback()
             logging.error(f"Unexpected error while saving grades: {e}")
-            CTkMessagebox(title="Error", message=f"Error saving grades: {e}")
+            print("Error save_grading_data", e)
             return False
 
     def save_irregular_grading_data(self, grading_data, year, semester):
@@ -1799,42 +1819,38 @@ class DatabaseHandler:
             print(f"❌ Unexpected Error in check_existing_grade: {e}")
             return False
 
-    def create_users_table(self):
+    def get_next_user_id(self):
         """
-        Create the admin_management table in PostgreSQL if it doesn't already exist.
-        """
-        create_table_query = """
-        CREATE TABLE IF NOT EXISTS admin_management (
-            id SERIAL PRIMARY KEY,
-            username VARCHAR(255) NOT NULL,
-            email VARCHAR(255) UNIQUE NOT NULL,
-            password VARCHAR(255) NOT NULL,
-            salt VARCHAR(255) NOT NULL,
-            role VARCHAR(50) DEFAULT 'user',
-            is_active BOOLEAN DEFAULT FALSE,
-            last_login TIMESTAMP,
-            registration_date TIMESTAMP NOT NULL DEFAULT NOW()
-        )
+        Get the next user ID from the admin_management table.
+        For PostgreSQL, the SERIAL column automatically increments,
+        but this function provides the next value for display or manual insert.
         """
         try:
-            # Ensure connection is alive
+            # Ensure connection is active
             if not hasattr(self, 'conn') or self.conn.closed != 0:
                 self.conn, self.cursor = self.get_db_connection()
 
-            with self.conn.cursor() as cursor:
-                cursor.execute(create_table_query)
-                self.conn.commit()
+            # PostgreSQL way to get the next sequence value
+            query = """ 
+                SELECT COALESCE(MAX(id), 0) + 1 AS next_id 
+                FROM admin_management 
+            """
+            self.cursor.execute(query)
+            result = self.cursor.fetchone()
 
-            print("✅ admin_management table ensured successfully.")
+            # Return the next available ID (ensure it's at least 1)
+            next_id = result[0] if result and result[0] is not None else 1
+            print(f"Next user ID: {next_id}")
+            return next_id
 
-        except psycopg2.Error as e:
-            print(f"❌ Database error creating admin_management table: {e}")
-            self.conn.rollback()
-            raise
+        except psycopg2.Error as err:
+            print(f"❌ Database Error in get_next_user_id: {err}")
+            # Fallback to 1 if there's an error
+            return 1
         except Exception as e:
-            print(f"❌ Unexpected error creating admin_management table: {e}")
-            self.conn.rollback()
-            raise
+            print(f"❌ Unexpected Error in get_next_user_id: {e}")
+            # Fallback to 1 if there's an unexpected error
+            return 1
 
     def save_user(self, id, email, hashed_password, salt, username):
         """
@@ -1854,8 +1870,9 @@ class DatabaseHandler:
             if len(username.strip()) < 3:
                 raise ValueError("Username must be at least 3 characters long")
 
-            # Ensure connection is active
-            if not hasattr(self, 'conn') or self.conn.closed != 0:
+            # Ensure connection is active - recreate if needed
+            if not hasattr(self, 'conn') or self.conn is None or self.conn.closed != 0:
+                print("Re-establishing database connection...")
                 self.conn, self.cursor = self.get_db_connection()
 
             # --- Check if email already exists ---
@@ -1883,61 +1900,71 @@ class DatabaseHandler:
             self.cursor.execute(
                 insert_query,(id, username.strip(), email.strip(), hashed_password, salt,
                     'user',               # Default role
-                    False,                # Default inactive
+                    True,                 # Default active (changed from False to True)
                     current_time,         # Registration date
                     current_time          # Last login initialized to now
                 ))
             self.conn.commit()
-
-            CTkMessagebox(title="Successful Registration", message=f"New user registered:\nUsername: {username}\nEmail: {email}\nID: {id}")
-
+            print(f"✅ New user registered: {username} ({email}) with ID {id}")
             return True
 
         except psycopg2.Error as db_error:
-            self.conn.rollback()
-            print(f"❌ Database Error: {db_error}")
-            CTkMessagebox(title="Database Error", message=f"Database error occurred:\n{db_error}")
+            if hasattr(self, 'conn') and self.conn and self.conn.closed == 0:
+                self.conn.rollback()
+            print(f"❌ Database Error in save_user: {db_error}")
             return False
-
         except ValueError as ve:
-            self.conn.rollback()
-            print(f"⚠️ Validation Error: {ve}")
-            CTkMessagebox(title="Validation Error",message=str(ve))
+            if hasattr(self, 'conn') and self.conn and self.conn.closed == 0:
+                self.conn.rollback()
+            print(f"⚠️ Validation Error in save_user: {ve}")
             return False
-
         except Exception as e:
-            self.conn.rollback()
+            if hasattr(self, 'conn') and self.conn and self.conn.closed == 0:
+                self.conn.rollback()
             print(f"❌ Unexpected Error in save_user: {e}")
-            CTkMessagebox(title="Unexpected Error", message=f"An unexpected error occurred:\n{e}")
             return False
 
-    def get_next_user_id(self):
+    def create_users_table(self):
         """
-        Get the next user ID from the admin_management table.
-        For PostgreSQL, the SERIAL column automatically increments,
-        but this function provides the next value for display or manual insert.
+        Create the admin_management table in PostgreSQL if it doesn't already exist.
+        """
+        create_table_query = """
+        CREATE TABLE IF NOT EXISTS admin_management (
+            id SERIAL PRIMARY KEY,
+            username VARCHAR(255) NOT NULL UNIQUE,
+            email VARCHAR(255) UNIQUE NOT NULL,
+            password VARCHAR(255) NOT NULL,
+            salt VARCHAR(255) NOT NULL,
+            role VARCHAR(50) DEFAULT 'user',
+            is_active BOOLEAN DEFAULT TRUE,
+            last_login TIMESTAMP,
+            registration_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
         """
         try:
             # Ensure connection is active
             if not hasattr(self, 'conn') or self.conn.closed != 0:
                 self.conn, self.cursor = self.get_db_connection()
 
-            # Safely get the next sequence value managed by PostgreSQL
-            query = """ SELECT COALESCE((SELECT MAX(id) + 1 FROM admin_management), 1) AS next_id """
-            self.cursor.execute(query)
-            result = self.cursor.fetchone()
+            with self.conn.cursor() as cursor:
+                cursor.execute(create_table_query)
+                self.conn.commit()
 
-            # Return the next available ID
-            return result[0] if result else 1
+            print("✅ admin_management table ensured successfully.")
+            return True
 
-        except psycopg2.Error as err:
-            print(f"❌ Database Error in get_next_user_id: {err}")
-            return None
-
+        except psycopg2.Error as e:
+            print(f"❌ Database error creating admin_management table: {e}")
+            if hasattr(self, 'conn') and self.conn and self.conn.closed == 0:
+                self.conn.rollback()
+            return False
         except Exception as e:
-            print(f"❌ Unexpected Error in get_next_user_id: {e}")
-            return None
-
+            print(f"❌ Unexpected error creating admin_management table: {e}")
+            if hasattr(self, 'conn') and self.conn and self.conn.closed == 0:
+                self.conn.rollback()
+            return False
+        
     def get_user_by_email(self, email):
         """
         Retrieve a user record by email from the admin_management table.
@@ -1968,14 +1995,12 @@ class DatabaseHandler:
 
         except psycopg2.Error as db_error:
             print(f"❌ Database Error in get_user_by_email: {db_error}")
-            CTkMessagebox(title="Database Error", message=f"Error retrieving user from database:\n{db_error}")
             return None
 
         except Exception as e:
             print(f"❌ Unexpected Error in get_user_by_email: {e}")
-            CTkMessagebox(title="Unexpected Error", message=f"An unexpected error occurred while fetching user:\n{e}")
             return None
-
+        
     def __del__(self):
         """Cleanup method for PostgreSQL database connection."""
         try:
@@ -1987,8 +2012,6 @@ class DatabaseHandler:
                         self.cursor.close()
                     self.conn.close()
                     print("✅ PostgreSQL connection explicitly closed.")
-                    # Optional GUI message — careful if this is called during app exit
-                    # CTkMessagebox(title="Database Closed", message="PostgreSQL connection closed successfully")
         except Exception as e:
             print(f"⚠️ Error while closing PostgreSQL connection: {e}")
 
@@ -2000,9 +2023,9 @@ class DatabaseHandler:
             if self.conn is not None and not self.conn.closed:
                 self.cursor.close()
                 self.conn.close()
-                CTkMessagebox(title="PostgreSQL Connection", message="PostgreSQL connection explicitly closed")
+                print("PostgreSQL Connection explicitly closed.")
         except Exception as e:
-            CTkMessagebox(title="PostgreSQL Connection Error", message=f"Error closing connection: {e}")
+            print("PostgreSQL Connection Error",e)
 
     def create_templates_table(self):
         """
@@ -2016,9 +2039,9 @@ class DatabaseHandler:
         try:
             self.cursor.execute(query)
             self.conn.commit()
-            CTkMessagebox(title="Database Templates Table", message="Table 'templates' created or already exists.")
+            print("Database Templates Table", "Table 'templates' created or already exists.")
         except Exception as e:
-            CTkMessagebox(title="Database Templates Table Error", message=f"Error creating table: {e}")
+            print("Database Templates Table Error",e)
             self.conn.rollback()
 
     def save_templates_to_database(self, file_paths):
@@ -2056,21 +2079,24 @@ class DatabaseHandler:
     def preload_grade_data(self):
         """Preload grade data for all semesters"""
         try:
+            # Get a fresh database connection
+            conn, cursor = self.get_db_connection()
             grade_data = {}
             semesters = ["1.1", "1.2", "2.1", "2.2","3.1", "3.2", "4.1", "4.2"]
 
             for semester in semesters:
                 # Make sure get_grades_by_semester returns list/dict compatible with PostgreSQL queries
                 grade_data[semester] = self.get_grades_by_semester(semester=semester, school_year="2023-2024",
-                    student_id="All"  # adjust if your PostgreSQL query needs NULL or '%' instead of 'All'
-                )
-
+                    student_id="All") # adjust if your PostgreSQL query needs NULL or '%' instead of 'All'
+            # Close the connection when done
+            cursor.close()
+            conn.close()
             return grade_data
 
         except Exception as e:
-            CTkMessagebox(title="Database Error Preload of Grade", message=f"Error preloading grade data: {e}")
+            print("Database Error Preload of Grade",e)
             return {}
-
+        
     def get_grades_by_semester(self, year_level, school_year, sex_filter):
         try:
             table_mapping = {"1.1": "first_year_first_semester", "1.2": "first_year_second_semester",
@@ -2123,7 +2149,7 @@ class DatabaseHandler:
             return {'columns': df.columns.tolist(), 'data': df.to_dict('records')}
 
         except psycopg2.Error as err:
-            CTkMessagebox(message=f"Database Error: {err}")
+            print("Database Error",err)
             print(f"Database Error: {err}")
             raise
         except Exception as e:
@@ -2188,11 +2214,9 @@ class DatabaseHandler:
 
         except psycopg2.Error as err:
             print(f"Database Error: {err}")
-            CTkMessagebox(title="Error", message=f"Failed to update grade: {err}")
             return False
         except Exception as e:
             print(f"Error: {e}")
-            CTkMessagebox(title="Error", message=f"An error occurred: {e}")
             return False
 
     def get_all_users(self):
@@ -2406,7 +2430,7 @@ class DatabaseHandler:
             return students
 
         except psycopg2.Error as e:
-            CTkMessagebox(title="Retrieval Error", message=f"Failed to retrieve students: {e}")
+            print("Retrieval Error",e)
             return []
         finally:
             if cursor:
@@ -2449,10 +2473,10 @@ class DatabaseHandler:
             return students
 
         except psycopg2.Error as e:
-            CTkMessagebox(title="Search Error", message=f"Failed to search students: {e}")
+            print("Search Error",e)
             return []
         except Exception as e:
-            CTkMessagebox(title="Search Error", message=f"An unexpected error occurred: {e}")
+            print("Search Error",e)
             return []
         finally:
             if cursor:
@@ -2498,10 +2522,10 @@ class DatabaseHandler:
             return students_list
 
         except psycopg2.Error as e:
-            CTkMessagebox(title="Retrieval Error", message=f"Failed to retrieve students: {e}")
+            print("Retrieval Error")
             return []
         except Exception as e:
-            CTkMessagebox(title="Retrieval Error", message=f"Unexpected error: {e}")
+            print("Retrieval Error",e)
             return []
         finally:
             if cursor:
@@ -2529,10 +2553,10 @@ class DatabaseHandler:
             return result[0] if result else "N/A"
 
         except psycopg2.Error as e:
-            CTkMessagebox(title="Retrieval Error", message=f"Failed to retrieve SCHOOL_YEAR for ID {id_no}: {e}")
+            print(e)
             return "N/A"
         except Exception as e:
-            CTkMessagebox(title="Retrieval Error", message=f"Unexpected error retrieving SCHOOL_YEAR: {e}")
+            print(e)
             return "N/A"
         finally:
             if cursor:
@@ -2581,10 +2605,10 @@ class DatabaseHandler:
             return []
 
         except psycopg2.Error as e:
-            CTkMessagebox(title="Search Error", message=f"Failed to search students: {e}")
+            print(e)
             return []
         except Exception as e:
-            CTkMessagebox(title="Search Error", message=f"Unexpected error: {e}")
+            print(e)
             return []
         finally:
             if cursor:
@@ -2733,11 +2757,11 @@ class DatabaseHandler:
 
         except psycopg2.Error as err:
             logging.error(f"PostgreSQL Database error: {err}")
-            CTkMessagebox(title="Database Error", message=f"Failed to retrieve curriculum: {err}")
+            print(err)
             return [], []
         except Exception as e:
             logging.error(f"Unexpected error retrieving curriculum: {e}")
-            CTkMessagebox(title="Database Error", message=f"Unexpected error: {e}")
+            print(err)
             return [], []
         finally:
             if cursor:
@@ -2972,115 +2996,3 @@ class DatabaseHandler:
             self.conn.rollback()
             print(f"Error updating enrollment status in bulk: {err}")
             raise
-#need to fix since i need to create table manually in postgre
-class DatabaseInitializer:
-    """Class responsible for initializing database and tables"""
-
-    def __init__(self, host='localhost', user='comscie', password='BS_Comscie@2025!', port=3306):
-        self.host = host
-        self.user = user
-        self.password = password
-        self.port = port
-
-    def create_database_and_tables(self):
-        """Create department database and required tables if they don't exist"""
-        try:
-            # Create initial connection without database
-            conn = psycopg2.connect(host=self.host,user=self.user,password=self.password,port=self.port)
-            cursor = conn.cursor()
-
-            # Create and use database
-            cursor.execute("CREATE DATABASE IF NOT EXISTS department CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci")
-            cursor.execute("USE department")
-
-            # Define tables structure
-            tables = {
-                'student_information': """
-                    CREATE TABLE IF NOT EXISTS `student_information` (
-                        `ID_NO` VARCHAR(100) NOT NULL,
-                        `LAST_NAME` VARCHAR(100) NOT NULL,
-                        `FIRST_NAME` VARCHAR(100) NOT NULL,
-                        `MIDDLE_NAME` VARCHAR(100) NOT NULL,
-                        `YR` VARCHAR(100) NOT NULL,
-                        `AGE` VARCHAR(100) NOT NULL,
-                        `BIRTHDAY` DATE,
-                        `SEX` CHAR(25) NOT NULL,
-                        `PARENT_GUARDIAN` VARCHAR(150),
-                        `PHONE_NUMBER` VARCHAR(10),
-                        `EMAIL_ADDRESS` VARCHAR(100) NOT NULL,
-                        `SHS` VARCHAR(100) NOT NULL,
-                        `ADDRESS` VARCHAR(100) NOT NULL,
-                        `ENROLLED_YEAR` VARCHAR(255),
-                        PRIMARY KEY (`ID_NO`)
-                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-                """,
-                'curriculum_regular': """
-                    CREATE TABLE IF NOT EXISTS `curriculum_regular` (
-                        `COURSE_NO` VARCHAR(100) NOT NULL,
-                        `DESCRIPTIVE_TITLE` VARCHAR(255) NOT NULL,
-                        `YEAR_LEVEL` DECIMAL(5,1) NOT NULL,
-                        `UNITS` INT(11) NOT NULL,
-                        `LEC` INT(11) NOT NULL,
-                        `LAB` INT(11) NOT NULL,
-                        `PREREQUISITE` VARCHAR(255) NOT NULL,
-                        `GRADES` DECIMAL(10,2) NOT NULL,
-                        `SY_REVISION` VARCHAR(100) NOT NULL,
-                        PRIMARY KEY (`COURSE_NO`)
-                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-                """,
-                'studgrade_pass': """
-                    CREATE TABLE IF NOT EXISTS `studgrade_pass` (
-                        `ID_NO` VARCHAR(20) NOT NULL,
-                        `LAST_NAME` VARCHAR(50) NOT NULL,
-                        `FIRST_NAME` VARCHAR(50) NOT NULL,
-                        `MIDDLE_NAME` VARCHAR(50),
-                        `PASSWORD` VARCHAR(100) NOT NULL,
-                        PRIMARY KEY (`ID_NO`)
-                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
-                """
-            }
-
-            # Add semester tables
-            semesters = {
-                'first_year_first_semester': '1.1',
-                'first_year_second_semester': '1.2',
-                'second_year_first_semester': '2.1',
-                'second_year_second_semester': '2.2',
-                'third_year_first_semester': '3.1',
-                'third_year_second_semester': '3.2',
-                'fourth_year_first_semester': '4.1',
-                'fourth_year_second_semester': '4.2'
-            }
-
-            for table_name in semesters.keys():
-                tables[table_name] = f"""
-                    CREATE TABLE IF NOT EXISTS `{table_name}` (
-                        `ID_NO` VARCHAR(20) NOT NULL,
-                        `LAST_NAME` VARCHAR(50) NOT NULL,
-                        `FIRST_NAME` VARCHAR(50) NOT NULL,
-                        `MIDDLE_NAME` VARCHAR(50),
-                        `SCHOOL_YEAR` VARCHAR(20) NOT NULL,
-                        `COURSE_NO` VARCHAR(20) NOT NULL,
-                        `GRADES` DECIMAL(4,2),
-                        PRIMARY KEY (`ID_NO`, `COURSE_NO`, `SCHOOL_YEAR`),
-                        FOREIGN KEY (`ID_NO`) REFERENCES `student_information`(`ID_NO`) ON DELETE CASCADE
-                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
-                """
-
-            # Create all tables
-            for table_name, query in tables.items():
-                try:
-                    cursor.execute(query)
-                    print(f"Table {table_name} created/verified successfully")
-                except psycopg2.Error as err:
-                    print(f"Error creating table {table_name}: {err}")
-                    return False
-
-            conn.commit()
-            cursor.close()
-            conn.close()
-            return True
-
-        except psycopg2.Error as err:
-            print(f"Database initialization failed: {err}")
-            return False

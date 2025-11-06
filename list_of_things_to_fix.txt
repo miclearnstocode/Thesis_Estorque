@@ -92,3 +92,123 @@ Gracefully handle connection interruptions. Implement retries or re-establish co
 Explicitly close connections when truly done. For example, when the app closes or a task finishes fully, close the DB connection to free up resources.
 
 Avoid leaving transactions open for long periods. Commit or rollback promptly to prevent locking issues.
+
+Ah, I understand now! You want to use the user's existing PostgreSQL installation (not embed it), and automatically start the PostgreSQL service when your app launches. 
+
+#need to fix since i need to create table manually in postgre
+class DatabaseInitializer:
+    """Class responsible for initializing PostgreSQL database and tables"""
+
+    def __init__(self):
+        self.host = app_config.host
+        self.port = app_config.port
+        self.db_name = app_config.database
+        self.user = app_config.user
+        self.password = app_config.password
+
+
+    def create_database_and_tables(self):
+        """Create department database and required tables if they don't exist"""
+        try:
+            # Connect to the default postgres database
+            conn = psycopg2.connect(host=self.host,port=self.port,dbname='postgres',user=self.user,password=self.password)
+            conn.autocommit = True
+            cursor = conn.cursor()
+
+            # Check if the department database already exists
+            cursor.execute("SELECT 1 FROM pg_database WHERE datname = %s", [self.db_name])
+            exists = cursor.fetchone()
+
+            if not exists:
+                cursor.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(self.db_name)))
+                print(f"✅ Database '{self.db_name}' created successfully.")
+            else:
+                print(f"ℹ️ Database '{self.db_name}' already exists.")
+
+            cursor.close()
+            conn.close()
+
+            # Connect to the department database
+            conn = psycopg2.connect(host=self.host,port=self.port,dbname=self.db_name,user=self.user,
+                password=self.password)
+            cursor = conn.cursor()
+
+            # Define tables
+            tables = {
+                'student_information': """
+                    CREATE TABLE IF NOT EXISTS student_information (
+                        ID_NO VARCHAR(100) PRIMARY KEY,
+                        LAST_NAME VARCHAR(100) NOT NULL,
+                        FIRST_NAME VARCHAR(100) NOT NULL,
+                        MIDDLE_NAME VARCHAR(100),
+                        YR VARCHAR(100),
+                        AGE VARCHAR(100),
+                        BIRTHDAY DATE,
+                        SEX VARCHAR(25),
+                        PARENT_GUARDIAN VARCHAR(150),
+                        PHONE_NUMBER VARCHAR(20),
+                        EMAIL_ADDRESS VARCHAR(100),
+                        SHS VARCHAR(100),
+                        ADDRESS VARCHAR(255),
+                        ENROLLED_YEAR VARCHAR(255)
+                    )
+                """,
+                'curriculum_regular': """
+                    CREATE TABLE IF NOT EXISTS curriculum_regular (
+                        COURSE_NO VARCHAR(100) PRIMARY KEY,
+                        DESCRIPTIVE_TITLE VARCHAR(255) NOT NULL,
+                        YEAR_LEVEL DECIMAL(5,1) NOT NULL,
+                        UNITS INT NOT NULL,
+                        LEC INT NOT NULL,
+                        LAB INT NOT NULL,
+                        PREREQUISITE VARCHAR(255),
+                        GRADES DECIMAL(10,2),
+                        SY_REVISION VARCHAR(100)
+                    )
+                """,
+                'studgrade_pass': """
+                    CREATE TABLE IF NOT EXISTS studgrade_pass (
+                        ID_NO VARCHAR(20) PRIMARY KEY,
+                        LAST_NAME VARCHAR(50) NOT NULL,
+                        FIRST_NAME VARCHAR(50) NOT NULL,
+                        MIDDLE_NAME VARCHAR(50),
+                        PASSWORD VARCHAR(100) NOT NULL
+                    )
+                """}
+
+            # Semester tables
+            semesters = {'first_year_first_semester','first_year_second_semester',
+                'second_year_first_semester','second_year_second_semester',
+                'third_year_first_semester','third_year_second_semester',
+                'fourth_year_first_semester','fourth_year_second_semester'}
+
+            for table_name in semesters:
+                tables[table_name] = f"""
+                    CREATE TABLE IF NOT EXISTS {table_name} (
+                        ID_NO VARCHAR(20) NOT NULL,
+                        LAST_NAME VARCHAR(50) NOT NULL,
+                        FIRST_NAME VARCHAR(50) NOT NULL,
+                        MIDDLE_NAME VARCHAR(50),
+                        SCHOOL_YEAR VARCHAR(20) NOT NULL,
+                        COURSE_NO VARCHAR(20) NOT NULL,
+                        GRADES DECIMAL(4,2),
+                        PRIMARY KEY (ID_NO, COURSE_NO, SCHOOL_YEAR),
+                        FOREIGN KEY (ID_NO) REFERENCES student_information (ID_NO) ON DELETE CASCADE
+                    )
+                """
+
+            # Execute all table creation commands
+            for name, query in tables.items():
+                cursor.execute(query)
+                print(f"✅ Table '{name}' created or verified successfully.")
+
+            conn.commit()
+            cursor.close()
+            conn.close()
+
+            print("🎯 PostgreSQL database and tables initialized successfully.")
+            return True
+
+        except psycopg2.Error as err:
+            print(f"❌ Database initialization failed: {err}")
+            return False

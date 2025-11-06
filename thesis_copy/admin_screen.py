@@ -131,8 +131,6 @@ class AdminScreen(ctk.CTkFrame):
     
     def prepare_user_refresh(self):
         """Prepare user data for refresh"""
-        # Implement your user data retrieval logic
-        # Return a dataframe or list of user data
         try:
             db = DatabaseHandler()
             user_data = db.get_all_users()  # Implement this method in your DatabaseHandler
@@ -146,11 +144,62 @@ class AdminScreen(ctk.CTkFrame):
         # Implement your statistics data retrieval logic
         try:
             db = DatabaseHandler()
-            stats_data = {'year_counts': db.get_students_per_year(),'level_counts': db.get_students_per_level()}
+            # Use safe methods that return default values if no data
+            year_counts = self.get_safe_year_counts(db)
+            level_counts = self.get_safe_level_counts(db)
+            
+            stats_data = {
+                'year_counts': year_counts,
+                'level_counts': level_counts
+            }
             db.close_db_connection()
             return stats_data
         except Exception as e:
             raise Exception(f"Statistics refresh failed: {e}")
+    
+    def get_safe_year_counts(self, db):
+        """Safely get year counts with default values"""
+        try:
+            query_by_year = """
+                SELECT ENROLLED_YEAR, COUNT(*) as count 
+                FROM student_information 
+                GROUP BY ENROLLED_YEAR 
+                ORDER BY ENROLLED_YEAR
+            """
+            db.cursor.execute(query_by_year)
+            year_data = db.cursor.fetchall()
+            
+            if not year_data:
+                return {'No Data': 0}
+            
+            return {str(year[0]): year[1] for year in year_data}
+        except Exception as e:
+            logging.warning(f"Error fetching year counts: {e}")
+            return {'No Data': 0}
+    
+    def get_safe_level_counts(self, db):
+        """Safely get level counts with default values"""
+        try:
+            query_by_level = """
+                SELECT YR, COUNT(*) as count 
+                FROM student_information 
+                GROUP BY YR 
+                ORDER BY YR
+            """
+            db.cursor.execute(query_by_level)
+            level_data = db.cursor.fetchall()
+            
+            if not level_data:
+                return {'No Data': 0}
+            
+            def ordinal(n):
+                n = int(n) if n else 0
+                return "%d%s" % (n, "tsnrhtdd"[((n//10%10!=1)*(n%10<4)*n%10)::4])
+            
+            return {f"{ordinal(level[0])} Year": level[1] for level in level_data}
+        except Exception as e:
+            logging.warning(f"Error fetching level counts: {e}")
+            return {'No Data': 0}
     
     def update_user_table(self, user_data):
         """Update user management table with new data"""
@@ -158,50 +207,90 @@ class AdminScreen(ctk.CTkFrame):
         for item in self.user_table.get_children():
             self.user_table.delete(item)
         
-        # Insert new data
-        for user in user_data:
-            self.user_table.insert('', 'end', values=user)
+        # Insert new data or show "No Data" message
+        if not user_data:
+            self.user_table.insert('', 'end', values=('No Data', 'No Data', 'No Data', 'No Data', 'No Data'))
+        else:
+            for user in user_data:
+                self.user_table.insert('', 'end', values=user)
     
     def update_statistics_plots(self, stats_data):
         """Update statistics plots with new data"""
-        # Clear existing plots
-        for ax in self.axes:
-            ax.clear()
-        
-        # Recreate plots with new data
-        years = list(stats_data['year_counts'].keys())
-        year_counts = list(stats_data['year_counts'].values())
-        levels = list(stats_data['level_counts'].keys())
-        level_counts = list(stats_data['level_counts'].values())
-        
-        # Replot with dynamic coloring
-        def get_color(count, max_count):
-            if count <= max_count * 0.3:
-                return '#FF6347'  # Tomato Red
-            elif count <= max_count * 0.7:
-                return '#1E90FF'  # Dodger Blue
-            else:
-                return '#32CD32'  # Lime Green
-        
-        # First plot (Students per Enrolled Year)
-        max_year_count = max(year_counts)
-        year_colors = [get_color(count, max_year_count) for count in year_counts]
-        self.axes[0].barh(years, year_counts, color=year_colors)
-        self.axes[0].set_title('Students per Enrolled Year')
-        
-        # Second plot (Students per Year Level)
-        max_level_count = max(level_counts)
-        level_colors = [get_color(count, max_level_count) for count in level_counts]
-        self.axes[1].bar(levels, level_counts, color=level_colors)
-        self.axes[1].set_title('Students per Year Level')
-        
-        # Refresh the canvas to show updated plots
-        self.canvas.draw()
+        try:
+            # Clear existing plots
+            for ax in self.axes:
+                ax.clear()
+            
+            # Check if we have actual data
+            year_counts = stats_data['year_counts']
+            level_counts = stats_data['level_counts']
+            
+            # Create default data if no real data exists
+            if not year_counts or list(year_counts.keys()) == ['No Data']:
+                year_counts = {'No Data Available': 1}
+            
+            if not level_counts or list(level_counts.keys()) == ['No Data']:
+                level_counts = {'No Data Available': 1}
+            
+            years = list(year_counts.keys())
+            year_counts_list = list(year_counts.values())
+            levels = list(level_counts.keys())
+            level_counts_list = list(level_counts.values())
+            
+            # Function to get color for bars
+            def get_color(count, max_count):
+                if max_count == 0:  # Handle case where all counts are zero
+                    return '#808080'  # Gray for no data
+                if count <= max_count * 0.3:
+                    return '#FF6347'  # Tomato Red
+                elif count <= max_count * 0.7:
+                    return '#1E90FF'  # Dodger Blue
+                else:
+                    return '#32CD32'  # Lime Green
+            
+            # First plot (Students per Enrolled Year)
+            max_year_count = max(year_counts_list) if year_counts_list else 1
+            year_colors = [get_color(count, max_year_count) for count in year_counts_list]
+            self.axes[0].barh(years, year_counts_list, color=year_colors)
+            self.axes[0].set_title('Students per Enrolled Year')
+            
+            # Add value labels to the bars
+            for i, v in enumerate(year_counts_list):
+                self.axes[0].text(v, i, str(v), va='center', fontsize=8)
+            
+            # Second plot (Students per Year Level)
+            max_level_count = max(level_counts_list) if level_counts_list else 1
+            level_colors = [get_color(count, max_level_count) for count in level_counts_list]
+            self.axes[1].bar(levels, level_counts_list, color=level_colors)
+            self.axes[1].set_title('Students per Year Level')
+            
+            # Add value labels to the bars
+            for i, v in enumerate(level_counts_list):
+                self.axes[1].text(i, v, str(v), ha='center', va='bottom', fontsize=8)
+            
+            # Adjust layout for better appearance
+            plt.tight_layout()
+            
+            # Refresh the canvas to show updated plots
+            self.canvas.draw()
+            
+        except Exception as e:
+            logging.error(f"Error updating statistics plots: {e}")
+            # Create a simple error plot
+            for ax in self.axes:
+                ax.clear()
+                ax.text(0.5, 0.5, 'Error Loading Data\n' + str(e), 
+                       ha='center', va='center', transform=ax.transAxes)
+                ax.set_title('Data Load Error')
+            self.canvas.draw()
     
     def __init__(self, parent, controller):
         super().__init__(parent)
         self.controller = controller
         self.db_handler = DatabaseHandler()
+        
+        # Initialize axes list
+        self.axes = []
         
         # Bind cleanup method to window destroy event
         self.bind("<Destroy>", self.cleanup)
@@ -220,8 +309,10 @@ class AdminScreen(ctk.CTkFrame):
         # Create frames
         self.left_frame = ctk.CTkFrame(master=self.main_container, fg_color="#F0F0F0")
         self.left_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+        
         # Button style configuration
         button_style = {"fg_color": "transparent", "hover_color": "#707070", "text_color": "black", "height": 32, "border_width": 1, "border_color": "black"}
+        
         # Button container frame in left frame
         button_container = ctk.CTkFrame(self.left_frame, fg_color="transparent")
         button_container.pack(fill="x", pady=20, padx=10)
@@ -236,7 +327,6 @@ class AdminScreen(ctk.CTkFrame):
         self.home_btn.pack(pady=5)
         
         # Refresh button
-        # Update refresh button to use enhanced method
         self.refresh_btn = ctk.CTkButton(button_container, text="Refresh", command=self.enhanced_refresh, width=150,**button_style)
         self.refresh_btn.pack(pady=5)
         
@@ -248,9 +338,7 @@ class AdminScreen(ctk.CTkFrame):
         self.right_frame = ctk.CTkFrame(self.main_container, fg_color="#F0F0F0")
         self.right_frame.grid(row=0, column=2, sticky="nsew", padx=10, pady=10)
         
-        user_icon = Image.open(LoginForm.resource_path("icons/user.png"))
-        self.user_icon = ctk.CTkImage(light_image=user_icon, dark_image=user_icon, size=(30, 30))
-
+        # User icon and title
         try:
             user_icon = Image.open(LoginForm.resource_path("icons/user.png"))
             self.user_icon = ctk.CTkImage(light_image=user_icon, dark_image=user_icon, size=(30, 30))
@@ -258,7 +346,6 @@ class AdminScreen(ctk.CTkFrame):
                 font=ctk.CTkFont("Helvetica", size=20, weight="bold"), text_color='grey50')
         except Exception as e:
             print(f"Failed to load user icon: {e}")
-            # Create label without icon if image loading fails
             title_label = ctk.CTkLabel(self.center_frame, text="User Account Management",font=ctk.CTkFont("Helvetica", size=20, weight="bold"), text_color='grey50')
         title_label.pack(pady=10)
         
@@ -275,15 +362,23 @@ class AdminScreen(ctk.CTkFrame):
         self.bottom_frame.grid(row=1, rowspan=2, column=0, columnspan=4, sticky="n", padx=10, pady=10)
         
         # Configure frame heights
-        self.center_frame.configure(height=200)  # Adjust this value as needed
-        self.right_frame.configure(height=200)   # Match center frame height
+        self.center_frame.configure(height=200)
+        self.right_frame.configure(height=200)
         
         # Prevent automatic resizing
         self.center_frame.grid_propagate(False)
         self.right_frame.grid_propagate(False)
         self.bottom_frame.grid_propagate(False)
+        
+        # Setup the interface
+        self.setup_treeview(tree_frame)
         self.setup_bottom_frame()
         
+        # Load initial data
+        self.refresh_users()
+
+    def setup_treeview(self, tree_frame):
+        """Setup the treeview with scrollbars and styling"""
         # Scrollbars
         y_scroll = ttk.Scrollbar(tree_frame, orient="vertical")
         y_scroll.grid(row=0, column=1, sticky="ns")
@@ -297,8 +392,7 @@ class AdminScreen(ctk.CTkFrame):
         style.configure("Treeview.Heading", font=('Helvetica', 12, 'bold'))
         
         # Configure alternating colors
-        style.map('Treeview', background=[('selected', '#0078D7')],)  # Selection color
-
+        style.map('Treeview', background=[('selected', '#0078D7')])
         style.configure('Treeview', background='white',fieldbackground='white', selectbackground='#0078D7')
 
         # Create Treeview
@@ -309,6 +403,7 @@ class AdminScreen(ctk.CTkFrame):
         # Add tag configuration for alternating rows
         self.user_tree.tag_configure('oddrow', background='#F5F5F5')
         self.user_tree.tag_configure('evenrow', background='white')
+        self.user_tree.tag_configure('nodata', background='#FFE4E1', foreground='red')  # Light red for no data
         
         # Configure scrollbars
         y_scroll.config(command=self.user_tree.yview)
@@ -332,12 +427,10 @@ class AdminScreen(ctk.CTkFrame):
         self.user_tree.bind('<ButtonRelease-1>', self.handle_checkbox_click)
         
         # Dictionary to store checkbox states
-        self.checkbox_states = {}        
-        # Load initial data
-        self.refresh_users()
+        self.checkbox_states = {}
 
     def create_statistics_plots(self):
-        """display statistics plots in bottom frame"""
+        """Display statistics plots in bottom frame with error handling"""
         try:
             # Clear any existing plots
             plt.close('all')
@@ -352,77 +445,59 @@ class AdminScreen(ctk.CTkFrame):
             
             # Create a figure with two subplots side by side
             fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 7))
+            self.axes = [ax1, ax2]  # Store axes for later updates
             
-            # First histogram: Students per Enrolled Year
-            query_by_year = """
-                SELECT ENROLLED_YEAR, COUNT(*) as count 
-                FROM student_information 
-                GROUP BY ENROLLED_YEAR 
-                ORDER BY ENROLLED_YEAR
-            """
-            self.db_handler.cursor.execute(query_by_year)
-            year_data = self.db_handler.cursor.fetchall()
+            # Get data safely
+            year_counts = self.get_safe_year_counts(self.db_handler)
+            level_counts = self.get_safe_level_counts(self.db_handler)
             
-            years = [str(year[0]) for year in year_data]  # Enrolled Years
-            year_counts = [year[1] for year in year_data]  # Number of Students
+            # Check if we have actual data
+            if not year_counts or list(year_counts.keys()) == ['No Data']:
+                year_counts = {'No Data Available': 1}
             
-            def get_year_color(count, max_count):
-                if count <= max_count * 0.3:  # Low range
+            if not level_counts or list(level_counts.keys()) == ['No Data']:
+                level_counts = {'No Data Available': 1}
+            
+            years = list(year_counts.keys())
+            year_counts_list = list(year_counts.values())
+            levels = list(level_counts.keys())
+            level_counts_list = list(level_counts.values())
+            
+            # Function to get color for bars
+            def get_color(count, max_count):
+                if max_count == 0:  # Handle case where all counts are zero
+                    return '#808080'  # Gray for no data
+                if count <= max_count * 0.3:
                     return '#FF6347'  # Tomato Red
-                elif count <= max_count * 0.7:  # Medium range
+                elif count <= max_count * 0.7:
                     return '#1E90FF'  # Dodger Blue
-                else:  # High range
+                else:
                     return '#32CD32'  # Lime Green
 
-            max_year_count = max(year_counts)
-            year_colors = [get_year_color(count, max_year_count) for count in year_counts]
-            ax1.barh(years, year_counts, color=year_colors)
+            # First histogram: Students per Enrolled Year
+            max_year_count = max(year_counts_list) if year_counts_list else 1
+            year_colors = [get_color(count, max_year_count) for count in year_counts_list]
+            ax1.barh(years, year_counts_list, color=year_colors)
             ax1.set_title('Students Enrolled per Year', fontsize=12, fontweight='bold')
-            ax1.set_xlabel('Number of Students', fontsize=10)  # X-axis label
-            ax1.set_ylabel('Enrolled Year', fontsize=10)  # Y-axis label
+            ax1.set_xlabel('Number of Students', fontsize=10)
+            ax1.set_ylabel('Enrolled Year', fontsize=10)
             ax1.tick_params(axis='both', labelsize=8)
             
             # Add value labels to the bars
-            for i, v in enumerate(year_counts):
+            for i, v in enumerate(year_counts_list):
                 ax1.text(v, i, str(v), va='center', fontsize=8)
                     
             # Second histogram: Students per Year Level
-            query_by_level = """
-                SELECT YR, COUNT(*) as count 
-                FROM student_information 
-                GROUP BY YR 
-                ORDER BY YR
-            """
-            self.db_handler.cursor.execute(query_by_level)
-            level_data = self.db_handler.cursor.fetchall()
-            
-            # Function to add ordinal suffix
-            def ordinal(n):
-                n = int(n)  # Convert to integer
-                return "%d%s" % (n, "tsnrhtdd"[((n//10%10!=1)*(n%10<4)*n%10)::4])
-            
-            # Convert year level to integer before using ordinal function
-            levels = [f"{ordinal(level[0])} Year" for level in level_data]
-            level_counts = [level[1] for level in level_data]
-            
-            def get_level_color(count, max_count):
-                if count <= max_count * 0.3:  # Low range
-                    return '#FF4500'  # Orange Red
-                elif count <= max_count * 0.7:  # Medium range
-                    return '#32CD32'  # Lime Green
-                else:  # High range
-                    return '#1E90FF'  # Dodger Blue
-
-            max_level_count = max(level_counts)
-            level_colors = [get_level_color(count, max_level_count) for count in level_counts]
-            ax2.bar(levels, level_counts, color=level_colors)
+            max_level_count = max(level_counts_list) if level_counts_list else 1
+            level_colors = [get_color(count, max_level_count) for count in level_counts_list]
+            ax2.bar(levels, level_counts_list, color=level_colors)
             ax2.set_title('Students Enrolled per Year Level', fontsize=12, fontweight='bold')
             ax2.set_xlabel('Year Level', fontsize=10)
             ax2.set_ylabel('Number of Students', fontsize=10)
             ax2.tick_params(axis='both', labelsize=8)
             
             # Add value labels to the bars
-            for i, v in enumerate(level_counts):
+            for i, v in enumerate(level_counts_list):
                 ax2.text(i, v, str(v), ha='center', va='bottom', fontsize=8)
 
             # Adjust layout
@@ -458,7 +533,13 @@ class AdminScreen(ctk.CTkFrame):
             
         except Exception as e:
             print(f"Error creating statistics plots: {e}")
-            messagebox.showerror("Error", f"Failed to create statistics: {e}")
+            # Create error display
+            error_label = ctk.CTkLabel(self.bottom_frame, 
+                                     text=f"Error loading statistics: {str(e)}", 
+                                     text_color="red",
+                                     font=ctk.CTkFont(size=12))
+            error_label.pack(expand=True, fill="both", padx=20, pady=20)
+
     def setup_bottom_frame(self):
         """Setup the bottom frame with statistics"""
         # Clear any existing widgets in bottom frame
@@ -486,6 +567,14 @@ class AdminScreen(ctk.CTkFrame):
             self.db_handler.cursor.execute(query)
             users = self.db_handler.cursor.fetchall()
             
+            # Check if we have users
+            if not users:
+                # Insert "No Data" row
+                self.user_tree.insert('', 'end', values=(
+                    'No Data', 'No Data Available', 'No Data Available', 'No Data', 'No Data'
+                ), tags=('nodata',))
+                return
+            
             # Process and display users
             for index, user in enumerate(users):
                 user_id, username, email, is_active = user
@@ -507,16 +596,13 @@ class AdminScreen(ctk.CTkFrame):
             # Comprehensive error handling
             error_message = f"Error fetching users: {e}"
             logging.error(error_message)
-            messagebox.showerror("Database Error", error_message)
+            # Insert error row
+            self.user_tree.insert('', 'end', values=(
+                'Error', 'Error Loading Data', str(e), 'Error', 'Error'
+            ), tags=('nodata',))
 
     def update_user_status(self, user_id, new_status):
-        """Update user status in the database
-        Args:
-            user_id: The ID of the user to update
-            new_status: Boolean indicating the new status (True for active, False for paused)
-        Returns:
-            bool: True if update was successful, False otherwise
-        """
+        """Update user status in the database"""
         try:
             self.db_handler.cursor.execute("UPDATE admin_management SET is_active = %s WHERE id = %s",(new_status, user_id))
             self.db_handler.conn.commit()
@@ -542,40 +628,39 @@ class AdminScreen(ctk.CTkFrame):
             selected_items = self.user_tree.selection()
             if not selected_items:
                 return
-            status_msg = []
-
-            for item in selected_items:
-                values = self.user_tree.item(item)['values']
-                if not values:
-                    continue
             
-                user_id = values[0]
-                
-                # Fetch current user status
-                self.db_handler.cursor.execute("SELECT is_active FROM admin_management WHERE id = %s",(user_id,))
-                result = self.db_handler.cursor.fetchone()
-                
-                if result is None:
-                    messagebox.showerror("Error", "User not found in database")
-                    return
-                
-                # Toggle user status
-                current_status = result[0]
-                new_status = not current_status
-                
-                # Update user status
-                if self.update_user_status(user_id, new_status):
-                    self.refresh_users()
-                    status_msg = "activated" if new_status else "paused"
-                    messagebox.showinfo("Success", f"Account {status_msg} successfully!")
-                else:
-                    messagebox.showerror("Error", "Failed to update account status")
-            # Show all status messages at once
-            if status_msg:
-                messagebox.showinfo("Status Update", (status_msg))
+            item = selected_items[0]
+            values = self.user_tree.item(item)['values']
             
-            # Refresh the user list after processing all selected items
-            self.refresh_users()
+            # Check if this is a "No Data" row
+            if values and values[0] in ['No Data', 'Error']:
+                messagebox.showinfo("Info", "No user data available to modify.")
+                return
+            
+            if not values:
+                return
+            
+            user_id = values[0]
+            
+            # Fetch current user status
+            self.db_handler.cursor.execute("SELECT is_active FROM admin_management WHERE id = %s",(user_id,))
+            result = self.db_handler.cursor.fetchone()
+            
+            if result is None:
+                messagebox.showerror("Error", "User not found in database")
+                return
+            
+            # Toggle user status
+            current_status = result[0]
+            new_status = not current_status
+            
+            # Update user status
+            if self.update_user_status(user_id, new_status):
+                self.refresh_users()
+                status_msg = "activated" if new_status else "paused"
+                messagebox.showinfo("Success", f"Account {status_msg} successfully!")
+            else:
+                messagebox.showerror("Error", "Failed to update account status")
 
         except Exception as e:
             error_message = f"Failed to update status: {e}"
@@ -586,11 +671,11 @@ class AdminScreen(ctk.CTkFrame):
             if hasattr(self.db_handler, 'conn'):
                 self.db_handler.conn.rollback()
 
-    # Remove the toggle_user_status method since we're handling it directly in the checkbox click
     def refresh_screen(self):
         """Refresh both the user tree and pending accounts"""
         self.refresh_users()
-        self.load_pending_accounts()
+        if hasattr(self, 'load_pending_accounts'):
+            self.load_pending_accounts()
     
     def cleanup(self, event=None):
         """Clean up database connections and matplotlib figures when the window is destroyed"""
@@ -633,12 +718,12 @@ class AdminScreen(ctk.CTkFrame):
         try:
             for user_id in selected_users:
                 # Get current status
-                self.db_handler.cursor.execute("SELECT is_active FROM Admin_management WHERE id = %s", (user_id,))
+                self.db_handler.cursor.execute("SELECT is_active FROM admin_management WHERE id = %s", (user_id,))
                 current_status = self.db_handler.cursor.fetchone()[0]
                 
                 # Toggle status
                 new_status = not current_status
-                self.db_handler.cursor.execute("UPDATE Admin_management SET is_active = %s WHERE id = %s", (new_status, user_id))
+                self.db_handler.cursor.execute("UPDATE admin_management SET is_active = %s WHERE id = %s", (new_status, user_id))
             
             self.db_handler.conn.commit()
             self.checkbox_states.clear()  # Clear selections after update

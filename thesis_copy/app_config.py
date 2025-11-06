@@ -1,11 +1,10 @@
-#database
+#app_config.py
 #192.168.254.125
-host='localhost'
-user='comscie'
-password='BS_Comscie@2025!'
-database='department'
-port=3306
-allow_local_infile=True
+host = 'localhost'
+user = 'postgres'  # Change to your PostgreSQL username
+password = 'comscie@2025'  # Change to your actual PostgreSQL password
+database = 'department'
+port = 5432
 
 #icon paths
 add_students = "assets/icons/add_students.png"

@@ -4,14 +4,14 @@ from CTkMessagebox import CTkMessagebox
 import hashlib, os, re
 from database import DatabaseHandler
 from PIL import Image
-import sys, os, psutil, subprocess
+import sys, os
 from time import time
+from postgres_manager import PostgresManager  # Add this import
 
 class LoginForm(ctk.CTkFrame):
     def __init__(self, master, login_success_callback=None, admin_login_callback=None):
         super().__init__(master)
         self.master = master
-        self.check_xampp_services()
         
         # Database Handler
         self.db_handler = DatabaseHandler()
@@ -75,6 +75,7 @@ class LoginForm(ctk.CTkFrame):
         self.container.grid_propagate(False)
         # Create login widgets
         self.create_login_widgets()
+        
     @staticmethod  
     def resource_path(relative_path):
         try:
@@ -82,73 +83,7 @@ class LoginForm(ctk.CTkFrame):
         except AttributeError:
             base_path = os.path.abspath(".")  # Running normally
         return os.path.join(base_path, relative_path)
-    
-    def check_xampp_services(self):
-        """Check if XAMPP MySQL service is running, prompt user if not"""
-        def is_mysql_running():
-            """Check if MySQL process is running"""
-            try:
-                for proc in psutil.process_iter(['name']):
-                    if proc.info['name'] and 'mysqld' in proc.info['name'].lower():
-                        return True
-                return False
-            except Exception as e:
-                print(f"Error checking MySQL process: {e}")
-                return False
-        
-        def find_xampp_path():
-            """Find XAMPP installation path"""
-            possible_paths = [r"C:\xampp", r"D:\xampp",  r"E:\xampp", os.path.join(os.environ.get('ProgramFiles', ''), 'xampp'), os.path.join(os.environ.get('ProgramFiles(x86)', ''), 'xampp')]
-            
-            for path in possible_paths:
-                control_panel = os.path.join(path, 'xampp-control.exe')
-                if os.path.exists(control_panel):
-                    return path
-            return None
-        
-        def start_xampp_control():
-            """Start XAMPP Control Panel"""
-            xampp_path = find_xampp_path()
-            if xampp_path:
-                control_panel = os.path.join(xampp_path, 'xampp-control.exe')
-                try:
-                    subprocess.Popen([control_panel])
-                    return True
-                except Exception as e:
-                    print(f"Failed to start XAMPP Control Panel: {e}")
-            return False
-        
-        # Check if MySQL is running
-        if not is_mysql_running():
-            # Show warning message
-            msg = CTkMessagebox(title="Database Service Required",
-                message="MySQL database service is not running.\n\n"
-                       "This application requires XAMPP MySQL to be running.\n\n"
-                       "Do you want to open XAMPP Control Panel to start MySQL service?", icon="warning", option_1="Open XAMPP", option_2="Continue Anyway", option_3="Exit")
-            
-            response = msg.get()
-            
-            if response == "Open XAMPP":
-                if start_xampp_control():
-                    CTkMessagebox(title="XAMPP Control Panel",
-                        message="XAMPP Control Panel has been opened.\n\n"
-                               "Please start the MySQL service and then try logging in again.", icon="info")
-                else:
-                    CTkMessagebox(title="XAMPP Not Found",
-                        message="XAMPP Control Panel not found.\n\n"
-                               "Please ensure XAMPP is installed and start MySQL service manually.", icon="error")
-                # Keep the login form open for user to retry
-                return False
-                
-            elif response == "Exit":
-                self.master.quit()
-                return False
-            elif response == "Continue Anyway":
-                # User wants to try anyway (maybe they'll start service manually)
-                return True
-        
-        return True
-    
+
     def create_login_widgets(self):
         # Clear existing widgets except the CSD logo
         if self.container and self.container.winfo_exists():
@@ -230,21 +165,22 @@ class LoginForm(ctk.CTkFrame):
         return hashed_password, salt
 
     def validate_login(self):
-        if not self.check_xampp_services():
-            return  # XAMPP services not running, exit validation
         current_time = time()
         # Clear any previous error message
         self.error_label.configure(text="")
         
         email = self.email_entry.get().strip()
         password = self.password_entry.get()
+        
         if current_time < self.lockout_until:
             wait_time = int(self.lockout_until - current_time)
             self.error_label.configure(text=f"Too many failed attempts. Please try again in {wait_time} seconds.")
             return
+            
         if not email or not password:
             self.error_label.configure(text="Please enter both email and password")
             return
+            
         # Admin credentials check - bypass all other validations
         if email == "admin@gmail.com" and password == "BSCS@2024!":
             self.error_label.configure(text="Admin Login Successful!", text_color="green")
@@ -284,13 +220,14 @@ class LoginForm(ctk.CTkFrame):
         
         except Exception as e:
             self.error_label.configure(text=f"Login error: {str(e)}")
-        email = self.email_entry.get().strip()
-        password = self.password_entry.get()
+            
+        # Additional validation for failed attempts
         if self.is_login_valid(email, password):
             # Reset failed attempts if login is valid
             self.failed_attempts.clear()
             self.lockout_until = 0
-            self.login_success_callback()
+            if self.login_success_callback:
+                self.login_success_callback()
         else:
             self.failed_attempts.append(current_time)
             self.failed_attempts = [t for t in self.failed_attempts if current_time - t < 60]  # Keep only last 60 seconds
@@ -301,6 +238,7 @@ class LoginForm(ctk.CTkFrame):
             else:
                 remaining = 5 - len(self.failed_attempts)
                 self.error_label.configure(text=f"Invalid email or password. {remaining} attempts remaining.")
+
     def is_login_valid(self, email, password):
         """Check if the provided email and password are valid"""
         try:
@@ -347,10 +285,6 @@ class RegistrationForm:
         self.login_success_callback = login_success_callback
         self.admin_login_callback = admin_login_callback
         
-        """fix the problem that after ng a mak register wala siya ga 
-        log in remember it today dec 31, 2024 last call 
-        ko sakun problem sa system"""
-
         # Get screen dimensions
         screen_width = self.master.winfo_screenwidth()
         screen_height = self.master.winfo_screenheight()
@@ -396,7 +330,7 @@ class RegistrationForm:
         self.name_entry = ctk.CTkEntry(name_frame, placeholder_text="Enter your full name", height=35, corner_radius=30)
         self.name_entry.pack(fill='x')
         self.name_entry.bind("<Return>", lambda event: self.email_entry.focus_set())
-        self.name_entry.bind("<KeyRelease>", self.validate_name_input)  # Add this line
+        self.name_entry.bind("<KeyRelease>", self.validate_name_input)
         
         # Add name requirements label
         name_requirements = ctk.CTkLabel(
@@ -426,6 +360,7 @@ class RegistrationForm:
         
         pass_label = ctk.CTkLabel(password_frame, text="Password must contain e.g. A,3,n", font=("Helviteca", 12), text_color="gray")
         pass_label.pack(anchor='w')
+        
         # Add password entry and show checkbox in a container
         password_entry_frame = ctk.CTkFrame(password_frame, fg_color="transparent")
         password_entry_frame.pack(fill='x')
@@ -454,19 +389,18 @@ class RegistrationForm:
         
         self.show_confirm_password_cb = ctk.CTkCheckBox(confirm_entry_frame,text="Show",width=20,height=20,checkbox_width=16,checkbox_height=16,corner_radius=3,fg_color="#2196F3",hover_color="#1976D2",command=lambda: self.toggle_password_visibility(self.confirm_password_entry),font=("Helvetica", 12))
         self.show_confirm_password_cb.pack(side="right", padx=(5, 0))
-       # Add error label above register button
+       
+        # Add error label above register button
         self.reg_error_label = ctk.CTkLabel(self.scrollable_frame, text="", text_color="red", font=ctk.CTkFont(size=12), wraplength=280)
         self.reg_error_label.pack(pady=(5, 0))
 
         regis_icon =Image.open(LoginForm.resource_path("icons/register.png"))
         self.regis_icon = ctk.CTkImage(light_image=regis_icon, dark_image=regis_icon, size=(30, 30))
-        register_button = ctk.CTkButton(self.scrollable_frame, text="Register", image=self.regis_icon,command=self.register_user, corner_radius=30   ,height=40, font=ctk.CTkFont(size=15, weight="bold"))
+        register_button = ctk.CTkButton(self.scrollable_frame, text="Register", image=self.regis_icon,command=self.register_user, corner_radius=30, height=40, font=ctk.CTkFont(size=15, weight="bold"))
         register_button.pack(pady=30)
         
-
         self.overlay_frame.bind("<Return>", lambda event: self.register_user())
         self.scrollable_frame.bind("<Return>", lambda event: self.register_user())
-
 
         go_login = ctk.CTkLabel(self.scrollable_frame, text="Already have an account?", font=ctk.CTkFont(size=12), text_color="black")
         go_login.place(x=72, y=460)
@@ -512,6 +446,7 @@ class RegistrationForm:
         password = self.password_entry.get()
         confirm_password = self.confirm_password_entry.get()
 
+        # Validation checks
         if not name:
             self.reg_error_label.configure(text="Name is required")
             return
@@ -524,8 +459,16 @@ class RegistrationForm:
             self.reg_error_label.configure(text="Please enter your full name")
             return
 
-        if not name or not email or not password or not confirm_password:
-            self.reg_error_label.configure(text="All fields are required")
+        if not email:
+            self.reg_error_label.configure(text="Email is required")
+            return
+
+        if not password:
+            self.reg_error_label.configure(text="Password is required")
+            return
+
+        if not confirm_password:
+            self.reg_error_label.configure(text="Please confirm your password")
             return
 
         if password != confirm_password:
@@ -536,43 +479,76 @@ class RegistrationForm:
             self.reg_error_label.configure(text="Invalid email format")
             return
 
-        # Add password validation before the existing validation checks
+        # Password validation
         is_valid, message = self.validate_password(password)
         if not is_valid:
             self.reg_error_label.configure(text=message)
             return
 
         try:
+            # Check if user already exists
             existing_user = self.db_handler.get_user_by_email(email)
             
             if existing_user:
                 self.reg_error_label.configure(text="Email already registered")
                 return
 
+            # Get next available user ID
             new_id = self.db_handler.get_next_user_id()
+            if not new_id:
+                self.reg_error_label.configure(text="Failed to generate user ID. Please try again.")
+                return
+
             # Hash the password
             hashed_password, salt = self.hash_password(password)
             
-            # Save the new user with username instead of name
-            self.db_handler.save_user(id = new_id, email=email, hashed_password=hashed_password, salt=salt, username=name)
+            # Save the new user
+            success = self.db_handler.save_user(
+                id=new_id, 
+                email=email, 
+                hashed_password=hashed_password, 
+                salt=salt, 
+                username=name
+            )
             
-            # Show success message briefly
-            self.reg_error_label.configure(text="Registration successful! Please wait for admin approval.", text_color="green")
-            
-            # Clear the frame before calling back_callback
-            for widget in self.original_master.winfo_children():
-                widget.destroy()
-            LoginForm(self.original_master, self.login_success_callback, self.admin_login_callback)
-        
+            if success:
+                # Show success message
+                self.reg_error_label.configure(
+                    text="✅ Registration successful! Please wait for admin approval.", 
+                    text_color="green"
+                )
+                
+                # Clear form fields
+                self.name_entry.delete(0, 'end')
+                self.email_entry.delete(0, 'end')
+                self.password_entry.delete(0, 'end')
+                self.confirm_password_entry.delete(0, 'end')
+                
+                # Auto-redirect to login after 2 seconds
+                self.master.after(2000, self.redirect_to_login)
+                
+            else:
+                self.reg_error_label.configure(text="❌ Registration failed. Please try again.")
+                
         except Exception as e:
             print(f"Full registration error: {e}")
-            self.reg_error_label.configure(text=f"Registration error: {str(e)}")
-            if hasattr(self, 'overlay_frame') and self.overlay_frame.winfo_exists():
-                self.overlay_frame.destroy()
-    
-            # Return to login form
-            LoginForm(self.original_master, self.login_success_callback, self.admin_login_callback)
+            error_message = str(e)
+            if "duplicate key" in error_message.lower():
+                self.reg_error_label.configure(text="❌ Email already registered")
+            elif "connection" in error_message.lower():
+                self.reg_error_label.configure(text="❌ Database connection error. Please try again.")
+            else:
+                self.reg_error_label.configure(text=f"❌ Registration error: {error_message}")
+
+    def redirect_to_login(self):
+        """Redirect to login form after successful registration"""
+        # Clear all widgets
+        if self.original_master.winfo_exists():
+            for widget in self.original_master.winfo_children():
+                widget.destroy()
             
+        # Create new login form
+        LoginForm(self.original_master, self.login_success_callback, self.admin_login_callback)
 
     def handle_back_click(self, event=None):
         # Clear all widgets in the original_master
@@ -600,27 +576,9 @@ class RegistrationForm:
         
         return True, "Password is valid"
 
-    def register(self):
-        username = self.name_entry.get()
-        password = self.password_entry.get()
-        confirm_password = self.confirm_password_entry.get()
-
-        if not username or not password or not confirm_password:
-            CTkMessagebox(title="Error", message="All fields are required", icon="error")
-            return
-
-        # Validate password
-        is_valid, message = self.validate_password(password)
-        if not is_valid:
-            CTkMessagebox(title="Error", message= message)
-            return
-
-        if password != confirm_password:
-            CTkMessagebox(title="Error", message="Passwords do not match", icon="error")
-            return
-        try:
-            # Your existing registration code here
-            pass
-        except Exception as e:
-            CTkMessagebox(title="Error", message=f"Registration failed: {str(e)}")
-            
+    def show_message(self, message, is_success=True):
+        """Show a message to the user with appropriate styling"""
+        if is_success:
+            self.reg_error_label.configure(text=f"✅ {message}", text_color="green")
+        else:
+            self.reg_error_label.configure(text=f"❌ {message}", text_color="red")

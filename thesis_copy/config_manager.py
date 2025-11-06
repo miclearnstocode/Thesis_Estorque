@@ -48,42 +48,59 @@ class ConfigManager:
                     self.config.read(config_path)
                     config_found = True
                     logging.info(f"Configuration loaded from: {config_path}")
-                    print(f"✅ Config loaded from: {config_path}")  # Debug print
+                    print(f"✅ Config loaded from: {config_path}")
                     break
                 except Exception as e:
                     logging.warning(f"Failed to read config from {config_path}: {e}")
-                    print(f"❌ Failed to load config from {config_path}: {e}")  # Debug print
+                    print(f"❌ Failed to load config from {config_path}: {e}")
                     continue
         
         if not config_found:
             logging.warning("No config file found, using defaults")
-            print("⚠️  No config file found, using defaults")  # Debug print
+            print("⚠️  No config file found, using defaults")
             self.set_defaults()
     
     def set_defaults(self):
-        """Set default configuration values"""
+        """Set default configuration values for PostgreSQL"""
         if not self.config.has_section('database'):
             self.config.add_section('database')
         
+        # PostgreSQL defaults - using default PostgreSQL user
         self.config.set('database', 'host', 'localhost')
-        self.config.set('database', 'user', 'comscie')
-        self.config.set('database', 'password', 'BS_Comscie@2025!')
+        self.config.set('database', 'user', 'postgres')  # Default PostgreSQL user
+        self.config.set('database', 'password', '')  # Empty password - user will set this
         self.config.set('database', 'database', 'department')
-        self.config.set('database', 'port', '3306')
-        self.config.set('database', 'allow_local_infile', 'True')
+        self.config.set('database', 'port', '5432')  # PostgreSQL default port
+        
+        # Add PostgreSQL specific section
+        if not self.config.has_section('postgresql'):
+            self.config.add_section('postgresql')
+        
+        self.config.set('postgresql', 'auto_start', 'true')
+        self.config.set('postgresql', 'data_dir', r'C:\Program Files\PostgreSQL\16\data')  # Common default path
+        self.config.set('postgresql', 'bin_dir', r'C:\Program Files\PostgreSQL\16\bin')   # Common default path
+        self.config.set('postgresql', 'service_name', 'postgresql-x64-16')  # Common default service name
     
     def get_database_config(self):
         """Get database configuration as dictionary"""
         config = {
             'host': self.config.get('database', 'host', fallback='localhost'),
-            'user': self.config.get('database', 'user', fallback='comscie'),
-            'password': self.config.get('database', 'password', fallback='BS_Comscie@2025!'),
+            'user': self.config.get('database', 'user', fallback='postgres'),  # Default to postgres
+            'password': self.config.get('database', 'password', fallback=''),
             'database': self.config.get('database', 'database', fallback='department'),
-            'port': self.config.getint('database', 'port', fallback=3306),
-            'allow_local_infile': self.config.getboolean('database', 'allow_local_infile', fallback=True)
+            'port': self.config.getint('database', 'port', fallback=5432),
         }
-        print(f"🔧 Database config: {config}")  # Debug print
+        print(f"🔧 Database config: {config}")
         return config
+    
+    def get_postgres_config(self):
+        """Get PostgreSQL specific configuration"""
+        return {
+            'auto_start': self.config.getboolean('postgresql', 'auto_start', fallback=True),
+            'data_dir': self.config.get('postgresql', 'data_dir', fallback=r'C:\Program Files\PostgreSQL\16\data'),
+            'bin_dir': self.config.get('postgresql', 'bin_dir', fallback=r'C:\Program Files\PostgreSQL\16\bin'),
+            'service_name': self.config.get('postgresql', 'service_name', fallback='postgresql-x64-16')
+        }
     
     def get_icon_path(self, icon_name):
         """Get icon path from configuration"""
@@ -106,6 +123,28 @@ class ConfigManager:
         
         # Final fallback
         return default_path
+
+    def save_database_config(self, host, user, password, database, port):
+        """Save database configuration back to config file"""
+        try:
+            self.config.set('database', 'host', host)
+            self.config.set('database', 'user', user)
+            self.config.set('database', 'password', password)
+            self.config.set('database', 'database', database)
+            self.config.set('database', 'port', str(port))
+            
+            # Save to the first config location that exists, or create new one
+            base_path = self.get_base_path()
+            config_path = os.path.join(base_path, 'config.ini')
+            
+            with open(config_path, 'w') as configfile:
+                self.config.write(configfile)
+            
+            logging.info(f"Database configuration saved to: {config_path}")
+            return True
+        except Exception as e:
+            logging.error(f"Failed to save database configuration: {e}")
+            return False
 
 # Create global instance
 config_manager = ConfigManager()
