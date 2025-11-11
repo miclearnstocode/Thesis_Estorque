@@ -115,13 +115,21 @@ class StudentScreen(ctk.CTkFrame):
         # Connect to the database
         db_handler = DatabaseHandler()
         try:
-            #Fetch unenrolled students dynamically for each year level
+            # Fetch unenrolled students dynamically for each year level
             self.student_data = {}
             self.unenrolled_students = []
 
+            # Reset any previous transaction errors by creating a fresh connection
+            try:
+                db_handler.close()  # Close existing connection
+            except:
+                pass
+            db_handler = DatabaseHandler()  # Create new connection
+
             for year in range(1, 5):  # Loop through 1st to 4th year
                 students = db_handler.get_unenrolled_students(year, current_sy)
-                self.student_data[f"{year}st Year" if year == 1 else f"{year}nd Year" if year == 2 else f"{year}rd Year" if year == 3 else f"{year}th Year"] = students
+                year_label = f"{year}st Year" if year == 1 else f"{year}nd Year" if year == 2 else f"{year}rd Year" if year == 3 else f"{year}th Year"
+                self.student_data[year_label] = students
                 self.unenrolled_students.extend(students)
 
             # Compute total unenrolled students
@@ -132,9 +140,9 @@ class StudentScreen(ctk.CTkFrame):
                 
             # Generate tabs for each year level
             self.treeviews = {}  # Store treeviews for filtering
-            for year, students in self.student_data.items():
+            for year_label, students in self.student_data.items():
                 tab = ctk.CTkFrame(self.notebook)
-                self.notebook.add(tab, text=year)
+                self.notebook.add(tab, text=year_label)
 
                 tree_frame = ctk.CTkFrame(tab)
                 tree_frame.pack(pady=10, padx=10, fill="both", expand=True)
@@ -176,14 +184,14 @@ class StudentScreen(ctk.CTkFrame):
                     semester = student.get("SEMESTER", "")
                     tree.insert("", "end", values=(student["ID_NO"], full_name, student["YEAR_LEVEL"], semester,student["ENROLLMENT_STATUS"]), tags=(tag,))
 
-                self.treeviews[year] = tree  # Store treeview reference for filtering
+                self.treeviews[year_label] = tree  # Store treeview reference for filtering
+            
             not_enrolled_count = sum(1 for student in self.unenrolled_students if student.get("ENROLLMENT_STATUS") == "Not Enrolled")
             # Add a print button for unenrolled students
             
             print_icon = Image.open(LoginForm.resource_path("icons/prints.png"))
             self.print_icon =ctk.CTkImage(light_image=print_icon, dark_image=print_icon, size=(30, 30)) 
-            #fix nga ma update ang status once ma click na ang print all
-        
+            
             print_button = ctk.CTkButton(summary_frame, text=f"Print All ({not_enrolled_count})",image=self.print_icon,border_width=1, fg_color="transparent",text_color="black", font=('Helvetica', 14, 'bold'),corner_radius=30, command=self.print_all_not_enrolled)
             print_button.pack(pady=5, padx=30, side="right")
 
@@ -194,6 +202,13 @@ class StudentScreen(ctk.CTkFrame):
 
         except Exception as e:
             messagebox.showerror("Database Error", f"Failed to fetch student data: {str(e)}")
+        finally:
+            # Always close the database connection
+            try:
+                db_handler.close()
+            except:
+                pass
+            
     def print_all_not_enrolled(self):
         not_enrolled_ids = [student["ID_NO"] for student in self.unenrolled_students if student.get("ENROLLMENT_STATUS") == "Not Enrolled"]
         if not not_enrolled_ids:
@@ -360,7 +375,7 @@ class StudentScreen(ctk.CTkFrame):
         prerequisite_subjects = []
         
         # Get curriculum data and grades
-        curriculum_data = student_data.get("curriculum_regular_data", [])
+        curriculum_data = student_data.get("curriculum_data", [])
         all_grades = {}
         if "grades_data" in student_data and student_data["grades_data"]:
             for semester_grades in student_data["grades_data"].values():
@@ -440,33 +455,66 @@ class StudentScreen(ctk.CTkFrame):
                 self.student_cache = {}  # Initialize cache if not exists
                 
             # Check cache first
-            if id_no in self.student_cache:
-                student_data = self.student_cache[id_no]
+            cache_key = f"{id_no}_{year_level}" if year_level != "Select" else id_no
+            if cache_key in self.student_cache:
+                student_data = self.student_cache[cache_key]
                 print("Retrieved from cache")
             else:
                 # If not in cache, fetch from database
-                student_data = db_handler.fetch_student_data(id_no, None)
+                # Pass None for year_level to get all curriculum data initially
+                student_data = db_handler.fetch_student_data(id_no, None if year_level == "Select" else year_level)
                 
                 # Cache the result (with a maximum cache size)
                 MAX_CACHE_SIZE = 100
                 if len(self.student_cache) >= MAX_CACHE_SIZE:
                     # Remove oldest entry if cache is full
                     self.student_cache.pop(next(iter(self.student_cache)))
-                self.student_cache[id_no] = student_data
+                self.student_cache[cache_key] = student_data
                 print("Retrieved from database")
 
             # Process the student data
             if student_data["curriculum_data"]:
-                current_yr = student_data["curriculum_data"][0].get("YR", "1")
+                # Get student info from the student_info field instead of curriculum_data
+                student_info = student_data.get("student_info", {})
+                
+                if student_info:
+                    # Use lowercase keys to access student information
+                    current_yr = student_info.get('yr', '1')
+                    self.student_name = student_info.get('STUDENT_NAME', '')
+                    self.year_level = current_yr
+                    self.sex = student_info.get('sex', '')
+                    self.age = student_info.get('age', '')
+                else:
+                    # Fallback to first curriculum record if student_info is not available
+                    first_record = student_data["curriculum_data"][0]
+                    current_yr = first_record.get("yr", "1")
+                    self.student_name = first_record.get("STUDENT_NAME", "")
+                    self.year_level = current_yr
+                    self.sex = first_record.get("sex", "")
+                    self.age = first_record.get("age", "")
                 
                 # Use set for O(1) lookup time
                 completed_semesters = set(db_handler.check_all_tables_for_grades(id_no).keys())
                 
                 # Use dictionary for O(1) lookup time
-                year_semester_mapping = {'1': ['1.1', '1.2'],'2': ['2.1', '2.2'],'3': ['3.1', '3.2'],'4': ['4.1', '4.2']}
+                year_semester_mapping = {
+                    '1': ['1.1', '1.2'],
+                    '2': ['2.1', '2.2'],
+                    '3': ['3.1', '3.2'],
+                    '4': ['4.1', '4.2']
+                }
                 
                 # Use dictionary for O(1) lookup time
-                semester_conversion = {'first_year_first_semester': '1.1', 'first_year_second_semester': '1.2','second_year_first_semester': '2.1', 'second_year_second_semester': '2.2','third_year_first_semester': '3.1', 'third_year_second_semester': '3.2','fourth_year_first_semester': '4.1', 'fourth_year_second_semester': '4.2'}
+                semester_conversion = {
+                    'first_year_first_semester': '1.1', 
+                    'first_year_second_semester': '1.2',
+                    'second_year_first_semester': '2.1', 
+                    'second_year_second_semester': '2.2',
+                    'third_year_first_semester': '3.1', 
+                    'third_year_second_semester': '3.2',
+                    'fourth_year_first_semester': '4.1', 
+                    'fourth_year_second_semester': '4.2'
+                }
                 
                 # Convert to set for O(1) lookup time
                 completed_yr_sem = {semester_conversion[sem] for sem in completed_semesters 
@@ -493,7 +541,7 @@ class StudentScreen(ctk.CTkFrame):
         except Exception as e:
             CTkMessagebox(title="Database Error", message=f"An error occurred while fetching student data: {str(e)}")
             return
-        
+                
         # Create a frame to hold the student data and curriculum data
         student_frame = ttk.Frame(self.student_list_frame)
         student_frame.pack(fill="both", expand=True)
@@ -513,18 +561,33 @@ class StudentScreen(ctk.CTkFrame):
             self.tree.heading(column, text=column)
             self.tree.column(column, width=column_widths.get(column, 150), anchor='center', stretch=True)
 
-        # Maintain a set of inserted ID_NO to avoid duplicates
-        inserted_ids = set()
-
-        for row in student_data["curriculum_data"]:
-            student_id = row.get("ID_NO", "")
-            if student_id not in inserted_ids:
-                self.tree.insert("", "end", values=(student_id, row.get("STUDENT_NAME", ""),row.get("YR", ""), row.get("AGE", ""), row.get("SEX", ""), row.get("EMAIL_ADDRESS", "")))
-                self.student_name = row.get("STUDENT_NAME", "")  
-                self.year_level = row.get("YR", "")
-                self.sex = row.get("SEX","")
-                self.age = row.get("AGE","")
-                inserted_ids.add(student_id)
+        # Get student info for display
+        student_info = student_data.get("student_info", {})
+        
+        # Insert student data into the treeview
+        if student_info:
+            # Use lowercase keys to access student information
+            student_id = student_info.get('id_no', id_no)
+            student_name = student_info.get('STUDENT_NAME', '')
+            year = student_info.get('yr', '')
+            age = student_info.get('age', '')
+            sex = student_info.get('sex', '')
+            email = student_info.get('email_address', '')
+            
+            self.tree.insert("", "end", values=(
+                student_id, 
+                student_name, 
+                year, 
+                age, 
+                sex, 
+                email
+            ))
+            
+            # Store the student details for later use
+            self.student_name = student_name
+            self.year_level = year
+            self.sex = sex
+            self.age = age
 
         treeview_frame = ttk.Frame(student_frame)
         treeview_frame.pack(fill="both", expand=True)
@@ -532,7 +595,6 @@ class StudentScreen(ctk.CTkFrame):
         style = ttk.Style()
         style.configure("Treeview", font=("Helvetica", 12),  rowheight=36, background="white", fieldbackground="white", foreground="black") 
         style.configure("Treeview.Heading", font=("Helvetica", 12, "bold"), background="white", foreground="black")
-
 
         # Treeview widget for displaying curriculum data
         table_curriculum = ("Course No.", "Descriptive Title", "Year Level", "Units", "Lec", "Lab", "Pre-requisite", "Grade")
@@ -557,11 +619,11 @@ class StudentScreen(ctk.CTkFrame):
 
         displayed_courses = set()
         # Check if the data is not empty
-        if student_data["curriculum_regular_data"]:
+        if student_data["curriculum_data"]:
             current_year = None
             year_totals = {'units': 0, 'lec': 0, 'lab': 0}
-            sorted_curriculum = sorted(student_data["curriculum_regular_data"],
-            key=lambda x: ( float(x.get('YEAR_LEVEL', '0')), x.get('COURSE_NO', '')))
+            sorted_curriculum = sorted(student_data["curriculum_data"],
+            key=lambda x: ( float(x.get('YEAR_LEVEL', x.get('year_level', '0'))), x.get('COURSE_NO', x.get('course_no', ''))))
             def wrap_text(text, width=30):
                 """Function to wrap text to multiple lines"""
                 import textwrap
@@ -569,18 +631,19 @@ class StudentScreen(ctk.CTkFrame):
             
             for i, row in enumerate(sorted_curriculum):
                 if row:
-                    course_key = (row.get('COURSE_NO', '').strip(), row.get('YEAR_LEVEL', ''))
+                    course_key = (row.get('COURSE_NO', row.get('course_no', '')).strip(), 
+                                row.get('YEAR_LEVEL', row.get('year_level', '')))
                     if course_key in displayed_courses:
                         continue
                     displayed_courses.add(course_key)
                     # Convert values to strings
-                    course_no = row.get('COURSE_NO', '').strip()
-                    descriptive_title = wrap_text(row.get('DESCRIPTIVE_TITLE', '').strip(), width=40)
-                    year_level = row.get('YEAR_LEVEL', '')
-                    units = row.get('UNITS', '')
-                    lec = row.get('LEC', '')
-                    lab = row.get('LAB', '')
-                    prerequisite = wrap_text(row.get('PREREQUISITE', '').strip(), width=18)
+                    course_no = row.get('COURSE_NO', row.get('course_no', '')).strip()
+                    descriptive_title = wrap_text(row.get('DESCRIPTIVE_TITLE', row.get('descriptive_title', '')).strip(), width=40)
+                    year_level = row.get('YEAR_LEVEL', row.get('year_level', ''))
+                    units = row.get('UNITS', row.get('units', ''))
+                    lec = row.get('LEC', row.get('lec', ''))
+                    lab = row.get('LAB', row.get('lab', ''))
+                    prerequisite = wrap_text(row.get('PREREQUISITE', row.get('prerequisite', '')).strip(), width=18)
 
                     # If year level changes, insert total row for previous year
                     if current_year is not None and current_year != year_level:
@@ -631,7 +694,9 @@ class StudentScreen(ctk.CTkFrame):
                 empty_row = ["", "", "", "", "", "", "", ""]
                 self.curriculum_tree.insert("", "end", values=empty_row, tags=('empty_row',))
         else:
-            print("No data in curriculum_regular_data")
+            print("No data in curriculum_data")
+            print(f"Available keys: {student_data.keys()}")
+            print(f"Curriculum data length: {len(student_data['curriculum_data'])}")
 
         # Configure tag colors
         self.curriculum_tree.tag_configure('empty_row', background='white', font=('Helvetica', 12))
@@ -641,8 +706,8 @@ class StudentScreen(ctk.CTkFrame):
         self.curriculum_tree.tag_configure('total', background='#D3D3D3', font=('Helvetica', 12))  # Grey background for total rows
 
         # Store the retrieved student ID for later use in printing
-        self.selected_id_no = id_no  
-
+        self.selected_id_no = id_no
+        
     def get_grade_for_course(self, grades_data, course_no):
         # Remove any leading/trailing whitespace from the course number
         course_no = course_no.strip()
@@ -1153,7 +1218,7 @@ class StudentScreen(ctk.CTkFrame):
 
             if not appraised_data:
                 logging.info(f"No data found for ID_NO: {id_no}. Allowing new enrollment.")
-                CTkMessagebox(title="Enrollment Status", message="No records found. Student can enroll.")
+                CTkMessagebox(title="Enrollment Status", message="No records found. Student can't enroll.")
                 self.print_button.configure(state="normal")
                 return appraised_data
 

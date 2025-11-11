@@ -5,7 +5,6 @@ from PIL import Image
 import importlib
 import threading
 import sys , time
-
 import psycopg2
 import student_screen , curriculum_screen, archive_screen, appraisal_screen
 import grade_screen, admin_screen

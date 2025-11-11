@@ -259,25 +259,44 @@ class DatabaseHandler:
 
             self.cursor = self.conn.cursor()
 
-            # ✅ Create the table if it doesn't exist (PostgreSQL syntax)
+            # ✅ Create the table if it doesn't exist (PostgreSQL syntax) with all columns
             table_name = "appraised_curriculum"
             self.cursor.execute(f"""
-                CREATE TABLE IF NOT EXISTS {table_name} (appraised_id VARCHAR(20), id_no VARCHAR(50),
-                    last_name VARCHAR(110), first_name VARCHAR(100),  middle_name VARCHAR(100),
-                    year INT, sex VARCHAR(10), age INT, birthday DATE,
-                    contact_number VARCHAR(15), email_address VARCHAR(100), address VARCHAR(255),
-                    parent_guardian VARCHAR(100), course_no VARCHAR(100), descriptive_title VARCHAR(100),
-                    year_level NUMERIC(3,1), units INT, lec INT, lab INT, prerequisite VARCHAR(100), grades NUMERIC(5,2),
-                    school_year VARCHAR(20), PRIMARY KEY (appraised_id, id_no, course_no))""")
+                CREATE TABLE IF NOT EXISTS {table_name} (
+                    appraised_id VARCHAR(20), 
+                    id_no VARCHAR(50),
+                    last_name VARCHAR(110), 
+                    first_name VARCHAR(100),  
+                    middle_name VARCHAR(100),
+                    year INT, 
+                    sex VARCHAR(10), 
+                    age INT, 
+                    birthday DATE,
+                    contact_number VARCHAR(15), 
+                    email_address VARCHAR(100), 
+                    address VARCHAR(255),
+                    parent_guardian VARCHAR(100), 
+                    course_no VARCHAR(100), 
+                    descriptive_title VARCHAR(100),
+                    year_level NUMERIC(3,1), 
+                    units INT, 
+                    lec INT, 
+                    lab INT, 
+                    prerequisite VARCHAR(100), 
+                    grades NUMERIC(5,2),
+                    school_year VARCHAR(20), 
+                    PRIMARY KEY (appraised_id, id_no, course_no)
+                )
+            """)
 
-            #Insert matched subjects
+            # Insert matched subjects
             insert_query = f"""
                 INSERT INTO {table_name} (
                     appraised_id, id_no, last_name, first_name, middle_name,
                     year, sex, age, birthday, contact_number, email_address,
                     address, parent_guardian, course_no, descriptive_title,
                     year_level, units, lec, lab, prerequisite, grades, school_year)
-                VALUES ( %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (appraised_id, id_no, course_no)
                 DO UPDATE SET
                     last_name = EXCLUDED.last_name,
@@ -302,13 +321,41 @@ class DatabaseHandler:
             """
 
             for _, row in matched_subjects.iterrows():
-                self.cursor.execute(insert_query, (appraised_id, id_no, last_name, first_name,
-                    middle_name, year, sex, age, birthday if not pd.isna(birthday) else None,
-                    contact_number if not pd.isna(contact_number) else None, email_address if not pd.isna(email_address) else None,
-                    address if not pd.isna(address) else None, parent_guardian if not pd.isna(parent_guardian) else None,
-                    row.get('Course_No', None), row.get('Descriptive_Title', None), row.get('Year_Level', None),
-                    0 if pd.isna(row.get('Units')) else row['Units'], 0 if pd.isna(row.get('Lec')) else row['Lec'],
-                    0 if pd.isna(row.get('Lab')) else row['Lab'], row.get('Prerequisite', None), 0 if pd.isna(row.get('Grades')) else row['Grades'], school_year))
+                # Convert birthday to proper date format
+                birthday_date = None
+                if birthday and not pd.isna(birthday):
+                    try:
+                        if isinstance(birthday, str):
+                            birthday_date = pd.to_datetime(birthday, errors='coerce').date()
+                        else:
+                            birthday_date = pd.to_datetime(birthday, errors='coerce').date()
+                    except Exception:
+                        birthday_date = None
+                
+                # Clean contact number
+                clean_contact_number = None
+                if contact_number and not pd.isna(contact_number):
+                    clean_contact_number = str(contact_number).strip()
+                    # Remove any non-digit characters except +
+                    clean_contact_number = ''.join(filter(lambda x: x.isdigit() or x == '+', clean_contact_number))
+                
+                self.cursor.execute(insert_query, (
+                    appraised_id, id_no, last_name, first_name,
+                    middle_name, year, sex, age, birthday_date,
+                    clean_contact_number,  # Use cleaned contact number
+                    email_address if not pd.isna(email_address) else None,
+                    address if not pd.isna(address) else None, 
+                    parent_guardian if not pd.isna(parent_guardian) else None,
+                    row.get('Course_No', None), 
+                    row.get('Descriptive_Title', None), 
+                    row.get('Year_Level', None),
+                    0 if pd.isna(row.get('Units')) else row['Units'], 
+                    0 if pd.isna(row.get('Lec')) else row['Lec'],
+                    0 if pd.isna(row.get('Lab')) else row['Lab'], 
+                    row.get('Prerequisite', None), 
+                    0 if pd.isna(row.get('Grades')) else row['Grades'], 
+                    school_year
+                ))
 
             self.conn.commit()
             messagebox.showinfo("Success", "Appraised data saved to the database successfully!")
@@ -324,7 +371,7 @@ class DatabaseHandler:
                 self.cursor.close()
             if self.conn and self.conn.closed == 0:
                 self.conn.close()
-
+            
     def fetch_available_fallback_subjects(self, id_no):
         logging.debug(f"Fetching available fallback subjects for ID_NO: {id_no}")
 
@@ -377,7 +424,7 @@ class DatabaseHandler:
                 ac.first_name,
                 ac.middle_name,
                 ac.year, 
-                ac.age, 
+                ac.age,
                 ac.sex, 
                 ac.birthday,
                 ac.contact_number,
@@ -607,69 +654,108 @@ class DatabaseHandler:
     def fetch_student_data(self, id_no, year_level):
         logging.debug(f"Fetching data for ID_NO: {id_no}, Year Level: {year_level}")
 
+        # First, verify the student exists and get basic info
+        student_query = """
+            SELECT 
+                id_no, last_name, first_name, middle_name, yr, age,
+                birthday, sex, parent_guardian, phone_number, 
+                email_address, address, curriculum_id
+            FROM student_information 
+            WHERE id_no = %s
+        """
+
+        # Then get curriculum data based on curriculum_id
         curriculum_query = """
             SELECT 
-                si.ID_NO, 
-                si.LAST_NAME,
-                si.FIRST_NAME,
-                si.MIDDLE_NAME,
-                si.YR, 
-                si.AGE,
-                si.BIRTHDAY, 
-                si.SEX, 
-                si.PARENT_GUARDIAN,
-                si.PHONE_NUMBER,
-                si.EMAIL_ADDRESS,
-                si.ADDRESS,
-                cr.Course_No, 
-                cr.Descriptive_Title, 
-                cr.Year_Level, 
-                cr.Units, 
-                cr.Lec, 
-                cr.Lab, 
-                cr.Prerequisite
-            FROM student_information si
-            LEFT JOIN curriculum_regular cr 
-                ON (cr.YEAR_LEVEL::TEXT LIKE si.YR::TEXT || '.%' OR cr.YEAR_LEVEL = %s)
-            WHERE si.ID_NO = %s
+                cr.course_no, 
+                cr.descriptive_title, 
+                cr.year_level, 
+                cr.units, 
+                cr.lec, 
+                cr.lab, 
+                cr.prerequisite,
+                cr.grades
+            FROM curriculum_regular cr
+            WHERE cr.curriculum_id = %s
+            AND (%s IS NULL OR cr.year_level::TEXT LIKE %s)
+            ORDER BY cr.year_level, cr.course_no
         """
-        curriculum_params = (year_level, id_no)
 
         try:
             # Ensure PostgreSQL connection is active
             if not self.conn or self.conn.closed != 0:
-                raise psycopg2.Error("Database connection lost.")
+                logging.warning("Connection closed, reconnecting...")
+                self.conn, self.cursor = self.get_db_connection()
 
-            # Use psycopg2 cursor safely
+            curriculum_results = []
+            student_info = None
+
             with self.conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
-                cursor.execute(curriculum_query, curriculum_params)
-                curriculum_results = cursor.fetchall()
+                # First get student basic information
+                cursor.execute(student_query, (id_no,))
+                student_result = cursor.fetchone()
+                
+                if not student_result:
+                    logging.warning(f"No student found for ID_NO: {id_no}")
+                    return {
+                        "curriculum_data": [],
+                        "curriculum_regular_data": [],
+                        "enrollment_status": "Student not found",
+                        "table_exists": False,
+                        "has_grades": False,
+                        "grades_data": {},
+                        "student_info": None}
+                
+                student_info = dict(student_result)
+                
+                # Format student name - use lowercase column names
+                try:
+                    last_name = student_info.get('last_name', '') or ''
+                    first_name = student_info.get('first_name', '') or ''
+                    middle = student_info.get('middle_name', '') or ''
+                    middle_initial = f"{middle[0]}." if middle else ""
+                    student_info['STUDENT_NAME'] = f"{last_name}, {first_name} {middle_initial}".strip()
+                except (KeyError, IndexError, TypeError) as e:
+                    logging.warning(f"Error formatting student name: {e}")
+                    student_info['STUDENT_NAME'] = "Unknown Student"
 
-            if not curriculum_results:
-                logging.warning(f"No curriculum data found for ID_NO: {id_no}, Year Level: {year_level}")
-                curriculum_results = []
-            else:
-                # Format full name with proper error handling
-                for result in curriculum_results:
-                    try:
-                        middle = result.get('MIDDLE_NAME', '') or ''
-                        middle_initial = f"{middle[0]}." if middle else ""
-                        result['STUDENT_NAME'] = f"{result['LAST_NAME']}, {result['FIRST_NAME']} {middle_initial}".strip()
-
-                        # Optionally remove raw name parts
-                        result.pop('LAST_NAME', None)
-                        result.pop('FIRST_NAME', None)
-                        result.pop('MIDDLE_NAME', None)
-                    except (KeyError, IndexError) as e:
-                        logging.warning(f"Error formatting student name: {e}")
-                        result['STUDENT_NAME'] = "Unknown Student"
+                # Then get curriculum data based on curriculum_id
+                curriculum_id = student_info.get('curriculum_id')
+                if curriculum_id:
+                    # Build LIKE pattern for year level filtering
+                    if year_level and year_level != "Select":
+                        year_pattern = f"{year_level.split('.')[0]}.%"
+                    else:
+                        year_pattern = f"{student_info.get('yr', '1')}.%"
+                    
+                    cursor.execute(curriculum_query, (curriculum_id, year_level, year_pattern))
+                    curriculum_results = cursor.fetchall()
+                    
+                    # Combine student info with each curriculum record
+                    combined_results = []
+                    for curriculum in curriculum_results:
+                        combined_record = student_info.copy()
+                        combined_record.update(curriculum)
+                        
+                        # Ensure all required fields are present with proper keys
+                        combined_record['COURSE_NO'] = curriculum.get('course_no', '')
+                        combined_record['DESCRIPTIVE_TITLE'] = curriculum.get('descriptive_title', '')
+                        combined_record['YEAR_LEVEL'] = curriculum.get('year_level', '')
+                        combined_record['UNITS'] = curriculum.get('units', 0)
+                        combined_record['LEC'] = curriculum.get('lec', 0)
+                        combined_record['LAB'] = curriculum.get('lab', 0)
+                        combined_record['PREREQUISITE'] = curriculum.get('prerequisite', '')
+                        combined_record['GRADES'] = curriculum.get('grades', 0.00)
+                        
+                        combined_results.append(combined_record)
+                    
+                    curriculum_results = combined_results
+                else:
+                    logging.warning(f"No curriculum_id found for student {id_no}")
 
         except psycopg2.Error as err:
             logging.error(f"Database error while fetching student data: {err}")
             raise RuntimeError(f"Database error while fetching student data: {err}")
-        except Exception as e:
-            logging.error(f"Unexpected error while fetching student data: {e}")
-            raise RuntimeError(f"Unexpected error while fetching student data: {e}")
 
         # Map year levels to semester tables
         table_mapping = {
@@ -690,25 +776,27 @@ class DatabaseHandler:
         except Exception as e:
             logging.warning(f"Error fetching grades data: {e}")
 
-        current_table = table_mapping.get(year_level)
+        # Determine enrollment status
+        current_table = table_mapping.get(year_level) if year_level and year_level != "Select" else None
         if current_table:
             if current_table in all_grades_data:
                 enrollment_status = f"Student has grades for {year_level}"
             else:
                 enrollment_status = f"No grades yet for {year_level}"
         else:
-            enrollment_status = f"Invalid year level: {year_level}"
+            enrollment_status = "Student found" if student_info else "Student not found"
 
         # Merge grade data into curriculum results with error handling
         for curriculum in curriculum_results:
-            course_no = curriculum.get('Course_No')
+            course_no = curriculum.get('course_no') or curriculum.get('COURSE_NO')
             if course_no:
                 for table, grades in all_grades_data.items():
                     if course_no in grades:
                         curriculum[f'Grade_{table}'] = grades[course_no]
+                        # Also update the main GRADES field
+                        curriculum['GRADES'] = grades[course_no]
 
-        logging.debug(f"All grades data: {all_grades_data}")
-        logging.debug(f"Curriculum data with grades: {curriculum_results}")
+        logging.debug(f"Curriculum data with grades: {len(curriculum_results)} records")
 
         # Safely fetch all curriculum_regular rows
         curriculum_regular_data = []
@@ -725,10 +813,10 @@ class DatabaseHandler:
             "enrollment_status": enrollment_status, 
             "table_exists": current_table in all_grades_data if current_table else False,
             "has_grades": bool(all_grades_data.get(current_table)) if current_table else False,
-            "grades_data": all_grades_data
+            "grades_data": all_grades_data,
+            "student_info": student_info  # Include student info separately
         }
-
-    
+        
     # pag check ng grade sa regular student
     def check_all_tables_for_grades(self, id_no):
         table_names = [
@@ -2770,11 +2858,7 @@ class DatabaseHandler:
     def get_unenrolled_students(self, year_level, current_sy):
         """
         Fetch students of a given year level who are not yet enrolled in both first and second semester.
-        :param year_level: The year level of students (1, 2, 3, or 4).
-        :param current_sy: The current school year (e.g., "2024-2025").
-        :return: List of dictionaries containing student details.
         """
-        # Map numeric year_level to its word equivalent for table names
         year_word_map = {1: "first", 2: "second", 3: "third", 4: "fourth",
                         "1": "first", "2": "second", "3": "third", "4": "fourth"}
         year_word = year_word_map.get(year_level)
@@ -2788,7 +2872,9 @@ class DatabaseHandler:
                 self.conn, _ = self.get_db_connection()
 
             cursor = self.conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            year_level_str = str(year_level)
 
+            # Query with lowercase column names (no aliases needed)
             query = f"""
                 SELECT s.id_no, s.last_name, s.first_name, s.middle_name, s.yr, s.enrolled_year
                 FROM student_information s
@@ -2801,24 +2887,27 @@ class DatabaseHandler:
                 ORDER BY s.last_name, s.first_name
             """
 
-            # Debug: Print query
-            print(f"Executing query for {year_level}-year students:\n{query}")
+            print(f"Executing query for {year_level}-year students")
+            print(f"Parameters: {current_sy}, {current_sy}, {year_level_str}")
 
-            cursor.execute(query, (current_sy, current_sy, year_level))
+            cursor.execute(query, (current_sy, current_sy, year_level_str))
             students = cursor.fetchall()
 
-            # Debug: Print fetched students
-            print(f"Fetched {len(students)} students: {students}")
+            print(f"Fetched {len(students)} students for year {year_level}")
+            if students:
+                print(f"Available columns in result: {list(students[0].keys())}")
 
             return self.format_students(students) if students else []
 
         except psycopg2.Error as err:
             print(f"{year_level}-year Database error: {err}")
+            if self.conn and self.conn.closed == 0:
+                self.conn.rollback()
             return []
         finally:
             if cursor:
                 cursor.close()
-
+                
     def get_next_semester(self, id_no):
         """
         Determine the next semester for a student based on completed grades.
@@ -2876,36 +2965,55 @@ class DatabaseHandler:
 
         try:
             for row in students:
-                id_no = row['ID_NO'] if isinstance(row, dict) else row[0]
-                last_name = row['LAST_NAME'] if isinstance(row, dict) else row[1]
-                first_name = row['FIRST_NAME'] if isinstance(row, dict) else row[2]
-                middle_name = row['MIDDLE_NAME'] if isinstance(row, dict) else (row[3] or "")
-                year_level = row['YR'] if isinstance(row, dict) else row[4]
+                # FIX: Use only lowercase column names that match PostgreSQL result
+                id_no = row.get('id_no')
+                last_name = row.get('last_name')
+                first_name = row.get('first_name')
+                middle_name = row.get('middle_name') or ''
+                year_level = row.get('yr')
+                enrolled_year = row.get('enrolled_year')  # Also get enrolled_year if needed
+
+                # Check if we have all required fields
+                if not all([id_no, last_name, first_name, year_level]):
+                    print(f"Skipping incomplete student record: {row}")
+                    print(f"Available columns: {list(row.keys())}")
+                    continue
 
                 # Fetch the latest enrollment status
                 cursor.execute("""
-                    SELECT STATUS
+                    SELECT status
                     FROM enrollment
-                    WHERE ID_NO = %s
-                    ORDER BY ENROLLMENT_DATE DESC, enrollment_id DESC
+                    WHERE id_no = %s
+                    ORDER BY enrollment_date DESC, enrollment_id DESC
                     LIMIT 1
                 """, (id_no,))
                 status_result = cursor.fetchone()
-                status = status_result['STATUS'] if status_result else "Not Enrolled"
+                status = status_result['status'] if status_result else "Not Enrolled"
 
                 # Determine next semester
                 next_semester = self.get_next_semester(id_no)
 
-                student_list.append({"ID_NO": id_no, "LAST_NAME": last_name, "FIRST_NAME": first_name, "MIDDLE_NAME": middle_name, "YEAR_LEVEL": year_level, "ENROLLMENT_STATUS": status, "SEMESTER": semester_number_to_word(next_semester)})
+                student_list.append({
+                    "ID_NO": id_no, 
+                    "LAST_NAME": last_name, 
+                    "FIRST_NAME": first_name, 
+                    "MIDDLE_NAME": middle_name, 
+                    "YEAR_LEVEL": year_level, 
+                    "ENROLLMENT_STATUS": status, 
+                    "SEMESTER": semester_number_to_word(next_semester)
+                })
 
             return student_list
 
         except psycopg2.Error as e:
             print(f"Database error while formatting students: {e}")
             return []
+        except Exception as e:
+            print(f"Error while formatting students: {e}")
+            return []
         finally:
             cursor.close()
-
+            
     def create_enrollment_table(self):
         """
         Create the 'enrollment' table in PostgreSQL if it does not exist.

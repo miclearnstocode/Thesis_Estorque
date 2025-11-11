@@ -190,15 +190,16 @@ class BulkStudentPrinter:
                         student_data = self.db_handler.fetch_student_data(student_id, self.year_level)
                         curriculum_data = student_data.get("curriculum_data", [])
                         if not curriculum_data:
+                            print(f"No curriculum data for {student_id}")
                             continue
-                        student_details = curriculum_data[0]
+                        student_details = curriculum_data[0] if curriculum_data else {}
                         student_name = student_details.get("STUDENT_NAME", "")
-                        year = student_details.get("YR", "")
-                        sex = student_details.get("SEX", "")
-                        age = student_details.get("AGE", "")
-                        parent_name = student_details.get("PARENT_GUARDIAN", "")
-                        phone = student_details.get("PHONE_NUMBER", "")
-                        address = student_details.get("ADDRESS", "")
+                        year = student_details.get("yr", "")
+                        sex = student_details.get("sex", "")
+                        age = student_details.get("age", "")
+                        parent_name = student_details.get("parent_guardian", "")
+                        phone = student_details.get("phone_number", "")
+                        address = student_details.get("address", "")
                     except Exception as e:
                         print(f"Error fetching data for {student_id}: {e}")
                         continue
@@ -249,10 +250,11 @@ class BulkStudentPrinter:
                     prerequisite_analysis = self.check_prerequisites(student_data, self.year_level)
 
                     for subject in prerequisite_analysis['enrollable']:
-                        course_no = subject.get('COURSE_NO', '')
-                        if course_no not in seen_rows:
-                            descriptive_title = textwrap.fill(subject.get('DESCRIPTIVE_TITLE', ''), 40)
-                            units = subject.get('UNITS', 0)
+                        course_no = subject.get('course_no')  # Handle lowercase
+                        if course_no and course_no not in seen_rows:
+                            descriptive_title = subject.get('descriptive_title')
+                            descriptive_title = textwrap.fill(descriptive_title, 40) if descriptive_title else ""
+                            units = subject.get('units')
                             faculty = ""
                             data.append([course_no, descriptive_title, units, faculty])
                             seen_rows.add(course_no)
@@ -263,10 +265,11 @@ class BulkStudentPrinter:
                             total_units += unit
 
                     for subject in prerequisite_analysis['prerequisite_subjects']:
-                        course_no = subject.get('COURSE_NO', '')
-                        if course_no not in seen_rows:
-                            descriptive_title = textwrap.fill(subject.get('DESCRIPTIVE_TITLE', ''), 40)
-                            units = subject.get('UNITS', 0)
+                        course_no = subject.get('course_no') or subject.get('COURSE_NO', '')  # Handle lowercase
+                        if course_no and course_no not in seen_rows:
+                            descriptive_title = subject.get('descriptive_title') or subject.get('DESCRIPTIVE_TITLE', '')
+                            descriptive_title = textwrap.fill(descriptive_title, 40) if descriptive_title else ""
+                            units = subject.get('units') or subject.get('UNITS', 0)
                             faculty = ""
                             data.append([course_no, descriptive_title, units, faculty])
                             seen_rows.add(course_no)
@@ -277,7 +280,7 @@ class BulkStudentPrinter:
                             total_units += unit
 
                     data.append(["Total ", "", total_units, ""])
-
+                    print(f"Table data for {student_id}: {len(data)} rows, first row: {data[0] if data else 'No data'}")
                     # Row heights
                     row_heights = []
                     for row in data:
@@ -371,13 +374,13 @@ class BulkStudentPrinter:
         # Get current year level subjects
         current_year_subjects = [
             subject for subject in curriculum_data 
-            if subject and str(subject.get('YEAR_LEVEL', '')) == str(selected_year_semester)
+            if subject and str(subject.get('year_level', '')) == str(selected_year_semester)
         ]
 
         # Analyze each subject for the current year
         for subject in current_year_subjects:
-            course_no = subject.get('COURSE_NO', '').strip()
-            prerequisite = subject.get('PREREQUISITE', '').strip()
+            course_no = subject.get('course_no', '').strip()
+            prerequisite = subject.get('prerequisite', '').strip()
             grade = [1.00, 1.50, 1.75, 2.00, 2.25, 2.50, 2.75, 3.00]
 
 
@@ -397,11 +400,11 @@ class BulkStudentPrinter:
                     # Find the prerequisite subject in curriculum data
                     prereq_subject = next(
                         (s for s in curriculum_data if s and 
-                        fuzz.ratio(s.get('COURSE_NO', '').strip().lower(), prereq.lower()) >= 100),None)
+                        fuzz.ratio(s.get('course_no', '').strip().lower(), prereq.lower()) >= 100),None)
                     
                     if prereq_subject:
                         # Only append if the prerequisite has no grade
-                        prereq_course_no = prereq_subject.get('COURSE_NO', '').strip()
+                        prereq_course_no = prereq_subject.get('course_no', '').strip()
                         if prereq_course_no not in all_grades:
                             if prereq_subject not in prerequisite_subjects:
                                 prerequisite_subjects.append(prereq_subject)
