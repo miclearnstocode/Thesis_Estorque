@@ -192,7 +192,7 @@ class DatabaseHandler:
                 curriculum_id = get_curriculum_id_for_year(enrolled_year)
 
                 processed_row = (
-                    row[0],         # ID_NO
+                    row[0],         # id_no
                     last_name,      # LAST_NAME
                     first_name,     # FIRST_NAME
                     middle_name,    # MIDDLE_NAME
@@ -211,7 +211,7 @@ class DatabaseHandler:
 
             # INSERT or UPDATE logic using PostgreSQL-safe code
             for row in processed_data:
-                self.cursor.execute("SELECT COUNT(*) FROM student_information WHERE ID_NO = %s", (row[0],))
+                self.cursor.execute("SELECT COUNT(*) FROM student_information WHERE id_no = %s", (row[0],))
                 exists = self.cursor.fetchone()[0] > 0
 
                 if exists:
@@ -220,13 +220,13 @@ class DatabaseHandler:
                         SET LAST_NAME=%s, FIRST_NAME=%s, MIDDLE_NAME=%s, YR=%s, AGE=%s, BDAY=%s, 
                             SEX=%s, PARENT_GUARDIAN=%s, PHONE_NUMBER=%s, EMAIL_ADDRESS=%s, SHS=%s,
                             ADDRESS=%s, ENROLLED_YEAR=%s, TO_BE_ENROLLED_YEAR=%s, curriculum_id=%s
-                        WHERE ID_NO=%s
+                        WHERE id_no=%s
                     """
                     self.cursor.execute(update_query, (*row[1:], row[0]))
                 else:
                     insert_query = """
                         INSERT INTO student_information (
-                            ID_NO, LAST_NAME, FIRST_NAME, MIDDLE_NAME, YR, AGE, BDAY, SEX,
+                            id_no, LAST_NAME, FIRST_NAME, MIDDLE_NAME, YR, AGE, BDAY, SEX,
                             PARENT_GUARDIAN, PHONE_NUMBER, EMAIL_ADDRESS, SHS, ADDRESS,
                             ENROLLED_YEAR, TO_BE_ENROLLED_YEAR, curriculum_id
                         ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
@@ -373,7 +373,7 @@ class DatabaseHandler:
                 self.conn.close()
             
     def fetch_available_fallback_subjects(self, id_no):
-        logging.debug(f"Fetching available fallback subjects for ID_NO: {id_no}")
+        logging.debug(f"Fetching available fallback subjects for id_no: {id_no}")
 
         query = """
             SELECT 
@@ -399,10 +399,10 @@ class DatabaseHandler:
                 results = cursor.fetchall()
 
             if not results:
-                logging.warning(f"No available fallback subjects found for ID_NO: {id_no}")
+                logging.warning(f"No available fallback subjects found for id_no: {id_no}")
                 return []
 
-            logging.info(f"Found {len(results)} available fallback subjects for ID_NO: {id_no}")
+            logging.info(f"Found {len(results)} available fallback subjects for id_no: {id_no}")
             return results
 
         except psycopg2.Error as err:
@@ -414,7 +414,7 @@ class DatabaseHandler:
 
     # pag display sa irregular studnt baga
     def fetch_irregular_students(self, id_no):
-        logging.debug(f"Fetching irregular student data for ID_NO: {id_no}")
+        logging.debug(f"Fetching irregular student data for id_no: {id_no}")
 
         appraised_query = """
             SELECT 
@@ -455,7 +455,7 @@ class DatabaseHandler:
                 appraised_results = cursor.fetchall()
 
             if not appraised_results:
-                logging.warning(f"No appraised curriculum data found for ID_NO: {id_no}")
+                logging.warning(f"No appraised curriculum data found for id_no: {id_no}")
                 return []
 
             # Semester progression mapping
@@ -472,7 +472,7 @@ class DatabaseHandler:
                 year_level_courses[year_level].append(record)
 
             if not year_level_courses:
-                logging.warning(f"No valid year levels found for ID_NO: {id_no}")
+                logging.warning(f"No valid year levels found for id_no: {id_no}")
                 return appraised_results
 
             #Sort year levels for logical progression
@@ -536,7 +536,7 @@ class DatabaseHandler:
             # Check for incomplete or invalid grades
             for semester, grades in all_grades.items():
                 for course, grade in grades.items():
-                    if course in ['ID_NO', 'LAST_NAME', 'FIRST_NAME', 'MIDDLE_NAME', 'SCHOOL_YEAR']:
+                    if course in ['id_no', 'LAST_NAME', 'FIRST_NAME', 'MIDDLE_NAME', 'SCHOOL_YEAR']:
                         continue
                     if grade is None or str(grade).strip() == '' or str(grade).upper() == 'INC':
                         print(f"Found incomplete grade in {semester} for course {course}")
@@ -547,7 +547,7 @@ class DatabaseHandler:
 
             # Fetch current year level safely
             with self.conn.cursor() as cursor:
-                cursor.execute("SELECT YR FROM student_information WHERE ID_NO = %s", (id_no,))
+                cursor.execute("SELECT YR FROM student_information WHERE id_no = %s", (id_no,))
                 result = cursor.fetchone()
 
             if not result:
@@ -569,7 +569,7 @@ class DatabaseHandler:
             if new_yr and new_yr != current_yr:
                 print(f"Updating year level from {current_yr} to {new_yr}")
                 with self.conn.cursor() as cursor:
-                    cursor.execute("UPDATE student_information SET YR = %s WHERE ID_NO = %s", (new_yr, id_no))
+                    cursor.execute("UPDATE student_information SET YR = %s WHERE id_no = %s", (new_yr, id_no))
                 self.conn.commit()
                 print(f"Successfully updated student {id_no} year level to {new_yr}")
                 return new_yr
@@ -605,16 +605,16 @@ class DatabaseHandler:
             # Use parameterized PostgreSQL insert query
             insert_query = f"""
                 INSERT INTO {table_name} (
-                    ID_NO, LAST_NAME, FIRST_NAME, MIDDLE_NAME,
+                    id_no, LAST_NAME, FIRST_NAME, MIDDLE_NAME,
                     YR, AGE, BIRTHDAY, SEX, PARENT_GUARDIAN, PHONE_NUMBER,
                     EMAIL_ADDRESS, SHS, ADDRESS, ENROLLED_YEAR
                 )
                 VALUES (
-                    %(ID_NO)s, %(LAST_NAME)s, %(FIRST_NAME)s, %(MIDDLE_NAME)s,
+                    %(id_no)s, %(LAST_NAME)s, %(FIRST_NAME)s, %(MIDDLE_NAME)s,
                     %(YR)s, %(AGE)s, %(BIRTHDAY)s, %(SEX)s, %(PARENT_GUARDIAN)s, %(PHONE_NUMBER)s,
                     %(EMAIL_ADDRESS)s, %(SHS)s, %(ADDRESS)s, %(ENROLLED_YEAR)s
                 )
-                ON CONFLICT (ID_NO)
+                ON CONFLICT (id_no)
                 DO UPDATE SET
                     LAST_NAME = EXCLUDED.LAST_NAME,
                     FIRST_NAME = EXCLUDED.FIRST_NAME,
@@ -652,7 +652,7 @@ class DatabaseHandler:
 
     # ini ya hu sa regular student na display 
     def fetch_student_data(self, id_no, year_level):
-        logging.debug(f"Fetching data for ID_NO: {id_no}, Year Level: {year_level}")
+        logging.debug(f"Fetching data for id_no: {id_no}, Year Level: {year_level}")
 
         # First, verify the student exists and get basic info
         student_query = """
@@ -696,7 +696,7 @@ class DatabaseHandler:
                 student_result = cursor.fetchone()
                 
                 if not student_result:
-                    logging.warning(f"No student found for ID_NO: {id_no}")
+                    logging.warning(f"No student found for id_no: {id_no}")
                     return {
                         "curriculum_data": [],
                         "curriculum_regular_data": [],
@@ -1024,7 +1024,7 @@ class DatabaseHandler:
 
     # pag display sa curriculum data hatag also copy sa each ka student 
     def fetch_curriculum(self, year_level, id_no):
-        logging.debug(f"Fetching curriculum data for Year Level: {year_level}, ID_NO: {id_no}")
+        logging.debug(f"Fetching curriculum data for Year Level: {year_level}, id_no: {id_no}")
 
         curriculum_query = """
             SELECT
@@ -1053,7 +1053,7 @@ class DatabaseHandler:
                 curriculum_results = cursor.fetchall()
 
             if not curriculum_results:
-                logging.warning(f"No curriculum data found for Year Level: {year_level}, ID_NO: {id_no}")
+                logging.warning(f"No curriculum data found for Year Level: {year_level}, id_no: {id_no}")
                 return []
 
             #Format student name and clean result keys
@@ -1214,26 +1214,34 @@ class DatabaseHandler:
     def save_grading_data(self, grading_data, year, semester, school_year):
         """Save grading data to the appropriate table in PostgreSQL. Performs UPSERT (insert or update) on conflict."""
         try:
-            #  Clean DataFrame column names
+            # Clean DataFrame column names and normalize to lowercase
             grading_data = grading_data.copy()
             grading_data.columns = grading_data.columns.str.strip()
+            
+            # Normalize column names to handle case sensitivity
+            column_mapping = {}
+            for col in grading_data.columns:
+                col_lower = col.lower()
+                if col_lower in ['id_no', 'last_name', 'first_name', 'middle_name']:
+                    column_mapping[col] = col_lower
+                else:
+                    column_mapping[col] = col  # Keep course columns as-is
 
             # Map year & semester to table name
             year_mapping = {"1st Year": "first_year", "2nd Year": "second_year", "3rd Year": "third_year", "4th Year": "fourth_year"}
-
             semester_mapping = {"1st Semester": "first_semester", "2nd Semester": "second_semester"}
 
             table_name = f"{year_mapping[year]}_{semester_mapping[semester]}"
 
-            #Ensure connection is active
+            # Ensure connection is active
             if not self.conn or self.conn.closed != 0:
                 self.ensure_connection()
 
-            student_info_columns = ['ID_NO', 'LAST_NAME', 'FIRST_NAME', 'MIDDLE_NAME']
-            course_columns = [col for col in grading_data.columns if col not in student_info_columns]
+            # Use normalized column names
+            student_info_columns = ['id_no', 'last_name', 'first_name', 'middle_name']
+            course_columns = [col for col in grading_data.columns if col.lower() not in [info_col.lower() for info_col in student_info_columns]]
 
-            #PostgreSQL UPSERT (ON CONFLICT)
-            # Assumes a UNIQUE constraint on (id_no, course_no, school_year)
+            # PostgreSQL UPSERT (ON CONFLICT)
             insert_query = f"""
             INSERT INTO {table_name} 
                 (id_no, last_name, first_name, middle_name, school_year, course_no, grades)
@@ -1244,9 +1252,15 @@ class DatabaseHandler:
 
             values_list = []
             for _, row in grading_data.iterrows():
-                student_info = [str(row['ID_NO']).strip(), str(row['LAST_NAME']).strip(), str(row['FIRST_NAME']).strip(), str(row.get('MIDDLE_NAME', '')).strip(), school_year.strip()]
+                # Handle case-insensitive column access
+                student_id = str(row.get('ID_NO') or row.get('id_no', '')).strip()
+                last_name = str(row.get('LAST_NAME') or row.get('last_name', '')).strip()
+                first_name = str(row.get('FIRST_NAME') or row.get('first_name', '')).strip()
+                middle_name = str(row.get('MIDDLE_NAME') or row.get('middle_name', '')).strip()
 
-                #Iterate through all course columns
+                student_info = [student_id, last_name, first_name, middle_name, school_year.strip()]
+
+                # Iterate through all course columns
                 for course in course_columns:
                     grade = row[course]
                     if pd.notna(grade) and str(grade).strip() != "":
@@ -1280,7 +1294,7 @@ class DatabaseHandler:
             logging.error(f"Unexpected error while saving grades: {e}")
             print("Error save_grading_data", e)
             return False
-
+        
     def save_irregular_grading_data(self, grading_data, year, semester):
         """Save irregular grading data for a student into the appraised_curriculum table (PostgreSQL version). Updates existing records by matching id_no + course_no + year_level. """
         try:
@@ -1341,7 +1355,7 @@ class DatabaseHandler:
                 for entry in grading_iterable:
                     try:
                         # Normalize keys (case-insensitive)
-                        id_no = entry.get('id_no') or entry.get('ID_NO')
+                        id_no = entry.get('id_no') or entry.get('id_no')
                         course_no = entry.get('course_no') or entry.get('COURSE_NO')
                         grades = entry.get('grades') or entry.get('GRADES')
                         school_year = entry.get('school_year') or entry.get('SCHOOL_YEAR')
@@ -1479,9 +1493,9 @@ class DatabaseHandler:
 
             # Return dictionary result directly (keys match column names)
             if result:
-                return {'ID_NO': result['id_no'],'LAST_NAME': result['last_name'],'FIRST_NAME': result['first_name'],'MIDDLE_NAME': result['middle_name']}
+                return {'id_no': result['id_no'],'LAST_NAME': result['last_name'],'FIRST_NAME': result['first_name'],'MIDDLE_NAME': result['middle_name']}
 
-            logging.info(f"No student found with ID_NO: {id_no}")
+            logging.info(f"No student found with id_no: {id_no}")
             return None
 
         except psycopg2.Error as e:
@@ -1664,11 +1678,11 @@ class DatabaseHandler:
                         FROM {table_name}
                         WHERE id_no = %s AND course_no = %s AND school_year = %s
                     """
-                    self.cursor.execute(check_query, (row['ID_NO'].strip(), course_no, school_year.strip()))
+                    self.cursor.execute(check_query, (row['id_no'].strip(), course_no, school_year.strip()))
                     exists = self.cursor.fetchone()[0]
 
                     if exists:
-                        messagebox.showwarning("Duplicate Entry", f"Grade for student {row['ID_NO']} in course {course_no} for {school_year} already exists.")
+                        messagebox.showwarning("Duplicate Entry", f"Grade for student {row['id_no']} in course {course_no} for {school_year} already exists.")
                         continue
 
                     # Insert new record
@@ -1677,7 +1691,7 @@ class DatabaseHandler:
                             id_no, last_name, first_name, middle_name, school_year, course_no, grades)
                         VALUES (%s, %s, %s, %s, %s, %s, %s)
                     """
-                    values = (row['ID_NO'].strip(),row['Last Name'].strip(),row['First Name'].strip(), row['Middle Name'].strip(),school_year.strip(),course_no, grade)
+                    values = (row['id_no'].strip(),row['Last Name'].strip(),row['First Name'].strip(), row['Middle Name'].strip(),school_year.strip(),course_no, grade)
                     self.cursor.execute(insert_query, values)
 
                 except ValueError as ve:
@@ -1776,7 +1790,7 @@ class DatabaseHandler:
                 result = cursor.fetchall()
 
             # Define column names (must match query order)
-            columns = ['ID_NO', 'LAST_NAME', 'FIRST_NAME', 'MIDDLE_NAME','YR', 'AGE', 'SEX', 'EMAIL_ADDRESS', 'SHS', 'ADDRESS']
+            columns = ['id_no', 'last_name', 'first_name', 'middle_name','yr', 'age', 'sex', 'email_address', 'shs', 'address']
 
             # Convert result list of tuples → DataFrame
             return pd.DataFrame(result, columns=columns)
@@ -1790,7 +1804,7 @@ class DatabaseHandler:
             return pd.DataFrame()
 
     def get_missing_grades(self, year_level):
-        """Fetch students missing grades for all subjects in a given year level. Returns a DataFrame with ID_NO, STUDENT_NAME, COURSE_NO.
+        """Fetch students missing grades for all subjects in a given year level. Returns a DataFrame with id_no, STUDENT_NAME, COURSE_NO.
         """
         try:
             # Map year_level string to semester table name
@@ -1847,7 +1861,7 @@ class DatabaseHandler:
             self.cursor.execute(query, params)
             results = self.cursor.fetchall()
 
-            columns = ['ID_NO', 'STUDENT_NAME', 'COURSE_NO']
+            columns = ['id_no', 'student_name', 'course_no']
             df = pd.DataFrame(results, columns=columns)
 
             return df
@@ -2209,30 +2223,30 @@ class DatabaseHandler:
 
             # Build dynamic SELECT statement
             grades_query = f"""
-            SELECT 
-                si.id_no,
-                si.sex,
-                si.last_name || ', ' || si.first_name || 
-                CASE 
-                    WHEN si.middle_name IS NOT NULL AND si.middle_name != '' 
-                    THEN ' ' || si.middle_name
-                    ELSE ''
-                END AS student_name,
-                {', '.join(f'g."{col}"' for col in course_columns)}
-            FROM 
-                student_information si
-                LEFT JOIN {table_name} g ON si.id_no = g.id_no
-            WHERE 
-                g.school_year = %s
-                AND si.sex = %s
-            ORDER BY 
-                si.last_name, si.first_name, si.middle_name
-            """
+                SELECT 
+                    si.id_no,
+                    si.sex,
+                    si.last_name || ', ' || si.first_name || 
+                    CASE 
+                        WHEN si.middle_name IS NOT NULL AND si.middle_name != '' 
+                        THEN ' ' || si.middle_name
+                        ELSE ''
+                    END AS student_name,
+                    {', '.join(f'g.{col}' for col in course_columns)}
+                FROM 
+                    student_information si
+                    LEFT JOIN {table_name} g ON si.id_no = g.id_no
+                WHERE 
+                    g.school_year = %s
+                    AND si.sex = %s
+                ORDER BY 
+                    si.last_name, si.first_name, si.middle_name
+                """
 
             self.cursor.execute(grades_query, (school_year, sex_filter))
 
             # Convert results to pandas DataFrame
-            df = pd.DataFrame(self.cursor.fetchall(), columns=['ID_NO', 'SEX', 'Student_Name'] + course_columns)
+            df = pd.DataFrame(self.cursor.fetchall(), columns=['id_no', 'SEX', 'Student_Name'] + course_columns)
 
             return {'columns': df.columns.tolist(), 'data': df.to_dict('records')}
 
@@ -2292,7 +2306,7 @@ class DatabaseHandler:
             # Update the grade using double quotes for dynamic column
             update_query = f"""
             UPDATE {table_name}
-            SET "{course_no}" = %s
+            SET {course_no} = %s
             WHERE id_no = %s AND school_year = %s
             """
 
@@ -2733,12 +2747,11 @@ class DatabaseHandler:
                     continue
 
                 # Escape column names for PostgreSQL
-                escaped_columns = [f'"{col}"' for col in course_columns]
-                select_columns = ', '.join(escaped_columns)
+                select_columns = ', '.join(course_columns)
 
                 grade_query = f"""
                     SELECT id_no, {select_columns}
-                    FROM "{table_name}"
+                    FROM {table_name}
                     WHERE id_no = %s
                 """
                 cursor.execute(grade_query, (student_id,))
@@ -2994,7 +3007,7 @@ class DatabaseHandler:
                 next_semester = self.get_next_semester(id_no)
 
                 student_list.append({
-                    "ID_NO": id_no, 
+                    "id_no": id_no, 
                     "LAST_NAME": last_name, 
                     "FIRST_NAME": first_name, 
                     "MIDDLE_NAME": middle_name, 

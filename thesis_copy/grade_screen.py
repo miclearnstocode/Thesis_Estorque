@@ -21,8 +21,8 @@ import os
 
 SMTP_SERVER = 'smtp.gmail.com'
 SMTP_PORT = 587
-SMTP_EMAIL = 'michaelestorque123@gmail.com'
-SMTP_PASSWORD = 'ycxyqorukveyxiqs'
+SMTP_EMAIL = 'michaelestorque14@gmail.com'
+SMTP_PASSWORD = 'rivuzksnotzcbbib'
 
 class GradeScreen(ctk.CTkFrame):
     def __init__(self, master):
@@ -125,7 +125,7 @@ class GradeScreen(ctk.CTkFrame):
         template_style = {"fg_color": "white", "button_color": "#F0F0F0", "button_hover_color": "#E0E0E0", "text_color": "black", "dropdown_fg_color": "white", "dropdown_text_color": "black", "dropdown_hover_color": "#E0E0E0", "width": 200, "corner_radius": 6}
 
         self.db_handler.cursor.execute("SELECT file_name FROM templates")
-        templates = [row[0] for row in self.db_handler.cursor.fetchall()]
+        templates = [row['file_name'] for row in self.db_handler.cursor.fetchall()]
 
         # Add template download dropdown
         self.template_var = ctk.StringVar(value="Download Grading Sheet")
@@ -153,11 +153,21 @@ class GradeScreen(ctk.CTkFrame):
 
         self.progress_bar = ttk.Progressbar(self, orient="horizontal", length=200, mode="indeterminate", maximum=100)
         self.progress_bar.pack(pady=5)
-        for i in range(101):
-            self.progress_bar['value'] = i
-            self.update_idletasks()
-            time.sleep(0.07)
-        self.progress_bar.stop()
+        
+        try:
+            for i in range(101):
+                self.progress_bar['value'] = i
+                self.update_idletasks()
+                time.sleep(0.07)
+        except:
+            pass  # Handle interruption
+        finally:
+            # Always stop the progress bar
+            try:
+                self.progress_bar.stop()
+            except:
+                pass
+            
         self.progress_bar.pack_forget()
         back_button_style = {**button_style}
         
@@ -211,9 +221,9 @@ class GradeScreen(ctk.CTkFrame):
                 
                 # If not in appraised_curriculum, check student_information
                 self.db_handler.cursor.execute("""
-                    SELECT ID_NO, LAST_NAME, FIRST_NAME, MIDDLE_NAME 
+                    SELECT id_no, last_name, first_name, middle_name
                     FROM student_information
-                    WHERE ID_NO = %s
+                    WHERE id_no = %s
                 """, (id_no,))
                 student = self.db_handler.cursor.fetchone()
                 
@@ -226,9 +236,9 @@ class GradeScreen(ctk.CTkFrame):
                 else:
                     # If not found in student_information, check students table
                     self.db_handler.cursor.execute("""
-                        SELECT ID_NO, LAST_NAME, FIRST_NAME, MIDDLE_NAME 
+                        SELECT id_no, last_name, first_name, middle_name 
                         FROM students
-                        WHERE ID_NO = %s
+                        WHERE id_no = %s
                     """, (id_no,))
                     student = self.db_handler.cursor.fetchone()
                     
@@ -331,7 +341,7 @@ class GradeScreen(ctk.CTkFrame):
                 else:
                     # Get courses from curriculum_regular for regular students
                     self.db_handler.cursor.execute("""
-                        SELECT DISTINCT Course_No 
+                        SELECT DISTINCT course_No 
                         FROM curriculum_regular
                     """)
                     available_courses = [row[0] for row in self.db_handler.cursor.fetchall()]
@@ -658,6 +668,18 @@ class GradeScreen(ctk.CTkFrame):
             grading_data = self.get_cached_data(cache_key, pd.read_csv, file_path)
 
             if not grading_data.empty:
+                # Normalize column names to handle case sensitivity
+                grading_data.columns = grading_data.columns.str.strip()
+                
+                # Check if we have the required columns (case-insensitive)
+                required_columns = ['ID_NO', 'LAST_NAME', 'FIRST_NAME']
+                has_required = all(any(col.lower() == req_col.lower() for col in grading_data.columns) 
+                                for req_col in required_columns)
+                
+                if not has_required:
+                    CTkMessagebox(title="Error", message="CSV file missing required columns: ID_NO, LAST_NAME, FIRST_NAME")
+                    return False
+                    
                 self.grading_data = grading_data
                 self.year = year
                 self.semester = semester
@@ -679,6 +701,7 @@ class GradeScreen(ctk.CTkFrame):
         except Exception as e:
             CTkMessagebox(title="Error", message=f"Error loading file: {e}").pack()
             return False
+        
         
     def import_irregular_grading_sheet(self, file_path, year, semester):
         if not self.school_year_var.get():
@@ -801,17 +824,21 @@ class GradeScreen(ctk.CTkFrame):
             total_students = len(grading_data)
             processed_students = 0
 
-            # Define student info columns
-            student_info_columns = ['ID_NO', 'LAST_NAME', 'FIRST_NAME', 'MIDDLE_NAME']
+            # Define student info columns - USE LOWERCASE
+            student_info_columns = ['id_no', 'last_name', 'first_name', 'middle_name']
             
             # Get course columns (everything except student info)
-            course_columns = [col for col in grading_data.columns if col not in student_info_columns]
+            course_columns = [col for col in grading_data.columns if col.lower() not in [col.lower() for col in student_info_columns]]
 
             for index, row in grading_data.iterrows():
-                student_id = row['ID_NO']
-                last_name = row['LAST_NAME']
-                first_name = row['FIRST_NAME']
-                middle_name = row.get('MIDDLE_NAME', '')
+                # Use lowercase column names and handle case sensitivity
+                student_id = str(row.get('ID_NO') or row.get('id_no', '')).strip()
+                last_name = str(row.get('LAST_NAME') or row.get('last_name', '')).strip()
+                first_name = str(row.get('FIRST_NAME') or row.get('first_name', '')).strip()
+                middle_name = str(row.get('MIDDLE_NAME') or row.get('middle_name', '')).strip()
+
+                if not student_id:
+                    continue  # Skip if no student ID
 
                 # Check and update student year level
                 try:
@@ -829,12 +856,12 @@ class GradeScreen(ctk.CTkFrame):
                     
                     # Check if grade is incomplete or missing
                     if pd.isna(row[course_code]) or grade == '' or grade == 'INC':
-                        incomplete_courses.append({'course_code': course_code,'grade': grade})
+                        incomplete_courses.append({'course_code': course_code, 'grade': grade})
 
                 if incomplete_courses:
-                    student_data = student_info[student_info['ID_NO'] == student_id]
+                    student_data = student_info[student_info['id_no'] == student_id]
                     if not student_data.empty:
-                        student_email = student_data['EMAIL_ADDRESS'].values[0]
+                        student_email = student_data['email_address'].values[0]
                         if student_email:
                             # Extract just the course codes for the email
                             course_list = [course['course_code'] for course in incomplete_courses]
@@ -845,7 +872,14 @@ class GradeScreen(ctk.CTkFrame):
                 self.update_status(f"Processed {processed_students}/{total_students} students")
                 
                 # Cache individual student results with year update info
-                processed_results.append({'student_id': student_id, 'last_name': last_name, 'first_name': first_name, 'middle_name': middle_name, 'incomplete_courses': incomplete_courses, 'year_updated': new_yr if 'new_yr' in locals() else None})
+                processed_results.append({
+                    'student_id': student_id, 
+                    'last_name': last_name, 
+                    'first_name': first_name, 
+                    'middle_name': middle_name, 
+                    'incomplete_courses': incomplete_courses, 
+                    'year_updated': new_yr if 'new_yr' in locals() else None
+                })
 
             self.cache_data[cache_key] = processed_results
             self.update_status("All students processed and year levels updated!", final=True)
@@ -854,10 +888,20 @@ class GradeScreen(ctk.CTkFrame):
             print(f"Error in process_students: {e}")
             messagebox.showerror("Error", f"An error occurred while processing students: {e}")
         finally:
-            self.progress_bar.stop()
-            self.progress_bar.pack_forget()
+            try:
+                self.progress_bar.stop()
+                self.progress_bar.pack_forget()
+            except:
+                pass
 
         return processed_results
+
+    def get_case_insensitive_value(self, row, possible_keys, default=''):
+        """Get value from row using case-insensitive key matching"""
+        for key in possible_keys:
+            if key in row:
+                return str(row[key]).strip() if pd.notna(row[key]) else default
+        return default
 
     def clear_cache(self):
         """Clear cache and force garbage collection"""
@@ -1029,11 +1073,11 @@ class GradeScreen(ctk.CTkFrame):
             student_courses = []
             
             # For regular format
-            if 'ID_NO' in grading_data.columns:
+            if 'id_no' in grading_data.columns:
                 for _, row in grading_data.iterrows():
-                    student_id = str(row['ID_NO']).strip()
+                    student_id = str(row['id_no']).strip()
                     course_columns = [col for col in grading_data.columns 
-                                    if col not in ['ID_NO', 'LAST_NAME', 'FIRST_NAME', 'MIDDLE_NAME']]
+                                    if col not in ['id_no', 'last_name', 'first_name', 'middle_name']]
                     
                     for course in course_columns:
                         if pd.notna(row[course]):
@@ -1047,12 +1091,7 @@ class GradeScreen(ctk.CTkFrame):
 
             # Check each student-course combination for existing grades
             for student_id, course_no in student_courses:
-                exists = self.db_handler.check_existing_grade(
-                    student_id=student_id,
-                    course_no=course_no,
-                    year=year,
-                    semester=semester,
-                    school_year=school_year)
+                exists = self.db_handler.check_existing_grade(student_id=student_id,course_no=course_no,year=year,semester=semester,school_year=school_year)
                 if exists:
                     duplicates.append((student_id, course_no))
 
@@ -1073,13 +1112,13 @@ class GradeScreen(ctk.CTkFrame):
     def filter_out_duplicates(self, grading_data, duplicates):
         """Helper function to remove duplicate entries from grading data"""
         try:
-            if 'ID_NO' in grading_data.columns:
+            if 'id_no' in grading_data.columns:
                 # For regular format
                 filtered_data = grading_data.copy()
                 for student_id, course in duplicates:
-                    filtered_data.loc[filtered_data['ID_NO'] == student_id, course] = None
+                    filtered_data.loc[filtered_data['id_no'] == student_id, course] = None
                 return filtered_data.dropna(how='all', subset=[col for col in filtered_data.columns 
-                                                            if col not in ['ID_NO', 'LAST_NAME', 'FIRST_NAME', 'MIDDLE_NAME']])
+                                                            if col not in ['id_no', 'last_name', 'first_name', 'middle_name']])
             else:
                 # For irregular format
                 return grading_data[~grading_data.apply(lambda row: 
@@ -1134,10 +1173,7 @@ class GradeScreen(ctk.CTkFrame):
                 melted_data['grades'] = melted_data['grades'].apply(
                     lambda x: 'INC' if x == '' or pd.isna(x) else x)
                 
-                success = self.db_handler.save_irregular_grading_data(
-                    melted_data,
-                    year=self.year,
-                    semester=self.semester)
+                success = self.db_handler.save_irregular_grading_data(melted_data,year=self.year,semester=self.semester)
 
             message = "Grades have been successfully saved to the database." if success else "Failed to save to the database"
             CTkMessagebox(title="Success" if success else "Error", message=message)
@@ -1158,7 +1194,7 @@ class GradeScreen(ctk.CTkFrame):
         
         # Remove specific columns if irregular
         if is_irregular:
-            columns_to_remove = ['ID_NO', 'LAST_NAME', 'FIRST_NAME', 'MIDDLE_NAME']
+            columns_to_remove = ['id_no', 'last_name', 'first_name', 'middle_name']
             clean_data = clean_data.drop(columns=columns_to_remove, errors='ignore')
         
         # Clean up data values

@@ -783,7 +783,22 @@ class Application(ctk.CTk):
                     self.rowconfigure(0, weight=1)
                     self.columnconfigure(1, weight=1)
                     
-                    loading_frame.destroy()
+                    try:
+                        # Stop progress bar animations first
+                        for widget in loading_frame.winfo_children():
+                            if hasattr(widget, 'stop'):
+                                try:
+                                    widget.stop()
+                                except:
+                                    pass
+                        loading_frame.destroy()
+                    except Exception as e:
+                        print(f"Error destroying loading frame: {e}")
+                        # If destruction fails, just hide it
+                        try:
+                            loading_frame.place_forget()
+                        except:
+                            pass
                     
                     screen.grid(row=0, column=1, sticky="nsew")
                     self.current_screen = screen

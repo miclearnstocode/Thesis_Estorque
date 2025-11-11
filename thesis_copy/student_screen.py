@@ -497,24 +497,13 @@ class StudentScreen(ctk.CTkFrame):
                 completed_semesters = set(db_handler.check_all_tables_for_grades(id_no).keys())
                 
                 # Use dictionary for O(1) lookup time
-                year_semester_mapping = {
-                    '1': ['1.1', '1.2'],
-                    '2': ['2.1', '2.2'],
-                    '3': ['3.1', '3.2'],
-                    '4': ['4.1', '4.2']
-                }
+                year_semester_mapping = {'1': ['1.1', '1.2'],'2': ['2.1', '2.2'],'3': ['3.1', '3.2'],'4': ['4.1', '4.2']}
                 
                 # Use dictionary for O(1) lookup time
-                semester_conversion = {
-                    'first_year_first_semester': '1.1', 
-                    'first_year_second_semester': '1.2',
-                    'second_year_first_semester': '2.1', 
-                    'second_year_second_semester': '2.2',
-                    'third_year_first_semester': '3.1', 
-                    'third_year_second_semester': '3.2',
-                    'fourth_year_first_semester': '4.1', 
-                    'fourth_year_second_semester': '4.2'
-                }
+                semester_conversion = {'first_year_first_semester': '1.1', 'first_year_second_semester': '1.2',
+                    'second_year_first_semester': '2.1', 'second_year_second_semester': '2.2',
+                    'third_year_first_semester': '3.1', 'third_year_second_semester': '3.2',
+                    'fourth_year_first_semester': '4.1', 'fourth_year_second_semester': '4.2'}
                 
                 # Convert to set for O(1) lookup time
                 completed_yr_sem = {semester_conversion[sem] for sem in completed_semesters 
@@ -574,14 +563,7 @@ class StudentScreen(ctk.CTkFrame):
             sex = student_info.get('sex', '')
             email = student_info.get('email_address', '')
             
-            self.tree.insert("", "end", values=(
-                student_id, 
-                student_name, 
-                year, 
-                age, 
-                sex, 
-                email
-            ))
+            self.tree.insert("", "end", values=(student_id, student_name, year, age, sex, email))
             
             # Store the student details for later use
             self.student_name = student_name
@@ -623,7 +605,7 @@ class StudentScreen(ctk.CTkFrame):
             current_year = None
             year_totals = {'units': 0, 'lec': 0, 'lab': 0}
             sorted_curriculum = sorted(student_data["curriculum_data"],
-            key=lambda x: ( float(x.get('YEAR_LEVEL', x.get('year_level', '0'))), x.get('COURSE_NO', x.get('course_no', ''))))
+            key=lambda x: ( float(x.get('year_level', '0')), x.get('course_no', '')))
             def wrap_text(text, width=30):
                 """Function to wrap text to multiple lines"""
                 import textwrap
@@ -631,19 +613,18 @@ class StudentScreen(ctk.CTkFrame):
             
             for i, row in enumerate(sorted_curriculum):
                 if row:
-                    course_key = (row.get('COURSE_NO', row.get('course_no', '')).strip(), 
-                                row.get('YEAR_LEVEL', row.get('year_level', '')))
+                    course_key = (row.get('course_no', '').strip(), row.get('year_level', ''))
                     if course_key in displayed_courses:
                         continue
                     displayed_courses.add(course_key)
                     # Convert values to strings
-                    course_no = row.get('COURSE_NO', row.get('course_no', '')).strip()
-                    descriptive_title = wrap_text(row.get('DESCRIPTIVE_TITLE', row.get('descriptive_title', '')).strip(), width=40)
-                    year_level = row.get('YEAR_LEVEL', row.get('year_level', ''))
-                    units = row.get('UNITS', row.get('units', ''))
-                    lec = row.get('LEC', row.get('lec', ''))
-                    lab = row.get('LAB', row.get('lab', ''))
-                    prerequisite = wrap_text(row.get('PREREQUISITE', row.get('prerequisite', '')).strip(), width=18)
+                    course_no = row.get('course_no', '').strip()
+                    descriptive_title = wrap_text(row.get('descriptive_title', '').strip(), width=40)
+                    year_level = row.get('year_level', '')
+                    units = row.get('units', '')
+                    lec = row.get('lec', '')
+                    lab = row.get('lab', '')
+                    prerequisite = wrap_text( row.get('prerequisite', '').strip(), width=18)
 
                     # If year level changes, insert total row for previous year
                     if current_year is not None and current_year != year_level:
@@ -677,9 +658,13 @@ class StudentScreen(ctk.CTkFrame):
                                     grade = grade_value
                                     break
 
-                    values = [course_no, descriptive_title, year_level, units, lec, lab, prerequisite, grade]
+                    # Convert grade to string for proper comparison and handle the AttributeError
+                    grade_str = str(grade).strip() if grade is not None else ""
+                    
+                    values = [course_no, descriptive_title, year_level, units, lec, lab, prerequisite, grade_str]
 
-                    if grade.strip() == "":
+                    # Determine tag based on whether grade exists
+                    if not grade_str or grade_str.strip() == "":
                         tag = 'no_grade'
                     else:
                         tag = 'evenrow' if i % 2 == 0 else 'oddrow'
@@ -698,12 +683,12 @@ class StudentScreen(ctk.CTkFrame):
             print(f"Available keys: {student_data.keys()}")
             print(f"Curriculum data length: {len(student_data['curriculum_data'])}")
 
-        # Configure tag colors
+        # Configure tag colors - ENHANCED for better visibility
         self.curriculum_tree.tag_configure('empty_row', background='white', font=('Helvetica', 12))
         self.curriculum_tree.tag_configure('oddrow', background='#E5E5E5')
         self.curriculum_tree.tag_configure('evenrow', background='#FFFFFF')
-        self.curriculum_tree.tag_configure('no_grade', foreground='red')
-        self.curriculum_tree.tag_configure('total', background='#D3D3D3', font=('Helvetica', 12))  # Grey background for total rows
+        self.curriculum_tree.tag_configure('no_grade', background='#FFE6E6', foreground='red', font=('Helvetica', 12, 'bold'))  # Light red background for no grade rows
+        self.curriculum_tree.tag_configure('total', background='#D3D3D3', font=('Helvetica', 12, 'bold'))  # Grey background for total rows
 
         # Store the retrieved student ID for later use in printing
         self.selected_id_no = id_no
