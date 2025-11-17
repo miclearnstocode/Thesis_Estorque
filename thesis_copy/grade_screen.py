@@ -199,11 +199,11 @@ class GradeScreen(ctk.CTkFrame):
                 appraised_student = self.db_handler.cursor.fetchone()
                 
                 # If found in appraised_curriculum, use those details
-                if appraised_student:
+                if appraised_student and appraised_student.get('id_no'):
                     self.current_student_source = 'appraised'
-                    last_name_var.set(appraised_student[1])
-                    first_name_var.set(appraised_student[2])
-                    middle_name_var.set(appraised_student[3] if appraised_student[3] else '')
+                    last_name_var.set(appraised_student.get('last_name', ''))
+                    first_name_var.set(appraised_student.get('first_name', ''))
+                    middle_name_var.set(appraised_student.get('middle_name', ''))
                     
                     # Get available courses for this student
                     self.db_handler.cursor.execute("""
@@ -227,11 +227,11 @@ class GradeScreen(ctk.CTkFrame):
                 """, (id_no,))
                 student = self.db_handler.cursor.fetchone()
                 
-                if student:
+                if student and student.get('id_no'):
                     self.current_student_source = 'regular'
-                    last_name_var.set(student[1])
-                    first_name_var.set(student[2])
-                    middle_name_var.set(student[3] if student[3] else '')
+                    last_name_var.set(student.get('last_name', ''))
+                    first_name_var.set(student.get('first_name', ''))
+                    middle_name_var.set(student.get('middle_name', ''))
                     course_no_entry.focus()
                 else:
                     # If not found in student_information, check students table
@@ -242,7 +242,7 @@ class GradeScreen(ctk.CTkFrame):
                     """, (id_no,))
                     student = self.db_handler.cursor.fetchone()
                     
-                    if student:
+                    if student and student.get('id_no'):
                         # Even if found in students table, check if they exist in appraised_curriculum
                         self.db_handler.cursor.execute("""
                             SELECT id_no FROM appraised_curriculum WHERE id_no = %s LIMIT 1
@@ -255,9 +255,9 @@ class GradeScreen(ctk.CTkFrame):
                         else:
                             self.current_student_source = 'regular'
                         
-                        last_name_var.set(student[1])
-                        first_name_var.set(student[2])
-                        middle_name_var.set(student[3] if student[3] else '')
+                        last_name_var.set(student.get('last_name', ''))
+                        first_name_var.set(student.get('first_name', ''))
+                        middle_name_var.set(student.get('middle_name', ''))
                         course_no_entry.focus()
                     else:
                         self.current_student_source = None
@@ -267,8 +267,7 @@ class GradeScreen(ctk.CTkFrame):
                     
             except Exception as e:
                 print(f"Error fetching student details: {e}")
-                CTkMessagebox(title="Error", message="Failed to fetch student details")
-                
+                CTkMessagebox(title="Error", message="Failed to fetch student details")     
         # Frame for input fields
         input_frame = ctk.CTkFrame(self.completion_window)
         input_frame.pack(pady=20)
@@ -280,13 +279,14 @@ class GradeScreen(ctk.CTkFrame):
         middle_name_var = ctk.StringVar()
         course_no_var = ctk.StringVar()
         grade_var = ctk.StringVar()
+        
         def validate_id(new_value):
             # Allow only digits and hyphens
             return new_value == "" or all(char.isdigit() or char == '-' for char in new_value)
 
         # Labels and Entry fields
         ctk.CTkLabel(input_frame, text="ID No.").grid(row=0, column=0, padx=5, pady=5)
-        id_entry = ctk.CTkEntry( input_frame,  width=200,  textvariable=id_var, validate="key",validatecommand=(input_frame.register(validate_id), '%P'))
+        id_entry = ctk.CTkEntry(input_frame, width=200, textvariable=id_var, validate="key", validatecommand=(input_frame.register(validate_id), '%P'))
         id_entry.grid(row=0, column=1, padx=5, pady=5)
 
         # Bind the fetch_student_details function to ID entry
@@ -327,7 +327,8 @@ class GradeScreen(ctk.CTkFrame):
                     SELECT DISTINCT id_no FROM appraised_curriculum 
                     WHERE id_no = %s
                 """, (id_no,))
-                is_appraised = self.db_handler.cursor.fetchone() is not None
+                is_appraised_result = self.db_handler.cursor.fetchone()
+                is_appraised = is_appraised_result is not None and is_appraised_result.get('id_no')
 
                 if is_appraised:
                     # Get courses from appraised_curriculum for this student that have no grades
@@ -337,14 +338,16 @@ class GradeScreen(ctk.CTkFrame):
                         WHERE id_no = %s 
                         AND (grades IS NULL OR grades = '' OR grades = 'INC')
                     """, (id_no,))
-                    available_courses = [row[0] for row in self.db_handler.cursor.fetchall()]
+                    available_courses_result = self.db_handler.cursor.fetchall()
+                    available_courses = [row.get('course_no', '') for row in available_courses_result if row.get('course_no')]
                 else:
                     # Get courses from curriculum_regular for regular students
                     self.db_handler.cursor.execute("""
-                        SELECT DISTINCT course_No 
+                        SELECT DISTINCT course_no 
                         FROM curriculum_regular
                     """)
-                    available_courses = [row[0] for row in self.db_handler.cursor.fetchall()]
+                    available_courses_result = self.db_handler.cursor.fetchall()
+                    available_courses = [row.get('course_no', '') for row in available_courses_result if row.get('course_no')]
 
                 # Use fuzzy matching to find similar courses
                 matches = process.extract(current_input, available_courses, limit=5)
@@ -360,16 +363,16 @@ class GradeScreen(ctk.CTkFrame):
                     entry_y = course_no_entry.winfo_rooty() - input_frame.winfo_rooty()
                     
                     suggestion_listbox.lift()
-                    suggestion_listbox.place(x=entry_x,  y=entry_y + course_no_entry.winfo_height(), width=course_no_entry.winfo_width(), relx=0, rely=0)
+                    suggestion_listbox.place(x=entry_x, y=entry_y + course_no_entry.winfo_height(), width=course_no_entry.winfo_width(), relx=0, rely=0)
                 else:
                     suggestion_listbox.place_forget()
                     
             except Exception as e:
                 print(f"Error fetching course suggestions: {e}")
                 suggestion_listbox.place_forget()
-                
-                # Create suggestion frame
+        # Create suggestion frame
         suggestion_frame = ctk.CTkFrame(input_frame, fg_color="white", border_width=1, border_color="grey", width=200)
+        
         def handle_up_down_keys(event):
             if not suggestion_frame.winfo_ismapped():  # If suggestions are not visible
                 return
@@ -413,12 +416,12 @@ class GradeScreen(ctk.CTkFrame):
             self.after(100, suggestion_listbox.place_forget)
 
         # Create suggestion listbox
-        suggestion_listbox = tk.Listbox(input_frame, height=5, selectmode=tk.SINGLE, font=("Helvetica", 10),bg="white", fg="black")
+        suggestion_listbox = tk.Listbox(input_frame, height=5, selectmode=tk.SINGLE, font=("Helvetica", 10), bg="white", fg="black")
         suggestion_listbox.bind('<<ListboxSelect>>', use_suggestion)
 
         # Course No field
         ctk.CTkLabel(input_frame, text="Course No.").grid(row=4, column=0, padx=5, pady=5)
-        course_no_entry = ctk.CTkEntry( input_frame,  width=200,  textvariable=course_no_var, validate="key", validatecommand=(input_frame.register(validate_course_no), '%P'))
+        course_no_entry = ctk.CTkEntry(input_frame, width=200, textvariable=course_no_var, validate="key", validatecommand=(input_frame.register(validate_course_no), '%P'))
         course_no_entry.grid(row=4, column=1, padx=5, pady=5)
 
         # Bind events to course number entry
@@ -437,7 +440,7 @@ class GradeScreen(ctk.CTkFrame):
             return new_value in valid_grades or any(valid.startswith(new_value) for valid in valid_grades)
         
         ctk.CTkLabel(input_frame, text="Grade").grid(row=5, column=0, padx=5, pady=5)
-        grade_entry = ctk.CTkEntry(input_frame, width=200, textvariable=grade_var,validate="key",validatecommand=(input_frame.register(validate_grade), '%P'))
+        grade_entry = ctk.CTkEntry(input_frame, width=200, textvariable=grade_var, validate="key", validatecommand=(input_frame.register(validate_grade), '%P'))
         grade_entry.grid(row=5, column=1, padx=5, pady=5)
 
         def on_grade_enter(event):
@@ -470,8 +473,8 @@ class GradeScreen(ctk.CTkFrame):
         year_levels = ["1.1", "1.2", "2.1", "2.2", "3.1", "3.2", "4.1", "4.2"]
         ctk.CTkLabel(input_frame, text="Year Level:").grid(row=6, column=0, padx=5, pady=5)
         year_level_var = ctk.StringVar(value=year_levels[0])
-        year_level_dropdown = ctk.CTkOptionMenu(input_frame,variable=year_level_var, values=year_levels,fg_color="white",button_color="white",button_hover_color="#707070",text_color="black",dropdown_fg_color="white",dropdown_text_color="black",dropdown_hover_color="#707070")
-        year_level_dropdown.grid(row=6, columns=3, padx=5, pady=5)
+        year_level_dropdown = ctk.CTkOptionMenu(input_frame, variable=year_level_var, values=year_levels, fg_color="white", button_color="white", button_hover_color="#707070", text_color="black", dropdown_fg_color="white", dropdown_text_color="black", dropdown_hover_color="#707070")
+        year_level_dropdown.grid(row=6, column=1, padx=5, pady=5)  # Fixed: changed 'columns' to 'column'
         
         # School Year dropdown (now below year level)
         school_years = []
@@ -486,7 +489,7 @@ class GradeScreen(ctk.CTkFrame):
 
         # Button frame
         button_frame = ctk.CTkFrame(self.completion_window, fg_color="transparent")
-        button_frame.place(x=890,y=212)
+        button_frame.place(x=520,y=326)
 
         # Buttons with consistent styling
         button_style = {"fg_color": "transparent", "hover_color": "#707070", "text_color": "black", "width": 120, "height": 32, "border_width": 1, "border_color": "black"}
@@ -553,6 +556,8 @@ class GradeScreen(ctk.CTkFrame):
                 course_no = values[4]
                 grade = values[5]
                 
+                print(f"DEBUG: Processing completion form - ID: {id_no}, Course: {course_no}, Grade: {grade}")
+                
                 # Check student existence and source
                 student_source = self.db_handler.check_student_source(id_no)
                 
@@ -566,27 +571,18 @@ class GradeScreen(ctk.CTkFrame):
                         # Check if the course exists in appraised_curriculum for this student
                         self.db_handler.cursor.execute("""
                             SELECT id_no, course_no, grades FROM appraised_curriculum 
-                            WHERE id_no = %s AND course_no = %s AND (grades IS NULL OR grades = '' OR grades = 'INC')
+                            WHERE id_no = %s AND course_no = %s
                         """, (id_no, course_no))
                         
-                        incomplete_course = self.db_handler.cursor.fetchone()
+                        existing_course = self.db_handler.cursor.fetchone()
                         
-                        if incomplete_course:
-                            # Add to appraised updates if course exists and has no grade
+                        if existing_course:
+                            # Add to appraised updates if course exists
                             appraised_updates.append({'id_no': id_no, 'course_no': course_no, 'grade': grade})
+                            print(f"DEBUG: Added to appraised updates - {id_no}, {course_no}, {grade}")
                         else:
-                            # Check if course exists with a grade
-                            self.db_handler.cursor.execute("""
-                                SELECT id_no FROM appraised_curriculum 
-                                WHERE id_no = %s AND course_no = %s
-                            """, (id_no, course_no))
-                            exists_with_grade = self.db_handler.cursor.fetchone() is not None
-                            if exists_with_grade:
-                                CTkMessagebox(title="Warning", message=f"Course {course_no} for student {id_no} already has a grade in appraised curriculum.")
-                                continue
-                            else:
-                                CTkMessagebox(title="Warning", message=f"Course {course_no} for student {id_no} does not exist in appraised curriculum.")
-                                continue
+                            print(f"DEBUG: Course {course_no} not found in appraised_curriculum for {id_no}")
+                            
                     except Exception as e:
                         print(f"Error checking appraised curriculum: {e}")
                         continue
@@ -617,12 +613,18 @@ class GradeScreen(ctk.CTkFrame):
                 if grades_data:
                     grades_df = pd.DataFrame(grades_data, 
                         columns=["ID_NO", "Last Name", "First Name", "Middle Name", "Course No.", "Grade"])
-                    self.db_handler.save_manual_grades(grades_df, year_level, school_year)
+                    success = self.db_handler.save_manual_grades(grades_df, year_level, school_year)
+                    if not success:
+                        CTkMessagebox(title="Error", message="Failed to save regular grades")
+                        return
 
                 # Update existing incomplete grades in appraised_curriculum
                 if appraised_updates:
-                    appraised_df = pd.DataFrame(appraised_updates,columns=["id_no", "course_no", "grade"])
-                    self.db_handler.update_appraised_grades(appraised_df)
+                    appraised_df = pd.DataFrame(appraised_updates, columns=["id_no", "course_no", "grade"])
+                    success = self.db_handler.update_appraised_grades(appraised_df)
+                    if not success:
+                        CTkMessagebox(title="Error", message="Failed to update appraised curriculum grades")
+                        return
 
                 # Clear the grade tree after successful save
                 for item in self.grade_tree.get_children():
@@ -636,14 +638,15 @@ class GradeScreen(ctk.CTkFrame):
                     success_message += f"Updated grades in appraised curriculum: {len(appraised_updates)}"
 
                 CTkMessagebox(title="Success", message=success_message)
+                
             except Exception as e:
                 CTkMessagebox(title="Save Error", message=f"Failed to save grades: {str(e)}")
 
         # Add buttons with the new style
         ctk.CTkButton(button_frame, text="Add Grade", command=add_grade, **button_style).pack(side=tk.LEFT, padx=5)
-        ctk.CTkButton(button_frame,text="Delete Grade", command=delete_grade, **button_style).pack(side=tk.LEFT, padx=5)
-        ctk.CTkButton(button_frame,text="Save Grades",command=save_grades,**button_style).pack(side=tk.LEFT, padx=5)
-
+        ctk.CTkButton(button_frame, text="Delete Grade", command=delete_grade, **button_style).pack(side=tk.LEFT, padx=5)
+        ctk.CTkButton(button_frame, text="Save Grades", command=save_grades, **button_style).pack(side=tk.LEFT, padx=5)
+        
     def open_file_dialog(self, year, semester, choice):
         # Open a file dialog to select a CSV file
         file_path = filedialog.askopenfilename(filetypes=[("CSV files", "*.csv")])
@@ -1332,7 +1335,8 @@ class GradeScreen(ctk.CTkFrame):
         password = simpledialog.askstring("Password Required For Admin Only", "Enter password:", show="*")
         if password != "BSCS@2024!":
             messagebox.showerror("Invalid Password", "Password is incorrect.")
-            return  # Stop the function from executing further
+            return
+
         # Create a new top-level window for viewing and editing
         self.view_edit_window = ctk.CTkToplevel(self)
         self.view_edit_window.title("View and Edit Grades")
@@ -1340,73 +1344,132 @@ class GradeScreen(ctk.CTkFrame):
         self.view_edit_window.grab_set()
         
         # Create filter frame
-        filter_frame = ctk.CTkFrame(self.view_edit_window,bg_color="transparent")
+        filter_frame = ctk.CTkFrame(self.view_edit_window, fg_color="transparent")
         filter_frame.pack(pady=10, padx=10, fill="x")
         
         # Year Level dropdown
         ctk.CTkLabel(filter_frame, text="Year Level:", font=("Helvetica", 12)).pack(side=tk.LEFT, padx=5)
-        self.year_semester_var = ctk.StringVar(value="Select")
+        self.year_semester_var = ctk.StringVar(value=" ")  # Set default to first option
         year_levels = ["1.1", "1.2", "2.1", "2.2", "3.1", "3.2", "4.1", "4.2"]
-        year_semester_dropdown = ctk.CTkComboBox(filter_frame,variable=self.year_semester_var,values=year_levels,command=self.update_school_years,state="readonly",text_color="black",bg_color="ghost white",width=120)
+        year_semester_dropdown = ctk.CTkComboBox(filter_frame,variable=self.year_semester_var,values=year_levels,command=self.update_school_years,state="readonly",text_color="black",fg_color="white",width=120)
         year_semester_dropdown.pack(side=tk.LEFT, padx=5)
 
         # School Year dropdown
         ctk.CTkLabel(filter_frame, text="School Year:", font=("Helvetica", 12)).pack(side=tk.LEFT, padx=5)
-        self.school_year_var = ctk.StringVar(value="Select")
-        self.school_year_dropdown = ctk.CTkComboBox(filter_frame,variable=self.school_year_var,values=["Select Year Level First"],command=self.load_grades,state="readonly",bg_color="ghost white",width=120,text_color="black")
+        self.school_year_var = ctk.StringVar(value=" ")  # Default to empty
+        self.school_year_dropdown = ctk.CTkComboBox(filter_frame,variable=self.school_year_var,values=["Select Year Level First"],command=self.load_grades,state="readonly",fg_color="white",width=120,text_color="black")
         self.school_year_dropdown.pack(side=tk.LEFT, padx=5)
 
         # Sex Filter dropdown
         ctk.CTkLabel(filter_frame, text="Sex:", font=("Helvetica", 12)).pack(side=tk.LEFT, padx=5)
-        self.sex_var = ctk.StringVar(value="Select")  # Default to select sexz
-        sex_dropdown = ctk.CTkComboBox(filter_frame,variable=self.sex_var,values=["M", "F"],command=self.load_grades,state="readonly",width=80,text_color="black",bg_color="ghost white")
-        sex_dropdown.pack(side=tk.LEFT, padx=5)       
-        # Add instruction label with some styling
+        self.sex_var = ctk.StringVar(value=" ")  # Default to Male
+        sex_dropdown = ctk.CTkComboBox(filter_frame,variable=self.sex_var,values=["M", "F"],command=self.load_grades,state="readonly",width=80,text_color="black",fg_color="white")
+        sex_dropdown.pack(side=tk.LEFT, padx=5)
+        
+        # Add instruction label
         instruction_label = ctk.CTkLabel(filter_frame,text="(Double Click to Edit Student Grade)",font=("Helvetica", 12, "italic"),text_color="gray40")
         instruction_label.pack(side=tk.LEFT, padx=(10, 5))
 
         # Create Treeview frame
         self.tree_frame = ctk.CTkFrame(self.view_edit_window)
         self.tree_frame.pack(pady=10, padx=10, fill="both", expand=True)
-
+        
+        # Initialize school years for the default year level
+        self.after(100, lambda: self.update_school_years("1.1"))
+        
     def update_school_years(self, selected_year_level):
         """Update school year dropdown based on selected year level"""
         try:
+            if not selected_year_level:  # Check if empty
+                self.school_year_dropdown.configure(values=["Select Year Level First"])
+                self.school_year_var.set("")
+                # Clear the treeview
+                for widget in self.tree_frame.winfo_children():
+                    widget.destroy()
+                ctk.CTkMessagebox(message="Please select Year Level, School Year, and Sex to load grades")
+                return
+                
+            print(f"DEBUWG: Updating school years for {selected_year_level}")
+            
+            # Use the safe method
             school_years = self.db_handler.get_available_school_years(selected_year_level)
-            self.school_year_dropdown.configure(values=school_years)
-            self.school_year_var.set(school_years[0])
+            print(f"DEBUG: School years returned: {school_years}")
+            
+            # Handle the results
+            if not school_years or school_years == ["No data available"]:
+                self.school_year_dropdown.configure(values=["No data available"])
+                self.school_year_var.set("")
+                # Clear the treeview
+                for widget in self.tree_frame.winfo_children():
+                    widget.destroy()
+                print("No school years available for selected Year Level")
+            else:
+                self.school_year_dropdown.configure(values=school_years)
+                self.school_year_var.set("")  # Empty selection
+                print(f"DEBUG: Successfully set school years to: {school_years}")
+            
         except Exception as e:
-            messagebox.showerror("Error", f"Error loading school years: {e}")
+            print(f"DEBUG: Error in update_school_years: {e}")
+            self.school_year_dropdown.configure(values=["Error loading data"])
+            self.school_year_var.set("")
 
     def load_grades(self, selected_school_year=None):
         try:
             year_level = self.year_semester_var.get()
             school_year = self.school_year_var.get()
             sex_filter = self.sex_var.get()
+            print(f"DEBUG load_grades: year_level={year_level}, school_year={school_year}, sex_filter={sex_filter}")
+            # Check for empty selections
+            if not year_level or not school_year or not sex_filter:
+                print("DEBUG: Empty selection, skipping load")
+                # Clear the treeview
+                for widget in self.tree_frame.winfo_children():
+                    widget.destroy()
+                self.show_no_data_message("Please select Year Level, School Year, and Sex to load grades")
+                return
             
-            if "Select" in year_level or "Select" in school_year or "No data" in school_year:
+            # Check for invalid selections
+            if (school_year == "No data available" or school_year == "Select Year Level First" or
+                school_year == "Error loading data"):
+                print("DEBUG: Invalid selection, skipping load")
+                # Clear the treeview
+                for widget in self.tree_frame.winfo_children():
+                    widget.destroy()
+                self.show_no_data_message("Please select valid School Year")
                 return
             
             # Get all grades data
             grades_info = self.db_handler.get_grades_by_semester(year_level, school_year, sex_filter)
             
-            # Create new treeview with dynamic columns
+            # Clear existing treeview
             for widget in self.tree_frame.winfo_children():
                 widget.destroy()
+                
+            # Check if we have valid data
+            if not grades_info or not grades_info.get('data'):
+                # Show "no data" message
+                no_data_label = ctk.CTkLabel(self.tree_frame, text="No grade data available for the selected criteria",font=("Segoe UI", 14),text_color="#7f8c8d")
+                no_data_label.pack(expand=True, fill="both")
+                return
+                
+            # Create treeview with dynamic columns
             style = ttk.Style()
-            style.configure("Treeview", font=("Helvetica", 12),  rowheight=35, background="white", fieldbackground="white", foreground="black") 
-            style.configure("Treeview.Heading", font=("Helvetica", 12, "bold"), background="white", foreground="black")
+            style.configure("Treeview", font=("Helvetica", 12), rowheight=35, 
+                        background="white", fieldbackground="white", foreground="black") 
+            style.configure("Treeview.Heading", font=("Helvetica", 12, "bold"), 
+                        background="white", foreground="black")
+            
             self.grade_tree = ttk.Treeview(self.tree_frame, columns=grades_info['columns'], show="headings")
             
             # Configure tag colors for alternating rows
-            self.grade_tree.tag_configure('oddrow', background='#E8E8E8')  # Light grey
+            self.grade_tree.tag_configure('oddrow', background='#E8E8E8')
             self.grade_tree.tag_configure('evenrow', background='white')
             
             # Configure columns
             column_widths = {"ID_NO": 100, "SEX": 50, "Student_Name": 200}
             
             for col in grades_info['columns']:
-                display_name = col.replace('_', ' ').upper()
+                display_name = col.replace('_', ' ').title()
                 self.grade_tree.heading(col, text=display_name)
                 self.grade_tree.column(col, width=column_widths.get(col, 100), anchor='center')
             
@@ -1428,9 +1491,26 @@ class GradeScreen(ctk.CTkFrame):
             
             # Set up grade editing
             self.setup_grade_editing()
+            
         except Exception as e:
-            messagebox.showerror("Error", f"Error loading grades: {e}")
-
+            print(f"Error loading grades: {e}")
+            import traceback
+            print(f"Traceback: {traceback.format_exc()}")
+            # Show error message in the tree frame
+            for widget in self.tree_frame.winfo_children():
+                widget.destroy()
+                
+            error_label = ctk.CTkLabel(self.tree_frame, text=f"Error loading grades: {str(e)}",font=("Segoe UI", 14),text_color="#e74c3c")
+            error_label.pack(expand=True, fill="both")
+            
+    def show_no_data_message(self, message):
+        """Display a message when no data is available"""
+        for widget in self.tree_frame.winfo_children():
+            widget.destroy()
+        
+        message_label = ctk.CTkLabel(self.tree_frame, text=message,font=("Segoe UI", 14),text_color="#7f8c8d")
+        message_label.pack(expand=True, fill="both", padx=20, pady=20)
+        
     def setup_grade_editing(self):
         # Bind double-click event to the treeview
         self.grade_tree.bind('<Double-1>', self.on_double_click)
@@ -1506,37 +1586,55 @@ class GradeScreen(ctk.CTkFrame):
             """Save the grade if it's valid"""
             grade_str = grade_var.get().strip()
             
-            # Handle empty grade (if allowed)
+            # Handle empty grade
             if not grade_str:
                 msg = CTkMessagebox(title="Confirm", message="Are you sure you want to clear this grade?", icon="question", option_1="Yes", option_2="No")
-                response = msg.ask()
-                if response:
+                response = msg.get()
+                if response == "Yes":
                     new_grade = None
                 else:
                     return
             else:
                 # Validate non-empty grade
-                if not validate_grade(grade_str):
+                try:
+                    grade = float(grade_str)
+                    valid_grades = [1.00, 1.25, 1.50, 1.75, 2.00, 2.25, 2.50, 2.75, 3.00, 5.00]
+                    
+                    if grade not in valid_grades:
+                        CTkMessagebox(title="Error", message="Invalid grade. Please enter a valid grade:\n""1.00, 1.25, 1.50, 1.75, 2.00, 2.25, 2.50, 2.75, 3.00, 5.00")
+                        return
+                    new_grade = grade
+                except ValueError:
+                    CTkMessagebox(title="Error", message="Please enter a valid number")
                     return
-                new_grade = float(grade_str)
             
             try:
                 # Update database
                 year_level = self.year_semester_var.get()
                 school_year = self.school_year_var.get()
                 
+                # Ensure database connection is active
+                if not self.db_handler.conn or self.db_handler.conn.closed:
+                    self.db_handler.conn, self.db_handler.cursor = self.db_handler.get_db_connection()
+                
                 success = self.db_handler.update_grade(student_id, column_name, new_grade,  year_level, school_year)
+                
                 if success:
                     # Update treeview
                     values = list(self.grade_tree.item(item)['values'])
                     col_idx = int(column.replace("#", "")) - 1
                     values[col_idx] = new_grade if new_grade is not None else ""
                     self.grade_tree.item(item, values=values)
+                    
+                    CTkMessagebox(title="Success", message="Grade updated successfully!")
                     popup.destroy()
-                
+                else:
+                    CTkMessagebox(title="Error", message="Failed to save grade to database")
+                    
             except Exception as e:
-                messagebox.showerror("Error", f"Failed to save grade: {e}")
-        
+                print(f"Database error: {e}")
+                CTkMessagebox(title="Error", message=f"Failed to save grade: {str(e)}")
+                
         def cancel(event=None):
             popup.destroy()
         

@@ -60,6 +60,7 @@ class Application(ctk.CTk):
         startup_dialog = ctk.CTkToplevel(self)
         startup_dialog.title("Starting Database")
         startup_dialog.geometry("450x200")
+        startup_dialog.resizable(False, False)
         startup_dialog.attributes('-topmost', True)
         startup_dialog.protocol("WM_DELETE_WINDOW", lambda: None)  # Disable close button
         
@@ -733,106 +734,230 @@ class Application(ctk.CTk):
             button.pack(pady=15)
 
         self.current_screen = None
-
+        
     def show_screen(self, screen_class, screen_name):
-        """Handle screen switching with loading screen for grades"""
+        """Handle screen switching with modern progress bar"""
+        # Clean up current screen
         if self.current_screen:
             self.current_screen.grid_forget()
             self.current_screen.destroy()
 
         if screen_name == "Grade":
-            loading_frame = ctk.CTkFrame(self, fg_color="white")
-            loading_frame.grid(row=0, column=1, sticky="nsew")
+            # Create separate loading window
+            self.loading_window = ctk.CTkToplevel(self)
+            self.loading_window.title("Loading Grades Module")
+            self.loading_window.geometry("350x350")
+            self.loading_window.resizable(False, False)
             
-            loading_frame.grid_rowconfigure(0, weight=1)
-            loading_frame.grid_columnconfigure(0, weight=1)
+            # Center the loading window
+            self.loading_window.transient(self)
+            self.loading_window.grab_set()
             
-            loading_container = ctk.CTkFrame(loading_frame, fg_color="transparent")
-            loading_container.grid(row=0, column=0)
+            # Make it appear centered on main window
+            main_x = self.winfo_x()
+            main_y = self.winfo_y()
+            main_width = self.winfo_width()
+            main_height = self.winfo_height()
             
-            empty_img = ctk.CTkImage(light_image=Image.new("RGB", (300, 40), color="white"),
-                dark_image=Image.new("RGB", (300, 40), color="white"), size=(300, 40))
-
-            loading_label = ctk.CTkLabel( loading_container, text="Loading Grades Module",
-             font=("Helvetica", 16, "bold"), image=empty_img, compound="center")
-            loading_label.pack(pady=10)
+            load_width = 450
+            load_height = 350
             
-            progress = ctk.CTkProgressBar( loading_container, width=300, height=15, corner_radius=10, mode="indeterminate")
-            progress.pack(pady=10)
-            progress.start()
+            x = main_x + (main_width - load_width) // 2
+            y = main_y + (main_height - load_height) // 2
             
-            status_label = ctk.CTkLabel(loading_container, text="Initializing...", font=("Helvetica", 12))
-            status_label.pack(pady=5)
-
-            def update_status(message):
-                status_label.configure(text=message)
-                self.update()
+            self.loading_window.geometry(f"{load_width}x{load_height}+{x}+{y}")
+            
+            # Create loading content
+            loading_container = ctk.CTkFrame(self.loading_window, fg_color="transparent")
+            loading_container.pack(expand=True, fill="both", padx=40, pady=40)
+            
+            # Loading title
+            loading_title = ctk.CTkLabel(loading_container,text="Loading Grades Module",font=("Segoe UI", 24, "bold"),text_color="#2c3e50")
+            loading_title.pack(pady=(0, 30))
+            
+            # Progress percentage (large and prominent)
+            self.progress_var = ctk.StringVar(value="0%")
+            progress_label = ctk.CTkLabel(loading_container,textvariable=self.progress_var,font=("Segoe UI", 32, "bold"),text_color="#3498db")
+            progress_label.pack(pady=(0, 20))
+            
+            # Modern progress bar container
+            progress_container = ctk.CTkFrame(loading_container, fg_color="transparent")
+            progress_container.pack(fill="x", pady=(0, 15))
+            
+            # Main progress bar
+            self.progress_bar = ctk.CTkProgressBar(progress_container,width=300,height=12,progress_color="#3498db",corner_radius=6,mode="determinate")
+            self.progress_bar.pack(fill="x")
+            self.progress_bar.set(0)
+            
+            # Progress steps container
+            steps_container = ctk.CTkFrame(loading_container, fg_color="transparent")
+            steps_container.pack(fill="x", pady=(0, 20))
+            
+            # Status text
+            self.status_var = ctk.StringVar(value="Initializing module...")
+            status_label = ctk.CTkLabel(loading_container,textvariable=self.status_var,font=("Segoe UI", 14),text_color="#7f8c8d",wraplength=350)
+            status_label.pack(pady=(0, 10))
+            
+            # Loading steps indicator
+            self.steps_var = ctk.StringVar(value="Step 1 of 5")
+            steps_label = ctk.CTkLabel(loading_container,textvariable=self.steps_var,font=("Segoe UI", 12),text_color="#95a5a6")
+            steps_label.pack()
 
             def initialize_grade_screen():
+                """Background task for loading"""
+                steps = [("Loading database tables...", 20, "Step 1 of 5"),("Preparing grade interface...", 40, "Step 2 of 5"),
+                    ("Loading student records...", 60, "Step 3 of 5"),("Initializing components...", 80, "Step 4 of 5"),
+                    ("Finalizing setup...", 95, "Step 5 of 5"),("Ready!", 100, "Complete")]
+                
                 try:
-                    update_status("Loading database tables...")
-                    importlib.reload(database)
+                    for message, percentage, step_text in steps:
+                        # Update progress in main thread
+                        self.after(0, lambda msg=message, perc=percentage, step=step_text: 
+                                update_progress(msg, perc, step))
+                        
+                        # Simulate work being done
+                        time.sleep(0.8)
+                        
+                        # Actual loading work
+                        if "database" in message:
+                            importlib.reload(database)
+                        elif "interface" in message:
+                            importlib.reload(grade_screen)
+                        elif "records" in message:
+                            pass  # Actual record loading happens later
                     
-                    update_status("Preparing grade interface...")
-                    importlib.reload(grade_screen)
+                    # Return success
+                    return screen_class
                     
-                    update_status("Loading student records...")
-                    screen = screen_class(self)
+                except Exception as e:
+                    print(f"Error in background thread: {e}")
+                    return None
+
+            def update_progress(message, percentage, step_text):
+                """Update loading progress (runs in main thread)"""
+                if hasattr(self, 'status_var') and hasattr(self, 'progress_var') and hasattr(self, 'steps_var'):
+                    self.status_var.set(message)
+                    self.progress_var.set(f"{percentage}%")
+                    self.steps_var.set(step_text)
+                    self.progress_bar.set(percentage / 100)
                     
-                    update_status("Finalizing...")
+                    # Change progress bar color based on percentage
+                    if percentage < 30:
+                        self.progress_bar.configure(progress_color="#e74c3c")  # Red
+                    elif percentage < 70:
+                        self.progress_bar.configure(progress_color="#f39c12")  # Orange
+                    else:
+                        self.progress_bar.configure(progress_color="#27ae60")  # Green
+                    
+                    # Stop animation and close window when 100%
+                    if percentage >= 100:
+                        self.after(800, close_loading_window)  # Slightly longer delay to show completion
+
+            def close_loading_window():
+                """Close the loading window and cleanup"""
+                try:
+                    # Close the loading window
+                    if hasattr(self, 'loading_window') and self.loading_window and self.loading_window.winfo_exists():
+                        self.loading_window.destroy()
+                        self.loading_window = None
+                except Exception as e:
+                    print(f"Error closing loading window: {e}")
+
+            def on_loading_complete(result):
+                """Handle loading completion (runs in main thread)"""
+                try:
+                    if result is None:
+                        # Loading failed - show error
+                        close_loading_window()
+                        CTkMessagebox(title="Loading Error",message="Failed to load grade module. Please try again.",icon="cancel")
+                        self.show_main_menu()
+                        return
+                    
+                    # Loading successful - create screen
+                    screen_instance = result(self)
+                    
+                    # Ensure loading window is closed
+                    close_loading_window()
+                    
+                    screen_instance.grid(row=0, column=1, sticky="nsew")
+                    self.current_screen = screen_instance
+                    
                     self.rowconfigure(0, weight=1)
                     self.columnconfigure(1, weight=1)
                     
-                    try:
-                        # Stop progress bar animations first
-                        for widget in loading_frame.winfo_children():
-                            if hasattr(widget, 'stop'):
-                                try:
-                                    widget.stop()
-                                except:
-                                    pass
+                except Exception as e:
+                    print(f"Error completing loading: {e}")
+                    # Force cleanup
+                    close_loading_window()
+                    self.show_main_menu()
+
+            def run_background_task():
+                """Run background task and schedule completion in main thread"""
+                try:
+                    result = initialize_grade_screen()
+                    # Use after_idle to ensure main thread is ready
+                    self.after_idle(lambda: on_loading_complete(result))
+                except Exception as e:
+                    print(f"Background task error: {e}")
+                    self.after_idle(lambda: on_loading_complete(None))
+            
+            # Start background loading
+            threading.Thread(target=run_background_task, daemon=True).start()
+            
+        else:
+            # Handle other screens (non-Grade) - quick loading with simple progress
+            loading_frame = ctk.CTkFrame(self, fg_color="#f8f9fa", corner_radius=10)
+            loading_frame.grid(row=0, column=1, sticky="nsew")
+            
+            loading_container = ctk.CTkFrame(loading_frame, fg_color="transparent")
+            loading_container.place(relx=0.5, rely=0.5, anchor="center")
+            
+            loading_label = ctk.CTkLabel(loading_container,text=f"Loading {screen_name} Module...",font=("Segoe UI", 18, "bold"),text_color="#2c3e50")
+            loading_label.pack(pady=(0, 15))
+            
+            # Simple progress bar for other screens
+            quick_progress = ctk.CTkProgressBar(loading_container,width=200,height=8,progress_color="#3498db",corner_radius=4,mode="indeterminate")
+            quick_progress.pack(pady=(0, 10))
+            quick_progress.start()
+            
+            status_label = ctk.CTkLabel(loading_container,text="Please wait...",font=("Segoe UI", 12),text_color="#7f8c8d")
+            status_label.pack()
+            
+            def load_other_screen():
+                """Quick load for other screens"""
+                try:
+                    # Stop progress bar first
+                    quick_progress.stop()
+                    
+                    module_map = {"Student": student_screen,"Curriculum": curriculum_screen,"Appraisal": appraisal_screen,"Archive": archive_screen,}
+                    
+                    if screen_name in module_map:
+                        importlib.reload(database)
+                        module = module_map[screen_name]
+                        importlib.reload(module)
+                        screen_class = getattr(module, f"{screen_name}Screen")
+
+                    screen = screen_class(self)
+                    
+                    # Ensure loading frame is destroyed
+                    if loading_frame.winfo_exists():
                         loading_frame.destroy()
-                    except Exception as e:
-                        print(f"Error destroying loading frame: {e}")
-                        # If destruction fails, just hide it
-                        try:
-                            loading_frame.place_forget()
-                        except:
-                            pass
                     
                     screen.grid(row=0, column=1, sticky="nsew")
                     self.current_screen = screen
+
+                    self.rowconfigure(0, weight=1)
+                    self.columnconfigure(1, weight=1)
                     
                 except Exception as e:
-                    error_msg = f"Error loading grade screen: {str(e)}"
-                    print(error_msg)
-                    CTkMessagebox(title="Loading Error",message=error_msg,icon="cancel")
-                    loading_frame.destroy()
+                    print(f"Error loading {screen_name}: {e}")
+                    if loading_frame.winfo_exists():
+                        loading_frame.destroy()
                     self.show_main_menu()
-
-            threading.Thread(target=initialize_grade_screen, daemon=True).start()
             
-        else:
-            module_map = {
-                "Student": student_screen,
-                "Curriculum": curriculum_screen,
-                "Appraisal": appraisal_screen,
-                "Archive": archive_screen,
-            }
+            # Quick load with slight delay
+            self.after(100, load_other_screen)
             
-            if screen_name in module_map:
-                importlib.reload(database)
-                module = module_map[screen_name]
-                importlib.reload(module)
-                screen_class = getattr(module, f"{screen_name}Screen")
-
-            screen = screen_class(self)
-            screen.grid(row=0, column=1, sticky="nsew")
-            self.current_screen = screen
-
-            self.rowconfigure(0, weight=1)
-            self.columnconfigure(1, weight=1)
-
     def create_window_controls(self):
         """Create window control buttons"""
         control_frame = ctk.CTkFrame(self.left_frame, fg_color="transparent")

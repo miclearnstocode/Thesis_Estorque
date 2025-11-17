@@ -150,7 +150,7 @@ class StudentScreen(ctk.CTkFrame):
                 style.configure("Treeview", font=('Helvetica', 13),  rowheight=35)
                 style.configure("Treeview.Heading",  font=('Helvetica', 13, 'bold'))
                 # Create Treeview for student data
-                columns = ("ID", "Name", "Year Level", "Semester","Status")
+                columns = ("ID", "Name", "Year Level", "Semester", "Status", "School Year")
                 tree = ttk.Treeview(tree_frame, columns=columns, show="headings", height=10)
                 tree.pack(side="left", fill="both", expand=True)
 
@@ -165,13 +165,15 @@ class StudentScreen(ctk.CTkFrame):
                 tree.heading("Year Level", text="Year", anchor="center")
                 tree.heading("Semester", text="Semester", anchor="center")
                 tree.heading("Status", text="Enroll Status", anchor="center")
+                tree.heading("School Year", text="School Year", anchor="center")
 
                 # Set column widths
                 tree.column("ID", width=120, anchor="center")
                 tree.column("Name", width=250, anchor="w")
-                tree.column("Year Level", width=100, anchor="center")
+                tree.column("Year Level", width=80, anchor="center")
                 tree.column("Semester", width=100, anchor="center") 
-                tree.column("Status", width=150, anchor="center")
+                tree.column("Status", width=120, anchor="center")
+                tree.column("School Year", width=120, anchor="center")
 
                 # Add row styles
                 tree.tag_configure("oddrow", background="#f0f0f0")
@@ -179,14 +181,16 @@ class StudentScreen(ctk.CTkFrame):
 
                 # Populate the treeview
                 for i, student in enumerate(students):
-                    full_name = f"{student['LAST_NAME']}, {student['FIRST_NAME']} {student['MIDDLE_NAME']}".strip()
+                    full_name = f"{student['last_name']}, {student['first_name']} {student.get('middle_name', '')}".strip()
                     tag = "evenrow" if i % 2 == 0 else "oddrow"
-                    semester = student.get("SEMESTER", "")
-                    tree.insert("", "end", values=(student["ID_NO"], full_name, student["YEAR_LEVEL"], semester,student["ENROLLMENT_STATUS"]), tags=(tag,))
+                    semester = student.get("semester", "1st Semester")
+                    school_year = current_sy  # Use the current school year
+                    
+                    tree.insert("", "end", values=(student["id_no"], full_name, student["yr"],semester,student["enrollment_status"],school_year), tags=(tag,))
 
                 self.treeviews[year_label] = tree  # Store treeview reference for filtering
             
-            not_enrolled_count = sum(1 for student in self.unenrolled_students if student.get("ENROLLMENT_STATUS") == "Not Enrolled")
+            not_enrolled_count = sum(1 for student in self.unenrolled_students if student.get("enrolment_status") == "Not Enrolled")
             # Add a print button for unenrolled students
             
             print_icon = Image.open(LoginForm.resource_path("icons/prints.png"))
@@ -210,21 +214,63 @@ class StudentScreen(ctk.CTkFrame):
                 pass
             
     def print_all_not_enrolled(self):
-        not_enrolled_ids = [student["ID_NO"] for student in self.unenrolled_students if student.get("ENROLLMENT_STATUS") == "Not Enrolled"]
-        if not not_enrolled_ids:
-            messagebox.showinfo("No Students", "No not enrolled students to print.")
-            return
-        year_level = "1.1"  # Or get from user selection
-        printer = BulkStudentPrinter(self.master, not_enrolled_ids, year_level)
-        printer.print_all()
+        """Enroll all not enrolled students after confirmation"""
+        try:
+            # Get current school year
+            current_year = datetime.now().year
+            current_sy = f"{current_year}-{current_year+1}"
+            
+            # Get not enrolled students
+            not_enrolled_students = [student for student in self.unenrolled_students 
+                                if student.get("enrollment_status") == "Not Enrolled"]
+            
+            if not not_enrolled_students:
+                messagebox.showinfo("Info", "No students to enroll!")
+                return
+            
+            # Show confirmation dialog
+            confirm = messagebox.askyesno("Confirm Enrollment", f"Are you sure you want to enroll {len(not_enrolled_students)} students?\n"f"School Year: {current_sy}\n\n""This will update their enrollment status to 'Enrolled'.")
+            
+            if not confirm:
+                return
+            
+            # Connect to database
+            db_handler = DatabaseHandler()
+            
+            try:
+                # Enroll each student
+                enrolled_count = 0
+                for student in not_enrolled_students:
+                    id_no = student["id_no"]
+                    
+                    # Save enrollment with current school year
+                    db_handler.save_enrollment(id_no=id_no,school_year=current_sy,status="Enrolled")
+                    enrolled_count += 1
+                
+                # Show success message
+                messagebox.showinfo("Success", f"Successfully enrolled {enrolled_count} students for {current_sy}!")
+                
+                # Refresh the data
+                self.refresh_summary_data()
+                
+            except Exception as e:
+                messagebox.showerror("Database Error", f"Failed to enroll students: {str(e)}")
+            finally:
+                db_handler.close()
+                
+        except Exception as e:
+            messagebox.showerror("Error", f"An error occurred: {str(e)}")
 
-        # After printing, update all to enrolled
-        db_handler = DatabaseHandler()
-        current_year = datetime.now().year
-        school_year = f"{current_year}-{current_year+1}"
-        db_handler.update_enrollment_status_bulk(not_enrolled_ids, year_level, school_year)
-
-        # Optionally, refresh the summary or UI
+    def refresh_summary_data(self):
+        """Refresh the summary data after enrollment"""
+        # Close the current summary frame and reopen it
+        for widget in self.winfo_children():
+            if isinstance(widget, ctk.CTkFrame) and hasattr(widget, 'winfo_children') and len(widget.winfo_children()) > 0:
+                if isinstance(widget.winfo_children()[0], ctk.CTkLabel) and widget.winfo_children()[0].cget("text") == "Enrollment Summary":
+                    widget.destroy()
+                    break
+        
+        # Show summary again to refresh data
         self.show_summary()
 
     def filter_students(self):

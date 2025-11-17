@@ -1212,30 +1212,24 @@ class DatabaseHandler:
             return set()
 
     def save_grading_data(self, grading_data, year, semester, school_year):
-        """Save grading data to the appropriate table in PostgreSQL. Performs UPSERT (insert or update) on conflict."""
+        """Save grading data to the appropriate table in PostgreSQL."""
         try:
+            print(f"DEBUG: Starting save_grading_data for {year}, {semester}, {school_year}")
+            
             # Clean DataFrame column names and normalize to lowercase
             grading_data = grading_data.copy()
             grading_data.columns = grading_data.columns.str.strip()
             
-            # Normalize column names to handle case sensitivity
-            column_mapping = {}
-            for col in grading_data.columns:
-                col_lower = col.lower()
-                if col_lower in ['id_no', 'last_name', 'first_name', 'middle_name']:
-                    column_mapping[col] = col_lower
-                else:
-                    column_mapping[col] = col  # Keep course columns as-is
-
             # Map year & semester to table name
             year_mapping = {"1st Year": "first_year", "2nd Year": "second_year", "3rd Year": "third_year", "4th Year": "fourth_year"}
             semester_mapping = {"1st Semester": "first_semester", "2nd Semester": "second_semester"}
 
             table_name = f"{year_mapping[year]}_{semester_mapping[semester]}"
+            print(f"DEBUG: Target table: {table_name}")
 
             # Ensure connection is active
-            if not self.conn or self.conn.closed != 0:
-                self.ensure_connection()
+            if not self.conn or self.conn.closed:
+                self.conn, self.cursor = self.get_db_connection()
 
             # Use normalized column names
             student_info_columns = ['id_no', 'last_name', 'first_name', 'middle_name']
@@ -1251,49 +1245,77 @@ class DatabaseHandler:
             """
 
             values_list = []
-            for _, row in grading_data.iterrows():
+            invalid_students = []
+            
+            for index, row in grading_data.iterrows():
                 # Handle case-insensitive column access
                 student_id = str(row.get('ID_NO') or row.get('id_no', '')).strip()
                 last_name = str(row.get('LAST_NAME') or row.get('last_name', '')).strip()
                 first_name = str(row.get('FIRST_NAME') or row.get('first_name', '')).strip()
                 middle_name = str(row.get('MIDDLE_NAME') or row.get('middle_name', '')).strip()
+                
+                # Skip if student ID is empty
+                if not student_id:
+                    continue
 
+                # Check if student exists using the existing method
+                student_exists = self.check_student_existence(student_id)
+                print(f"DEBUG: Student {student_id} exists: {student_exists}")
+                
+                if not student_exists:
+                    invalid_students.append(student_id)
+                    continue
+                
                 student_info = [student_id, last_name, first_name, middle_name, school_year.strip()]
 
-                # Iterate through all course columns
+                # Iterate through all course columns - SAVE ALL COURSES INCLUDING NULL GRADES
                 for course in course_columns:
                     grade = row[course]
+                    
+                    # Handle different grade scenarios - SAVE ALL CASES
                     if pd.notna(grade) and str(grade).strip() != "":
                         try:
-                            values = student_info + [course.strip(), float(grade)]
+                            # Valid grade - convert to float
+                            grade_value = float(grade)
+                            values = student_info + [course.strip(), grade_value]
                             values_list.append(tuple(values))
                         except ValueError:
-                            logging.warning(f"Invalid grade value for {course}: {grade}")
-                            continue
+                            # Invalid grade format - insert as NULL but STILL SAVE THE RECORD
+                            values = student_info + [course.strip(), None]
+                            values_list.append(tuple(values))
+                    else:
+                        # Null/empty grade - insert as NULL to ensure student appears in table
+                        values = student_info + [course.strip(), None]
+                        values_list.append(tuple(values))
+
+            print(f"DEBUG: Total values to insert: {len(values_list)}")
+            print(f"DEBUG: Invalid students: {invalid_students}")
 
             if values_list:
                 with self.conn.cursor() as cursor:
                     cursor.executemany(insert_query, values_list)
                 self.conn.commit()
-                logging.info(f"Saved {len(values_list)} grade records into {table_name}")
-                return True
+                print(f"DEBUG: Successfully saved {len(values_list)} grade records")
+                
+                # Log any invalid students
+                if invalid_students:
+                    return False, f"Skipped {len(invalid_students)} students not found in system"
+                
+                return True, f"Successfully saved {len(values_list)} grade records"
 
-            logging.info("No valid grading data to save.")
-            return False
+            return False, "No valid grading data to save"
 
         except psycopg2.Error as err:
             if self.conn and self.conn.closed == 0:
                 self.conn.rollback()
-            logging.error(f"Database error while saving grades: {err}")
-            print("Database Error save_grading_data", err)
-            return False
+            print(f"Database Error save_grading_data: {err}")
+            return False, f"Database error: {err}"
 
         except Exception as e:
             if self.conn and self.conn.closed == 0:
                 self.conn.rollback()
-            logging.error(f"Unexpected error while saving grades: {e}")
-            print("Error save_grading_data", e)
-            return False
+            print(f"Error save_grading_data: {e}")
+            return False, f"Unexpected error: {e}"
         
     def save_irregular_grading_data(self, grading_data, year, semester):
         """Save irregular grading data for a student into the appraised_curriculum table (PostgreSQL version). Updates existing records by matching id_no + course_no + year_level. """
@@ -1509,7 +1531,7 @@ class DatabaseHandler:
             logging.error(f"Unexpected error fetching student by ID: {e}")
             print(f"Error fetching student: {e}")
             return None
-
+        
     def check_student_existence(self, id_no):
         """Check if student exists in multiple tables.
         Args:
@@ -1518,24 +1540,30 @@ class DatabaseHandler:
             bool: True if student exists in any table, False otherwise.
         """
         try:
+            # Clean the student ID
+            clean_id_no = str(id_no).strip()
+            
             # Ensure connection is alive
             if not self.conn or self.conn.closed != 0:
                 self.conn, self.cursor = self.get_db_connection()
 
-            with self.conn.cursor() as cursor:
+            with self.conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
                 # Check in student_information
-                cursor.execute("SELECT COUNT(*) FROM student_information WHERE id_no = %s", (id_no,))
-                if cursor.fetchone()[0] > 0:
+                cursor.execute("SELECT COUNT(*) as count FROM student_information WHERE id_no = %s", (clean_id_no,))
+                result = cursor.fetchone()
+                if result and result['count'] > 0:
                     return True
 
                 # Check in students
-                cursor.execute("SELECT COUNT(*) FROM students WHERE id_no = %s", (id_no,))
-                if cursor.fetchone()[0] > 0:
+                cursor.execute("SELECT COUNT(*) as count FROM students WHERE id_no = %s", (clean_id_no,))
+                result = cursor.fetchone()
+                if result and result['count'] > 0:
                     return True
 
                 # Check in appraised_curriculum
-                cursor.execute("SELECT COUNT(*) FROM appraised_curriculum WHERE id_no = %s", (id_no,))
-                if cursor.fetchone()[0] > 0:
+                cursor.execute("SELECT COUNT(*) as count FROM appraised_curriculum WHERE id_no = %s", (clean_id_no,))
+                result = cursor.fetchone()
+                if result and result['count'] > 0:
                     return True
 
             return False
@@ -1548,7 +1576,7 @@ class DatabaseHandler:
         except Exception as e:
             print(f"Unexpected error checking student existence: {e}")
             return False
-
+        
     def verify_record_exists(self, id_no, course_no):
         """
         Verify if a record exists in appraised_curriculum.
@@ -1587,46 +1615,79 @@ class DatabaseHandler:
     def update_appraised_grades(self, grades_df):
         """Update only the grades column in appraised_curriculum for existing records."""
         try:
+            print(f"DEBUG: Starting update_appraised_grades with {len(grades_df)} records")
+            
             # Ensure the connection is alive
             if not self.conn or self.conn.closed != 0:
                 self.conn, self.cursor = self.get_db_connection()
 
+            updated_count = 0
+            
             with self.conn.cursor() as cursor:
-                for _, row in grades_df.iterrows():
+                for index, row in grades_df.iterrows():
+                    id_no = str(row['id_no']).strip()
+                    course_no = str(row['course_no']).strip()
+                    grade = row['grade']
+                    
+                    print(f"DEBUG: Processing student {id_no}, course {course_no}, grade {grade}")
+                    
+                    # Convert empty string to None for NULL grades
+                    if pd.isna(grade) or str(grade).strip() == '':
+                        grade_value = None
+                    else:
+                        try:
+                            grade_value = float(grade)
+                        except (ValueError, TypeError):
+                            grade_value = None
+                    
+                    # Update query for appraised_curriculum
                     update_query = """
                         UPDATE appraised_curriculum
                         SET grades = %s
                         WHERE id_no = %s
                         AND course_no = %s
-                        AND year_level = %s
-                        AND school_year = %s
                         AND (grades IS NULL OR grades = '' OR grades = 'INC')
                     """
-
-                    cursor.execute(update_query,(row['grade'], row['id_no'], row['course_no'],row['year_level'], row['school_year']))
-
-                    if cursor.rowcount == 0:
-                        print(f"No update for student {row['id_no']}, " f"course {row['course_no']} — record missing or already has grade.")
+                    
+                    cursor.execute(update_query, (grade_value, id_no, course_no))
+                    
+                    if cursor.rowcount > 0:
+                        updated_count += 1
+                        print(f"DEBUG: Updated grade for student {id_no} in course {course_no} to {grade_value}")
                     else:
-                        print(f"Updated grade for student {row['id_no']} " f"({row['course_no']}) to {row['grade']}")
+                        # Check if the record exists but already has a grade
+                        check_query = """
+                            SELECT grades FROM appraised_curriculum 
+                            WHERE id_no = %s AND course_no = %s
+                        """
+                        cursor.execute(check_query, (id_no, course_no))
+                        existing_record = cursor.fetchone()
+                        
+                        if existing_record:
+                            existing_grade = existing_record[0]
+                            print(f"DEBUG: Course {course_no} for student {id_no} already has grade: {existing_grade}")
+                        else:
+                            print(f"DEBUG: No record found for student {id_no} in course {course_no}")
 
                 self.conn.commit()
-                return True
+            
+            print(f"DEBUG: Successfully updated {updated_count} grades in appraised_curriculum")
+            return True
 
         except psycopg2.Error as err:
-            print(f"❌ Database error while updating grades: {err}")
-            if self.conn:
+            print(f"Database error while updating appraised grades: {err}")
+            if self.conn and self.conn.closed == 0:
                 self.conn.rollback()
             return False
 
         except Exception as e:
-            print(f"❌ Unexpected error updating appraised grades: {e}")
-            if self.conn:
+            print(f"Unexpected error updating appraised grades: {e}")
+            if self.conn and self.conn.closed == 0:
                 self.conn.rollback()
             return False
-
+        
     def save_manual_grades(self, grading_data, year_level, school_year):
-        """Save manually entered grades for a given year and semester into PostgreSQL. Automatically creates the semester table if it doesn't exist."""
+        """Save manually entered grades for a given year and semester into PostgreSQL."""
         try:
             # Map year-levels to PostgreSQL table names
             year_mapping = {"1.1": "first_year_first_semester", "1.2": "first_year_second_semester",
@@ -1638,7 +1699,11 @@ class DatabaseHandler:
             if not table_name:
                 raise ValueError(f"Invalid year level: {year_level}")
 
-            # Create table if it doesn’t exist (PostgreSQL syntax)
+            # Ensure connection is active
+            if not self.conn or self.conn.closed:
+                self.conn, self.cursor = self.get_db_connection()
+
+            # Create table if it doesn't exist (PostgreSQL syntax)
             create_table_query = f"""
             CREATE TABLE IF NOT EXISTS {table_name} (
                 id_no VARCHAR(255),
@@ -1655,63 +1720,117 @@ class DatabaseHandler:
             # Valid grade list
             valid_grades = {1.0, 1.25, 1.5, 1.75, 2.0, 2.25, 2.5, 2.75, 3.0, 5.0}
 
-            # Process and insert each record
-            for _, row in grading_data.iterrows():
-                try:
-                    course_no = str(row['Course No.']).strip()
-                    # Validate grade
-                    try:
-                        grade = float(row['Grade'])
-                        if grade not in valid_grades:
-                            raise ValueError(
-                                f"Invalid grade {grade} for course {course_no}. "
-                                f"Valid grades are: {', '.join(map(str, valid_grades))}"
-                            )
-                    except ValueError as ve:
-                        if "could not convert" in str(ve):
-                            raise ValueError(f"Invalid grade format for course {course_no}: {row['Grade']}")
-                        raise ve
+            print(f"DEBUG: Columns in manual grades data: {list(grading_data.columns)}")
+            print(f"DEBUG: First row data: {grading_data.iloc[0].to_dict() if len(grading_data) > 0 else 'No data'}")
 
-                    # Check if record already exists
-                    check_query = f"""
-                        SELECT COUNT(*) 
-                        FROM {table_name}
-                        WHERE id_no = %s AND course_no = %s AND school_year = %s
-                    """
-                    self.cursor.execute(check_query, (row['id_no'].strip(), course_no, school_year.strip()))
-                    exists = self.cursor.fetchone()[0]
+            # Process and insert each record
+            for index, row in grading_data.iterrows():
+                try:
+                    # Convert row to dictionary for safer access
+                    row_dict = row.to_dict() if hasattr(row, 'to_dict') else dict(row)
+                    
+                    print(f"DEBUG: Row {index} data: {row_dict}")
+                    
+                    # Access data using the actual column names from the debug output
+                    student_id = str(row_dict.get('ID_NO', '')).strip()
+                    last_name = str(row_dict.get('Last Name', '')).strip()
+                    first_name = str(row_dict.get('First Name', '')).strip()
+                    middle_name = str(row_dict.get('Middle Name', '')).strip()
+                    course_no = str(row_dict.get('Course No.', '')).strip()
+                    grade_str = str(row_dict.get('Grade', '')).strip()
+
+                    print(f"DEBUG: Processing row {index}: ID={student_id}, Course={course_no}, Grade={grade_str}")
+
+                    # Validate required fields
+                    if not student_id:
+                        raise ValueError(f"Missing student ID in row {index}")
+                    if not last_name:
+                        raise ValueError(f"Missing last name in row {index}")
+                    if not first_name:
+                        raise ValueError(f"Missing first name in row {index}")
+                    if not course_no:
+                        raise ValueError(f"Missing course number in row {index}")
+
+                    # Handle grade - allow empty/null grades
+                    if not grade_str or grade_str == '':
+                        grade_value = None
+                        print(f"DEBUG: Using NULL grade for {course_no}")
+                    else:
+                        try:
+                            grade_value = float(grade_str)
+                            if grade_value not in valid_grades:
+                                raise ValueError(
+                                    f"Invalid grade {grade_value} for course {course_no}. "
+                                    f"Valid grades are: {', '.join(map(str, valid_grades))}"
+                                )
+                            print(f"DEBUG: Using grade {grade_value} for {course_no}")
+                        except ValueError as ve:
+                            if "could not convert" in str(ve):
+                                raise ValueError(f"Invalid grade format for course {course_no}: {grade_str}")
+                            raise ve
+
+                    # Check if record already exists using RealDictCursor
+                    with self.conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
+                        check_query = f"""
+                            SELECT COUNT(*) as count
+                            FROM {table_name}
+                            WHERE id_no = %s AND course_no = %s AND school_year = %s
+                        """
+                        cursor.execute(check_query, (student_id, course_no, school_year.strip()))
+                        result = cursor.fetchone()
+                        exists = result['count'] > 0 if result else False
 
                     if exists:
-                        messagebox.showwarning("Duplicate Entry", f"Grade for student {row['id_no']} in course {course_no} for {school_year} already exists.")
-                        continue
-
-                    # Insert new record
-                    insert_query = f"""
-                        INSERT INTO {table_name} (
-                            id_no, last_name, first_name, middle_name, school_year, course_no, grades)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s)
-                    """
-                    values = (row['id_no'].strip(),row['Last Name'].strip(),row['First Name'].strip(), row['Middle Name'].strip(),school_year.strip(),course_no, grade)
-                    self.cursor.execute(insert_query, values)
+                        # Update existing record
+                        update_query = f"""
+                            UPDATE {table_name}
+                            SET grades = %s
+                            WHERE id_no = %s AND course_no = %s AND school_year = %s
+                        """
+                        self.cursor.execute(update_query, (grade_value, student_id, course_no, school_year.strip()))
+                        print(f"DEBUG: Updated existing grade for {student_id} in {course_no}")
+                    else:
+                        # Insert new record
+                        insert_query = f"""
+                            INSERT INTO {table_name} (
+                                id_no, last_name, first_name, middle_name, school_year, course_no, grades)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s)
+                        """
+                        values = (student_id, last_name, first_name, middle_name, school_year.strip(), course_no, grade_value)
+                        self.cursor.execute(insert_query, values)
+                        print(f"DEBUG: Inserted new grade for {student_id} in {course_no}")
 
                 except ValueError as ve:
                     messagebox.showerror("Validation Error", str(ve))
                     self.conn.rollback()
                     return False
+                except Exception as e:
+                    messagebox.showerror("Error", f"Error processing row {index}: {str(e)}")
+                    print(f"DEBUG: Full error details: {type(e).__name__}: {e}")
+                    import traceback
+                    print(f"DEBUG: Traceback: {traceback.format_exc()}")
+                    self.conn.rollback()
+                    return False
 
             self.conn.commit()
+            print("DEBUG: Manual grades saved successfully")
             return True
 
         except psycopg2.Error as err:
             messagebox.showerror("Database Error", f"Error saving grades: {err}")
-            self.conn.rollback()
+            if self.conn and self.conn.closed == 0:
+                self.conn.rollback()
             return False
 
         except Exception as e:
-            messagebox.showerror("Error", f"Unexpected error: {e}")
-            self.conn.rollback()
+            messagebox.showerror("Error", f"Unexpected error in save manual grades: {e}")
+            print(f"DEBUG: Unexpected error: {type(e).__name__}: {e}")
+            import traceback
+            print(f"DEBUG: Traceback: {traceback.format_exc()}")
+            if self.conn and self.conn.closed == 0:
+                self.conn.rollback()
             return False
-
+        
     def check_student_source(self, id_no):
         """
         Check if a student exists in student_information or appraised_curriculum.
@@ -1800,7 +1919,7 @@ class DatabaseHandler:
             return pd.DataFrame()
 
         except Exception as e:
-            messagebox.showerror("Error", f"Unexpected error: {e}")
+            messagebox.showerror("Error", f"Unexpected error in get student info: {e}")
             return pd.DataFrame()
 
     def get_missing_grades(self, year_level):
@@ -1874,52 +1993,71 @@ class DatabaseHandler:
             print(f"❌ Unexpected Error: {e}")
             return pd.DataFrame()
 
-    def check_existing_grade(self, student_id, course_no, year, semester, school_year):
-        """Check if a grade already exists for a student in a specific course and semester.
-        Args:
-            student_id (str): Student's ID number
-            course_no (str): Course number/code
-            year (str): Year level (e.g., "1st Year")
-            semester (str): Semester (e.g., "1st Semester")
-            school_year (str): School year (e.g., "2024-2025")
-        Returns:
-            bool: True if grade exists, False otherwise
-        """
+    def check_existing_tables(self):
+        """Check what grade tables actually exist in the database with RealDictCursor support"""
         try:
-            # Year/Semester → Table mapping
-            year_mapping = {"1st Year": "first_year", "2nd Year": "second_year", "3rd Year": "third_year", "4th Year": "fourth_year"}
-            semester_mapping = {"1st Semester": "first_semester", "2nd Semester": "second_semester"}
-
-            table_name = f"{year_mapping.get(year)}_{semester_mapping.get(semester)}"
-            if not table_name:
-                print(f"Invalid year/semester combination: {year}, {semester}")
-                return False
-
-            # Ensure connection is active
-            if not hasattr(self, 'conn') or self.conn.closed != 0:
+            print("=== CHECKING EXISTING TABLES ===")
+            
+            # Check if connection is alive
+            if self.conn.closed:
+                print("Reconnecting to database...")
                 self.conn, self.cursor = self.get_db_connection()
-
-            query = f"""
-                SELECT COUNT(*) 
-                FROM {table_name}
-                WHERE id_no = %s 
-                AND course_no = %s 
-                AND school_year = %s
-                AND grades IS NOT NULL
-            """
-
-            with self.conn.cursor() as cursor:
-                cursor.execute(query, (student_id, course_no, school_year))
-                count = cursor.fetchone()[0]
-                return count > 0
-
-        except psycopg2.Error as err:
-            print(f"❌ Database Error in check_existing_grade: {err}")
-            return False
-
+            
+            # Get all tables in the database
+            self.cursor.execute("""
+                SELECT table_name 
+                FROM information_schema.tables 
+                WHERE table_schema = 'public'
+                ORDER BY table_name
+            """)
+            
+            results = self.cursor.fetchall()
+            print(f"DEBUG: Raw tables results: {results}")
+            
+            # Handle RealDictCursor
+            if results and isinstance(results[0], dict):
+                tables = [row['table_name'] for row in results]
+            else:
+                tables = [row[0] for row in results]
+                
+            print(f"All tables in database: {tables}")
+            
+            # Check specifically for grade tables
+            grade_tables = [
+                "first_year_first_semester", "first_year_second_semester",
+                "second_year_first_semester", "second_year_second_semester", 
+                "third_year_first_semester", "third_year_second_semester",
+                "fourth_year_first_semester", "fourth_year_second_semester"
+            ]
+            
+            print("=== GRADE TABLE CHECK ===")
+            for table in grade_tables:
+                self.cursor.execute("""
+                    SELECT EXISTS (
+                        SELECT FROM information_schema.tables 
+                        WHERE table_name = %s
+                    ) as table_exists
+                """, (table,))
+                
+                result = self.cursor.fetchone()
+                print(f"DEBUG: Table check result for {table}: {result}")
+                
+                # Handle RealDictCursor
+                if isinstance(result, dict):
+                    exists = result.get('table_exists', False)
+                else:
+                    exists = result[0] if result else False
+                    
+                print(f"{table}: {'EXISTS' if exists else 'MISSING'}")
+            
+            print("=== END TABLE CHECK ===")
+            return tables
+            
         except Exception as e:
-            print(f"❌ Unexpected Error in check_existing_grade: {e}")
-            return False
+            print(f"Error checking tables: {e}")
+            import traceback
+            print(f"Traceback: {traceback.format_exc()}")
+            return []
 
     def get_next_user_id(self):
         """
@@ -2200,17 +2338,33 @@ class DatabaseHandler:
             return {}
         
     def get_grades_by_semester(self, year_level, school_year, sex_filter):
+        """Get grades for a specific semester with consistent UPPERCASE column names"""
+        print(f"DEBUG get_grades_by_semester: year_level={year_level}, school_year={school_year}, sex_filter={sex_filter}")
+        
         try:
-            table_mapping = {"1.1": "first_year_first_semester", "1.2": "first_year_second_semester",
-                "2.1": "second_year_first_semester", "2.2": "second_year_second_semester",
-                "3.1": "third_year_first_semester", "3.2": "third_year_second_semester",
-                "4.1": "fourth_year_first_semester", "4.2": "fourth_year_second_semester"}
+            table_mapping = {
+                "1.1": "first_year_first_semester",
+                "1.2": "first_year_second_semester",
+                "2.1": "second_year_first_semester", 
+                "2.2": "second_year_second_semester",
+                "3.1": "third_year_first_semester", 
+                "3.2": "third_year_second_semester",
+                "4.1": "fourth_year_first_semester", 
+                "4.2": "fourth_year_second_semester"
+            }
 
             table_name = table_mapping.get(year_level)
             if not table_name:
-                raise ValueError(f"Invalid year level: {year_level}")
+                print(f"DEBUG: Invalid year level: {year_level}")
+                return {'columns': [], 'data': []}
+
+            # Check if connection is alive
+            if self.conn.closed:
+                print("DEBUG: Connection closed, reconnecting...")
+                self.conn, self.cursor = self.get_db_connection()
 
             # Get course columns for this semester
+            print(f"DEBUG: Getting columns for table {table_name}")
             columns_query = """
             SELECT column_name 
             FROM information_schema.columns 
@@ -2219,20 +2373,35 @@ class DatabaseHandler:
             ORDER BY ordinal_position
             """
             self.cursor.execute(columns_query, (table_name,))
-            course_columns = [row[0] for row in self.cursor.fetchall()]
+            course_columns_results = self.cursor.fetchall()
+            
+            # Handle RealDictCursor
+            if course_columns_results and isinstance(course_columns_results[0], dict):
+                course_columns = [row['column_name'] for row in course_columns_results]
+            else:
+                course_columns = [row[0] for row in course_columns_results]
+                
+            print(f"DEBUG: Course columns found: {course_columns}")
 
-            # Build dynamic SELECT statement
+            if not course_columns:
+                print(f"DEBUG: No course columns found for {table_name}")
+                return {'columns': [], 'data': []}
+
+            # Build dynamic SELECT statement - using UPPERCASE aliases for consistency
+            select_columns = ['si.id_no AS ID_NO', 'si.sex AS SEX']
+            select_columns.append("""
+                si.last_name || ', ' || si.first_name || 
+                CASE 
+                    WHEN si.middle_name IS NOT NULL AND si.middle_name != '' 
+                    THEN ' ' || si.middle_name
+                    ELSE ''
+                END AS STUDENT_NAME
+            """)
+            select_columns.extend([f'g.{col} AS {col.upper()}' for col in course_columns])
+
             grades_query = f"""
                 SELECT 
-                    si.id_no,
-                    si.sex,
-                    si.last_name || ', ' || si.first_name || 
-                    CASE 
-                        WHEN si.middle_name IS NOT NULL AND si.middle_name != '' 
-                        THEN ' ' || si.middle_name
-                        ELSE ''
-                    END AS student_name,
-                    {', '.join(f'g.{col}' for col in course_columns)}
+                    {', '.join(select_columns)}
                 FROM 
                     student_information si
                     LEFT JOIN {table_name} g ON si.id_no = g.id_no
@@ -2241,69 +2410,176 @@ class DatabaseHandler:
                     AND si.sex = %s
                 ORDER BY 
                     si.last_name, si.first_name, si.middle_name
-                """
+            """
 
+            print(f"DEBUG: Executing grades query with params: {school_year}, {sex_filter}")
             self.cursor.execute(grades_query, (school_year, sex_filter))
+            results = self.cursor.fetchall()
+            print(f"DEBUG: Query returned {len(results)} rows")
 
-            # Convert results to pandas DataFrame
-            df = pd.DataFrame(self.cursor.fetchall(), columns=['id_no', 'SEX', 'Student_Name'] + course_columns)
+            if not results:
+                print("DEBUG: No results found")
+                return {'columns': [], 'data': []}
 
-            return {'columns': df.columns.tolist(), 'data': df.to_dict('records')}
+            # Build columns list - ALL IN UPPERCASE
+            columns = ['ID_NO', 'SEX', 'STUDENT_NAME'] + [col.upper() for col in course_columns]
+            print(f"DEBUG: Final columns: {columns}")
+
+            # Convert results to list of dictionaries for easier handling
+            data = []
+            for row in results:
+                if isinstance(row, dict):
+                    # Already a dictionary (RealDictCursor) - ensure uppercase keys
+                    row_dict = {}
+                    for key, value in row.items():
+                        row_dict[key.upper()] = value
+                    data.append(row_dict)
+                else:
+                    # Convert tuple to dictionary with uppercase keys
+                    row_dict = {}
+                    for i, col in enumerate(columns):
+                        if i < len(row):
+                            row_dict[col] = row[i]
+                        else:
+                            row_dict[col] = ''
+                    data.append(row_dict)
+
+            print(f"DEBUG: Processed {len(data)} data rows")
+            return {'columns': columns, 'data': data}
 
         except psycopg2.Error as err:
-            print("Database Error",err)
-            print(f"Database Error: {err}")
-            raise
+            print(f"DEBUG: PostgreSQL error in get_grades_by_semester: {err}")
+            return {'columns': [], 'data': []}
         except Exception as e:
-            print(f"Error loading grades: {e}")
-            raise
-
+            print(f"DEBUG: Unexpected error in get_grades_by_semester: {e}")
+            import traceback
+            print(f"DEBUG: Traceback: {traceback.format_exc()}")
+            return {'columns': [], 'data': []}
+        
     def get_available_school_years(self, year_level):
         """
-        Get available school years for a specific semester (PostgreSQL version)
+        Get available school years for a specific semester with proper RealDictCursor handling
         """
+        print(f"DEBUG: Getting school years for year_level: {year_level}")
+        
         try:
-            table_mapping = {"1.1": "first_year_first_semester", "1.2": "first_year_second_semester",
-                "2.1": "second_year_first_semester", "2.2": "second_year_second_semester",
-                "3.1": "third_year_first_semester", "3.2": "third_year_second_semester",
-                "4.1": "fourth_year_first_semester", "4.2": "fourth_year_second_semester"}
+            table_mapping = {
+                "1.1": "first_year_first_semester", 
+                "1.2": "first_year_second_semester",
+                "2.1": "second_year_first_semester", 
+                "2.2": "second_year_second_semester",
+                "3.1": "third_year_first_semester", 
+                "3.2": "third_year_second_semester",
+                "4.1": "fourth_year_first_semester", 
+                "4.2": "fourth_year_second_semester"
+            }
 
             table_name = table_mapping.get(year_level)
+            print(f"DEBUG: Table name: {table_name}")
+            
             if not table_name:
-                raise ValueError(f"Invalid year level: {year_level}")
+                print("DEBUG: Invalid year level provided")
+                return ["No data available"]
 
-            # Get available school years for this semester
+            # Check if connection is alive
+            if self.conn.closed:
+                print("DEBUG: Connection closed, reconnecting...")
+                self.conn, self.cursor = self.get_db_connection()
+
+            # Check if table exists - FIXED for RealDictCursor
+            print(f"DEBUG: Checking if table {table_name} exists...")
+            self.cursor.execute("""
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables 
+                    WHERE table_name = %s
+                ) as table_exists
+            """, (table_name,))
+            
+            result = self.cursor.fetchone()
+            print(f"DEBUG: Raw result: {result}")
+            print(f"DEBUG: Result type: {type(result)}")
+            
+            # Handle RealDictCursor - it returns dictionaries, not tuples
+            if result is None:
+                print(f"DEBUG: No result returned")
+                return ["No data available"]
+                
+            # For RealDictCursor, access by column name instead of index
+            if isinstance(result, dict):
+                table_exists = result.get('table_exists', False)
+                print(f"DEBUG: RealDictCursor - table_exists: {table_exists}")
+            else:
+                # Fallback for regular cursor
+                table_exists = result[0] if result else False
+                print(f"DEBUG: Regular cursor - table_exists: {table_exists}")
+            
+            if not table_exists:
+                print(f"DEBUG: Table {table_name} does not exist")
+                return ["No data available"]
+
+            # Get available school years
+            print(f"DEBUG: Querying school years from {table_name}...")
             query = f"""
             SELECT DISTINCT school_year
             FROM {table_name}
-            WHERE school_year IS NOT NULL
+            WHERE school_year IS NOT NULL 
+            AND TRIM(school_year) != ''
             ORDER BY school_year DESC
             """
+            
+            print(f"DEBUG: Executing query: {query}")
             self.cursor.execute(query)
-            school_years = [year[0] for year in self.cursor.fetchall()]
-
-            return school_years if school_years else ["No data available"]
+            results = self.cursor.fetchall()
+            print(f"DEBUG: Query results: {results}")
+            print(f"DEBUG: Results type: {type(results)}")
+            
+            if results:
+                # Handle RealDictCursor results
+                if isinstance(results[0], dict):
+                    school_years = [str(row['school_year']) for row in results if row.get('school_year')]
+                else:
+                    school_years = [str(row[0]) for row in results if row[0]]
+                    
+                print(f"DEBUG: Processed school years: {school_years}")
+                return school_years if school_years else ["No data available"]
+            else:
+                print("DEBUG: No results found")
+                return ["No data available"]
 
         except psycopg2.Error as err:
-            print(f"Database Error: {err}")
-            raise
+            print(f"DEBUG: PostgreSQL error: {err}")
+            print(f"DEBUG: Error details: {err.pgcode} - {err.pgerror}")
+            return ["No data available"]
         except Exception as e:
-            print(f"Error getting school years: {e}")
-            raise
-
+            print(f"DEBUG: Unexpected error: {e}")
+            print(f"DEBUG: Error type: {type(e)}")
+            import traceback
+            print(f"DEBUG: Traceback: {traceback.format_exc()}")
+            return ["No data available"]
+        
     def update_grade(self, student_id, course_no, new_grade, year_level, school_year):
         """Update a student's grade in the PostgreSQL database"""
         try:
-            table_mapping = {"1.1": "first_year_first_semester","1.2": "first_year_second_semester",
-                "2.1": "second_year_first_semester","2.2": "second_year_second_semester",
-                "3.1": "third_year_first_semester","3.2": "third_year_second_semester",
-                "4.1": "fourth_year_first_semester","4.2": "fourth_year_second_semester"}
+            table_mapping = {
+                "1.1": "first_year_first_semester",
+                "1.2": "first_year_second_semester",
+                "2.1": "second_year_first_semester",
+                "2.2": "second_year_second_semester",
+                "3.1": "third_year_first_semester",
+                "3.2": "third_year_second_semester",
+                "4.1": "fourth_year_first_semester",
+                "4.2": "fourth_year_second_semester"
+            }
 
             table_name = table_mapping.get(year_level)
             if not table_name:
                 raise ValueError(f"Invalid year level: {year_level}")
 
-            # Update the grade using double quotes for dynamic column
+            # Ensure connection is active
+            if not self.conn or self.conn.closed:
+                self.conn, self.cursor = self.get_db_connection()
+
+            # Update the grade
             update_query = f"""
             UPDATE {table_name}
             SET {course_no} = %s
@@ -2312,15 +2588,26 @@ class DatabaseHandler:
 
             self.cursor.execute(update_query, (new_grade, student_id, school_year))
             self.conn.commit()
-            return True
+            
+            # Check if any row was actually updated
+            if self.cursor.rowcount > 0:
+                print(f"Successfully updated grade for {student_id} in {course_no}")
+                return True
+            else:
+                print(f"No record found for {student_id} in {school_year}")
+                return False
 
         except psycopg2.Error as err:
-            print(f"Database Error: {err}")
+            print(f"Database Error in update_grade: {err}")
+            if self.conn and self.conn.closed == 0:
+                self.conn.rollback()
             return False
         except Exception as e:
-            print(f"Error: {e}")
+            print(f"Error in update_grade: {e}")
+            if self.conn and self.conn.closed == 0:
+                self.conn.rollback()
             return False
-
+        
     def get_all_users(self):
         """Fetch all users with their status and last login (PostgreSQL version)"""
         try:
@@ -3037,9 +3324,13 @@ class DatabaseHandler:
                 id_no VARCHAR(100) NOT NULL,
                 school_year VARCHAR(20) NOT NULL,
                 enrollment_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                status VARCHAR(20) DEFAULT 'Not Enrolled' CHECK (status IN ('Not Enrolled', 'Enrolled', 'Stopped', 'Returnee', 'Dropped')),
-                CONSTRAINT fk_student FOREIGN KEY (id_no) REFERENCES student_information(id_no) ON DELETE CASCADE,
-                CONSTRAINT unique_enrollment UNIQUE (id_no, school_year)
+                status VARCHAR(20) DEFAULT 'Not Enrolled' 
+                    CHECK (status IN ('Not Enrolled', 'Enrolled', 'Stopped', 'Returnee', 'Dropped')),
+                semester VARCHAR(20) DEFAULT '1st Semester'
+                    CHECK (semester IN ('1st Semester', '2nd Semester')),
+                CONSTRAINT fk_student FOREIGN KEY (id_no) 
+                    REFERENCES student_information(id_no) ON DELETE CASCADE,
+                CONSTRAINT unique_enrollment UNIQUE (id_no, school_year, semester)
             );
         """
         try:
@@ -3049,44 +3340,51 @@ class DatabaseHandler:
         except psycopg2.Error as e:
             print(f"Error creating enrollment table: {e}")
             self.conn.rollback()
-
-    def save_enrollment(self, id_no, school_year, status="Enrolled"):
+            
+    def save_enrollment(self, id_no, school_year, status="Enrolled", semester=None):
         """
-        Update the enrollment status for a student for a given school year.
+        Update the enrollment status for a student for a given school year and semester.
         If the record does not exist, insert it.
-        Warn on duplicate insert but continue processing.
         """
         try:
             # Ensure connection is active
             if not self.conn or self.conn.closed:
                 self.conn, self.cursor = self.get_db_connection()
 
+            # Auto-detect semester if not provided
+            if semester is None:
+                # Determine semester based on current month
+                current_month = datetime.now().month
+                semester = "1st Semester" if 6 <= current_month <= 10 else "2nd Semester"
+
             # Update existing enrollment
             update_query = """
                 UPDATE enrollment
-                SET status = %s, enrollment_date = CURRENT_TIMESTAMP
+                SET status = %s, enrollment_date = CURRENT_TIMESTAMP, semester = %s
                 WHERE id_no = %s AND school_year = %s
             """
-            self.cursor.execute(update_query, (status, id_no, school_year))
+            self.cursor.execute(update_query, (status, semester, id_no, school_year))
 
             if self.cursor.rowcount == 0:
                 # Insert if no existing record
                 insert_query = """
-                    INSERT INTO enrollment (id_no, school_year, enrollment_date, status)
-                    VALUES (%s, %s, CURRENT_TIMESTAMP, %s)
-                    ON CONFLICT (id_no, school_year) DO NOTHING
+                    INSERT INTO enrollment (id_no, school_year, enrollment_date, status, semester)
+                    VALUES (%s, %s, CURRENT_TIMESTAMP, %s, %s)
+                    ON CONFLICT (id_no, school_year) DO UPDATE SET
+                        status = EXCLUDED.status,
+                        enrollment_date = EXCLUDED.enrollment_date,
+                        semester = EXCLUDED.semester
                 """
-                self.cursor.execute(insert_query, (id_no, school_year, status))
-                if self.cursor.rowcount == 0:
-                    messagebox.showwarning("Duplicate", f"Enrollment already exists for {id_no} in {school_year}.")
+                self.cursor.execute(insert_query, (id_no, school_year, status, semester))
 
             self.conn.commit()
+            return True
 
         except psycopg2.Error as err:
             self.conn.rollback()
-            messagebox.showerror("Database Error", f"Failed to save enrollment: {err}")
+            logging.error(f"Database error saving enrollment: {err}")
             raise
-
+        
     def update_enrollment_status_bulk(self, id_list, year_level, school_year, batch_size=100):
         """
         Set STATUS to 'Enrolled' for all students in id_list for the given year_level and school_year.
