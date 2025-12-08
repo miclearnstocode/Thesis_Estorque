@@ -71,26 +71,14 @@ class Application(ctk.CTk):
         startup_dialog.geometry(f"450x200+{x}+{y}")
         
         # Add loading content
-        loading_label = ctk.CTkLabel(
-            startup_dialog, 
-            text="Starting PostgreSQL Database...", 
-            font=("Helvetica", 16, "bold")
-        )
+        loading_label = ctk.CTkLabel(startup_dialog, text="Starting PostgreSQL Database...", font=("Helvetica", 16, "bold"))
         loading_label.pack(pady=20)
         
-        progress_bar = ctk.CTkProgressBar(
-            startup_dialog, 
-            width=350, 
-            mode='indeterminate'
-        )
+        progress_bar = ctk.CTkProgressBar(startup_dialog,width=350, mode='indeterminate')
         progress_bar.pack(pady=15)
         progress_bar.start()
         
-        status_label = ctk.CTkLabel(
-            startup_dialog, 
-            text="Initializing database server...",
-            font=("Helvetica", 12)
-        )
+        status_label = ctk.CTkLabel(startup_dialog, text="Initializing database server...",font=("Helvetica", 12))
         status_label.pack(pady=10)
         
         def update_status(message):
@@ -104,19 +92,13 @@ class Application(ctk.CTk):
                 update_status("Checking PostgreSQL installation...")
                 
                 if not self.postgres_manager.postgres_path:
-                    self.after(0, lambda: self.show_error_and_quit(
-                        startup_dialog,
-                        "PostgreSQL installation not found. Please install PostgreSQL and try again."
-                    ))
+                    self.after(0, lambda: self.show_error_and_quit(startup_dialog,"PostgreSQL installation not found. Please install PostgreSQL and try again."))
                     return
                 
                 update_status("Locating data directory...")
                 
                 if not self.postgres_manager.find_data_directory():
-                    self.after(0, lambda: self.show_error_and_quit(
-                        startup_dialog,
-                        "PostgreSQL data directory not found. Please check your PostgreSQL installation."
-                    ))
+                    self.after(0, lambda: self.show_error_and_quit(startup_dialog,"PostgreSQL data directory not found. Please check your PostgreSQL installation."))
                     return
                 
                 update_status("Starting PostgreSQL server (this may take a moment)...")
@@ -159,10 +141,7 @@ class Application(ctk.CTk):
                             time.sleep(2)
                 
                 if not connection_verified:
-                    self.after(0, lambda: self.show_error_and_quit(
-                        startup_dialog,
-                        "PostgreSQL started but cannot accept connections. Please check your database configuration."
-                    ))
+                    self.after(0, lambda: self.show_error_and_quit(startup_dialog,"PostgreSQL started but cannot accept connections. Please check your database configuration."))
                     return
                 
                 update_status("Database started successfully!")
@@ -176,10 +155,7 @@ class Application(ctk.CTk):
                 
             except Exception as e:
                 logging.error(f"Error in start_database: {e}")
-                self.after(0, lambda: self.show_error_and_quit(
-                    startup_dialog,
-                    f"Critical error starting database: {str(e)}"
-                ))
+                self.after(0, lambda: self.show_error_and_quit(startup_dialog,f"Critical error starting database: {str(e)}"))
         
         # Start database initialization in separate thread
         db_thread = threading.Thread(target=start_database, daemon=True)
@@ -188,11 +164,7 @@ class Application(ctk.CTk):
     def show_error_and_quit(self, dialog, message):
         """Show error message and quit application"""
         dialog.destroy()
-        CTkMessagebox(
-            title="Database Error", 
-            message=message,
-            icon="cancel"
-        )
+        CTkMessagebox(title="Database Error", message=message,icon="cancel")
         self.quit()
     
     def complete_startup(self, dialog):
@@ -205,11 +177,7 @@ class Application(ctk.CTk):
         self.login_frame.pack(expand=True, fill="both")
         
         # Create login form with callbacks
-        self.login_form = LoginForm(
-            self.login_frame, 
-            login_success_callback=self.login_success, 
-            admin_login_callback=self.admin_login_success
-        )
+        self.login_form = LoginForm(self.login_frame, login_success_callback=self.login_success, admin_login_callback=self.admin_login_success)
         
         # Preload grade data
         self.grade_data = self.preload_grade_data()
