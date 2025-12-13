@@ -2951,7 +2951,7 @@ class DatabaseHandler:
             if cursor:
                 cursor.close()
 
-    def search_students(self, search_term):
+    def search_student_archive(self, search_term):
         """
         Search students by ID, Name, or Year (PostgreSQL version)
         """
@@ -2971,19 +2971,15 @@ class DatabaseHandler:
                 FROM student_information 
                 WHERE id_no LIKE %s OR 
                     (last_name || ' ' || first_name || ' ' || COALESCE(middle_name, '')) LIKE %s OR
-                    yr = %s
+                    yr::TEXT LIKE %s  -- Always use string parameter for LIKE
                 ORDER BY last_name, first_name
             """
 
-            search_param = f"%{search_term}%"
-
-            # Convert search term to year if possible
-            try:
-                year_param = int(search_term)
-            except ValueError:
-                year_param = 0
-
-            cursor.execute(search_query, (search_param, search_param, year_param))
+            # Convert search_term to string with wildcards for all parameters
+            search_param = f"%{str(search_term).strip()}%"
+            
+            # Pass string parameters for ALL conditions (including year)
+            cursor.execute(search_query, (search_param, search_param, search_param))
             students = cursor.fetchall()
 
             # Convert tuple results to dictionary
@@ -2994,15 +2990,15 @@ class DatabaseHandler:
             return []
 
         except psycopg2.Error as e:
-            print(e)
+            print(f"Database error in search_student_archive: {e}")
             return []
         except Exception as e:
-            print(e)
+            print(f"Error in search_student_archive: {e}")
             return []
         finally:
             if cursor:
                 cursor.close()
-
+                
     def get_course_data(self, student_id):
         """
         Retrieve all course grades for a student across all semesters (PostgreSQL version)

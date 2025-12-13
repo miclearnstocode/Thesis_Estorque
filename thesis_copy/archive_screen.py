@@ -357,7 +357,7 @@ class ArchiveScreen(ctk.CTkFrame):
     def perform_search(self):
         search_term = self.search_entry.get()
         if search_term:
-            students = self.db_handler.search_students(search_term)
+            students = self.db_handler.search_student_archive(search_term)
             self.load_students(students)
         else:
             # If search is empty, reload all students

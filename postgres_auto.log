@@ -1,0 +1,6 @@
+2025-12-08 17:49:33,438 - INFO - Searching for PostgreSQL installation...
+2025-12-08 17:49:33,464 - INFO - Found PostgreSQL at: D:\programs\Postgres18\bin
+2025-12-08 17:49:33,713 - INFO - Starting PostgreSQL...
+2025-12-08 17:49:34,130 - INFO - PostgreSQL is already running on port None
+2025-12-08 17:49:34,130 - INFO - PostgreSQL started successfully
+2025-12-08 17:49:36,319 - ERROR - Database connection test failed
